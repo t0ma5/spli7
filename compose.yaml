@@ -1,0 +1,4 @@
+# OBSOLETE: Docker + Postgres is not the deploy path for this fork.
+# Use Cloudflare Workers + KV (`npm run deploy`) instead.
+
+services: {}

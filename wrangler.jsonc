@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "spliit",
+  "compatibility_date": "2026-08-10",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "spliit"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "DB",
+      "id": "94eaadc98e2246d7989b734acf2cb461",
+      "preview_id": "94eaadc98e2246d7989b734acf2cb461"
+    }
+  ]
+}
