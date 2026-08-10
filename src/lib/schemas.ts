@@ -1,4 +1,4 @@
-import { RecurrenceRule, SplitMode } from '@/lib/kv/types'
+import type { SplitMode } from '@/lib/kv/types'
 import Decimal from 'decimal.js'
 
 import * as z from 'zod'
@@ -119,9 +119,7 @@ export const expenseFormSchema = z
         }
       }),
     splitMode: z
-      .enum<SplitMode, [SplitMode, ...SplitMode[]]>(
-        Object.values(SplitMode) as any,
-      )
+      .enum(['EVENLY', 'BY_SHARES', 'BY_PERCENTAGE', 'BY_AMOUNT'])
       .default('EVENLY'),
     saveDefaultSplittingOptions: z.boolean(),
     isReimbursement: z.boolean(),
@@ -137,9 +135,7 @@ export const expenseFormSchema = z
       .default([]),
     notes: z.string().optional(),
     recurrenceRule: z
-      .enum<RecurrenceRule, [RecurrenceRule, ...RecurrenceRule[]]>(
-        Object.values(RecurrenceRule) as any,
-      )
+      .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
       .default('NONE'),
   })
   .superRefine((expense, ctx) => {
