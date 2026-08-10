@@ -1,3 +1,4 @@
+@ -1,26 +1,22 @@
 import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
 import createNextIntlPlugin from 'next-intl/plugin'
 import path from 'node:path'
@@ -7,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const requestConfigPath = path.join(__dirname, 'src', 'i18n', 'request.ts')
 
 const withNextIntl = createNextIntlPlugin(requestConfigPath)
+// Must be relative — next-intl + Turbopack rejects absolute paths
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
