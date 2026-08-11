@@ -1,3 +1,5 @@
+'use client'
+
 import { GroupDeletedScreen } from '@/app/groups/[groupId]/group-deleted-screen'
 import { GroupPinGate } from '@/app/groups/[groupId]/group-pin-gate'
 import { useToast } from '@/components/ui/use-toast'
