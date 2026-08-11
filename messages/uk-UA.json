@@ -82,6 +82,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Завантажте JSON-експорт Spliit або Tricount, щоб створити нову групу з учасниками, витратами, нотатками та історією."
     }
   },
   "GroupForm": {

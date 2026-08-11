@@ -82,6 +82,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "上傳 Spliit 或 Tricount 的 JSON 匯出，以建立包含參與者、支出、備註與歷史紀錄的新群組。"
     }
   },
   "GroupForm": {

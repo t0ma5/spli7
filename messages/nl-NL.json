@@ -85,6 +85,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Upload een Spliit- of Tricount-JSON-export om een nieuwe groep te maken met deelnemers, uitgaven, notities en geschiedenis."
     }
   },
   "GroupForm": {

@@ -85,6 +85,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Unggah ekspor JSON Spliit atau Tricount untuk membuat grup baru dengan peserta, pengeluaran, catatan, dan riwayat."
     }
   },
   "GroupForm": {

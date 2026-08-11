@@ -83,6 +83,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Nahrajte JSON export ze Spliit nebo Tricount a vytvořte novou skupinu s účastníky, výdaji, poznámkami a historií."
     }
   },
   "GroupForm": {

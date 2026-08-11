@@ -85,6 +85,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Laden Sie einen Spliit- oder Tricount-JSON-Export hoch, um eine neue Gruppe mit Teilnehmern, Ausgaben, Notizen und Verlauf zu erstellen."
     }
   },
   "GroupForm": {

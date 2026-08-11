@@ -61,6 +61,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Spliit 또는 Tricount JSON 내보내기를 업로드하여 참여자, 지출, 메모, 기록이 포함된 새 그룹을 만듭니다."
     }
   },
   "GroupForm": {

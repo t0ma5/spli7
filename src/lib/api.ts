@@ -31,6 +31,7 @@ import {
   GroupFormValues,
   GroupImportValues,
 } from '@/lib/schemas'
+import { parseTricountCsv } from '@/lib/tricount-import'
 
 function toDate(value: string | Date): Date {
   return value instanceof Date ? value : new Date(value)
@@ -288,6 +289,42 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
     participants,
     expenses,
     activities,
+  }
+
+  await persistGroup(group)
+  return mapGroup(group)
+}
+
+/** Create a new group from a Tricount GDPR CSV export (new IDs). */
+export async function createGroupFromTricountCsv(
+  csvText: string,
+  targetCurrencyCode?: string,
+) {
+  const parsed = await parseTricountCsv(csvText, targetCurrencyCode)
+  const now = new Date().toISOString()
+  const group: GroupDocument = {
+    id: parsed.participants[0]?.groupId ?? randomId(),
+    name: parsed.name,
+    information: null,
+    currency: parsed.currency,
+    currencyCode: parsed.currencyCode,
+    pinHash: null,
+    defaultSplitMode: SplitMode.EVENLY,
+    createdAt: now,
+    lastActivityAt: now,
+    deletedAt: null,
+    participants: parsed.participants,
+    expenses: parsed.expenses,
+    activities: [],
+  }
+
+  // Keep participant/expense groupIds aligned if randomId above was used
+  const groupId = group.id
+  for (const participant of group.participants) {
+    participant.groupId = groupId
+  }
+  for (const expense of group.expenses) {
+    expense.groupId = groupId
   }
 
   await persistGroup(group)

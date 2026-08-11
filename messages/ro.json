@@ -82,6 +82,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Încarcă un export JSON Spliit sau Tricount pentru a crea un grup nou cu participanți, cheltuieli, note și istoric."
     }
   },
   "GroupForm": {

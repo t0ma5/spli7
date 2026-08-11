@@ -82,6 +82,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Lataa Spliit- tai Tricount-JSON-vienti luodaksesi uuden ryhmän osallistujineen, kuluineen, muistiinpanoineen ja historioineen."
     }
   },
   "GroupForm": {

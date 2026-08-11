@@ -85,6 +85,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Puja un export JSON de Spliit o Tricount per crear un grup nou amb participants, despeses, notes i historial."
     }
   },
   "GroupForm": {

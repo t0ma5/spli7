@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/popover'
 import { useMediaQuery } from '@/lib/hooks'
 import { groupImportSchema } from '@/lib/schemas'
+import { looksLikeTricountCsv } from '@/lib/tricount-detect'
 import { trpc } from '@/trpc/client'
 import { Loader2, Upload } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -28,13 +29,26 @@ export function ImportGroupJsonButton({ reload }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const utils = trpc.useUtils()
-  const { mutateAsync } = trpc.groups.import.useMutation()
+  const { mutateAsync: importJson } = trpc.groups.import.useMutation()
+  const { mutateAsync: importTricount } =
+    trpc.groups.importTricount.useMutation()
 
   async function handleFile(file: File) {
     setError(null)
     setPending(true)
     try {
       const text = await file.text()
+
+      if (looksLikeTricountCsv(text)) {
+        const { groupId, groupName } = await importTricount({ csvText: text })
+        saveRecentGroup({ id: groupId, name: groupName })
+        await utils.groups.invalidate()
+        reload()
+        setOpen(false)
+        router.push(`/groups/${groupId}`)
+        return
+      }
+
       let parsed: unknown
       try {
         parsed = JSON.parse(text)
@@ -54,7 +68,7 @@ export function ImportGroupJsonButton({ reload }: Props) {
         return
       }
 
-      const { groupId, groupName } = await mutateAsync({
+      const { groupId, groupName } = await importJson({
         groupImportValues: validated.data,
       })
       saveRecentGroup({ id: groupId, name: groupName })
@@ -84,7 +98,7 @@ export function ImportGroupJsonButton({ reload }: Props) {
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,text/csv,.csv"
           className="hidden"
           disabled={pending}
           onChange={(event) => {

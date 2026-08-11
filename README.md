@@ -19,6 +19,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🟢 Search for expenses in a group
 - [x] 🟢 Export a group to JSON or CSV
 - [x] 🔴 Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
+- [x] 🔴 Import a group from a **Tricount** GDPR CSV export (participants + expenses)
 - [x] 🔴 Notes + activity history in JSON export/import (`exportVersion: 2`)
 - [x] 🔴 Copy an existing expense into a new draft
 - [x] 🔴 Math expressions in the amount field
@@ -49,17 +50,32 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - Friend-sized groups fit this model; very large groups may hit KV value size limits.
 - Groups track `lastActivityAt` on expense create/update/delete and group settings updates. After **24 months** without activity, cleanup soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted. Call `GET/POST /api/cron/cleanup-groups` with `Authorization: Bearer $CRON_SECRET` (set `CRON_SECRET` in Worker env).
 
-## JSON import
+## Group import (JSON / Tricount)
 
-On the **Groups** page, use **Import JSON** to upload a file produced by **Export to JSON** (this fork or upstream Spliit).
+On the **Groups** page, use **Import JSON** to upload:
+
+1. A **Spliit JSON** export (this fork or upstream Spliit), or
+2. A **Tricount** personal-data / GDPR **CSV** export (detected automatically).
+
+Shared behavior:
 
 - Always creates a **new** group (does not overwrite an existing one).
 - Regenerates group, participant, and expense IDs so imports never collide with live data.
+- Does **not** import a group PIN (PIN must be set again after import).
+
+### Spliit JSON
+
 - Restores participants, expenses, split modes, amounts, dates, **notes**, group **information**, and **activity history** (when present in the file).
 - Categories: match by `id` when present; otherwise by `name` / `grouping` against the seeded list (many exports omit `id`).
 - Newer exports include `exportVersion: 2` and expense `id`s (needed to re-link history).
 - Does **not** restore expense attachments or active recurring-expense links.
-- Does **not** import a group PIN (PIN must be set again after import).
+
+### Tricount CSV
+
+- Imports participants and expenses (amounts by share / impacted amounts).
+- Uses the CSV default currency (Frankfurter `.dev` for missing cross-rates).
+- Notes and activity history are Spliit-only; Tricount imports leave them empty.
+- Prior art: upstream [#526](https://github.com/spliit-app/spliit/pull/526).
 
 ## Extra UX on this fork
 
@@ -75,6 +91,7 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
 | **Notes + history in JSON** | Export/import round-trips expense notes, group information, and activity history (`exportVersion: 2`). | Expense notes also appear in Spliit Cloud / upstream [#165](https://github.com/spliit-app/spliit/pull/165); history round-trip is specific to this fork |
 | **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
+| **Tricount import** | GDPR CSV export via the same Import control as Spliit JSON. | Upstream [#526](https://github.com/spliit-app/spliit/pull/526) |
 | **Export / input hardening** | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries. | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/KV) |
 
 ## Removed / disabled upstream features (S3 & OpenAI)

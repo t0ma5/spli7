@@ -82,6 +82,9 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
+    },
+    "ImportJSON": {
+      "description": "Katılımcılar, harcamalar, notlar ve geçmiş içeren yeni bir grup oluşturmak için bir Spliit veya Tricount JSON dışa aktarımını yükleyin."
     }
   },
   "GroupForm": {
