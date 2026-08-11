@@ -51,3 +51,7 @@ desktop.ini
 
 tmp396/
 
+
+# Cursor IDE / agent local rules
+.cursor/
+
