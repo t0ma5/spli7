@@ -486,8 +486,24 @@ export function ExpenseForm({
       <form onSubmit={form.handleSubmit(submit)}>
         <Card>
           <CardHeader>
-            <CardTitle>
-              {t(`${sExpense}.${isCreate ? 'create' : 'edit'}`)}
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span>{t(`${sExpense}.${isCreate ? 'create' : 'edit'}`)}</span>
+              {!isCreate && expense && (
+                <Button
+                  type="button"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  title={t('copy')}
+                  asChild
+                >
+                  <Link
+                    href={`/groups/${group.id}/expenses/create?fromExpense=${expense.id}`}
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span className="sr-only">{t('copy')}</span>
+                  </Link>
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-6">
@@ -1320,16 +1336,6 @@ export function ExpenseForm({
             <Save className="w-4 h-4 mr-2" />
             {t(isCreate ? 'create' : 'save')}
           </SubmitButton>
-          {!isCreate && expense && (
-            <Button variant="secondary" asChild>
-              <Link
-                href={`/groups/${group.id}/expenses/create?fromExpense=${expense.id}`}
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                {t('copy')}
-              </Link>
-            </Button>
-          )}
           {!isCreate && onDelete && (
             <DeletePopup
               onDelete={() => onDelete(activeUserId ?? undefined)}
