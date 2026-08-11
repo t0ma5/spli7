@@ -44,3 +44,5 @@ next-env.d.ts
 
 # db
 postgres-data
+
+desktop.ini
