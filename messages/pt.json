@@ -129,8 +129,7 @@
         "label": "Utilizador ativo",
         "placeholder": "Selecionar um participante",
         "none": "Nenhum",
-        "description": "Utilizador usado por defeito para pagar despesas.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Utilizador usado por defeito para pagar despesas."
       },
       "save": "Gravar",
       "delete": "Delete group",

@@ -129,8 +129,7 @@
         "label": "משתמש פעיל",
         "placeholder": "בחר משתתף",
         "none": "אף אחד",
-        "description": "משתמש המשמש כברירת מחדל לתשלום הוצאות.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "משתמש המשמש כברירת מחדל לתשלום הוצאות."
       },
       "save": "שמור",
       "saving": "שומר…",

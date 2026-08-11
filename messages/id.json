@@ -129,8 +129,7 @@
         "label": "Pengguna aktif",
         "placeholder": "Pilih peserta",
         "none": "Tidak ada",
-        "description": "Pengguna digunakan sebagai default untuk membayar pengeluaran.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Pengguna digunakan sebagai default untuk membayar pengeluaran."
       },
       "save": "Simpan",
       "saving": "Meyimpan…",

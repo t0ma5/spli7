@@ -123,8 +123,7 @@
         "label": "Huidige gebruiker",
         "placeholder": "Selecteer een deelnemer",
         "none": "Geen",
-        "description": "De deelnemer die automatisch wordt geselecteerd als je een uitgave maakt.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "De deelnemer die automatisch wordt geselecteerd als je een uitgave maakt."
       },
       "save": "Opslaan",
       "saving": "Aan het opslaan…",

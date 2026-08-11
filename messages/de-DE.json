@@ -123,8 +123,7 @@
         "label": "Aktiver Nutzer",
         "placeholder": "Wähle ein Mitglied",
         "none": "Keiner",
-        "description": "Standardnutzer, der die Ausgaben übernimmt.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Standardnutzer, der die Ausgaben übernimmt."
       },
       "save": "Speichern",
       "saving": "Speichert…",

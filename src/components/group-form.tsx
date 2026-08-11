@@ -167,6 +167,62 @@ export function GroupForm({
 
             <FormField
               control={form.control}
+              name="defaultSplitMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('DefaultSplitField.label')}</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="EVENLY">
+                        {t('DefaultSplitField.evenly')}
+                      </SelectItem>
+                      <SelectItem value="BY_SHARES">
+                        {t('DefaultSplitField.byShares')}
+                      </SelectItem>
+                      <SelectItem value="BY_PERCENTAGE">
+                        {t('DefaultSplitField.byPercentage')}
+                      </SelectItem>
+                      <SelectItem value="BY_AMOUNT">
+                        {t('DefaultSplitField.byAmount')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    {t('DefaultSplitField.description')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="col-span-2">
+              <FormField
+                control={form.control}
+                name="information"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('InformationField.label')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={2}
+                        className="text-base"
+                        {...field}
+                        placeholder={t('InformationField.placeholder')}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
               name="currencyCode"
               render={({ field }) => (
                 <FormItem>
@@ -220,62 +276,6 @@ export function GroupForm({
                   </FormControl>
                   <FormDescription>
                     {t('CurrencyField.description')}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="col-span-2">
-              <FormField
-                control={form.control}
-                name="information"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('InformationField.label')}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        rows={2}
-                        className="text-base"
-                        {...field}
-                        placeholder={t('InformationField.placeholder')}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="defaultSplitMode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('DefaultSplitField.label')}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="EVENLY">
-                        {t('DefaultSplitField.evenly')}
-                      </SelectItem>
-                      <SelectItem value="BY_SHARES">
-                        {t('DefaultSplitField.byShares')}
-                      </SelectItem>
-                      <SelectItem value="BY_PERCENTAGE">
-                        {t('DefaultSplitField.byPercentage')}
-                      </SelectItem>
-                      <SelectItem value="BY_AMOUNT">
-                        {t('DefaultSplitField.byAmount')}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    {t('DefaultSplitField.description')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -549,9 +549,6 @@ export function GroupForm({
                   </FormControl>
                   <FormDescription>
                     {t('Settings.ActiveUserField.description')}
-                    <br />
-                    <br />
-                    {t('Settings.ActiveUserField.privacyNote')}
                   </FormDescription>
                 </FormItem>
               )}

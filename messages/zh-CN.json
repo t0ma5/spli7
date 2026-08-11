@@ -123,8 +123,7 @@
         "label": "当前用户",
         "placeholder": "选择一个群组成员",
         "none": "无",
-        "description": "用于支付消费的默认用户。",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "用于支付消费的默认用户。"
       },
       "save": "保存",
       "saving": "保存中……",

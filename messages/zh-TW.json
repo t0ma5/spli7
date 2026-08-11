@@ -120,8 +120,7 @@
         "label": "當前使用者",
         "placeholder": "選擇一位群組成員",
         "none": "無",
-        "description": "用於支付消費的預設用戶",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "用於支付消費的預設用戶"
       },
       "save": "保存",
       "saving": "保存中……",

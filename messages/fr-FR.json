@@ -123,8 +123,7 @@
         "label": "Utilisateur actif",
         "placeholder": "Sélectionner un participant",
         "none": "Aucun",
-        "description": "Utilisateur utilisé comme défaut pour payer les dépenses.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Utilisateur utilisé comme défaut pour payer les dépenses."
       },
       "save": "Sauvegarder",
       "saving": "Sauvegarde…",

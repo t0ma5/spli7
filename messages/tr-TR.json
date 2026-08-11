@@ -120,8 +120,7 @@
         "label": "Aktif kullanıcı",
         "placeholder": "Bir katılımcı seçin",
         "none": "Yok",
-        "description": "Masrafların varsayılan olarak kimin adına ekleneceği.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Masrafların varsayılan olarak kimin adına ekleneceği."
       },
       "save": "Kaydet",
       "saving": "Kaydediliyor…",

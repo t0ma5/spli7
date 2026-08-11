@@ -120,8 +120,7 @@
         "label": "Aktiivinen käyttäjä",
         "placeholder": "Valitse osallistuja",
         "none": "Ei kukaan",
-        "description": "Käytetään kulujen oletusmaksajana.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Käytetään kulujen oletusmaksajana."
       },
       "save": "Tallenna",
       "saving": "Tallennetaan…",

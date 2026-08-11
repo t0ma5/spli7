@@ -123,8 +123,7 @@
         "label": "Usuària activa",
         "placeholder": "Selecciona una participant...",
         "none": "Cap",
-        "description": "Usuària que paga les despeses de manera predeterminada.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Usuària que paga les despeses de manera predeterminada."
       },
       "save": "Desar",
       "saving": "Desant",

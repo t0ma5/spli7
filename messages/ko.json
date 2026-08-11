@@ -101,8 +101,7 @@
         "description": "사용자가 기본 지출 결제자로 사용돼요.",
         "placeholder": "참가자를 선택해 주세요",
         "label": "활성 사용자",
-        "none": "없음",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "none": "없음"
       },
       "save": "저장",
       "saving": "저장중…",

@@ -157,8 +157,7 @@
         "label": "Active user",
         "placeholder": "Select a participant",
         "none": "None",
-        "description": "User used as default for paying expenses.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "User used as default for paying expenses."
       },
       "save": "Save",
       "saving": "Saving…",

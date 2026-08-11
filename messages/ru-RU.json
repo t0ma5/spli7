@@ -121,8 +121,7 @@
         "label": "Активный участник",
         "placeholder": "Выберите участника",
         "none": "Не выбран",
-        "description": "Этот участник будет автоматически выбран при создании нового расхода.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Этот участник будет автоматически выбран при создании нового расхода."
       },
       "save": "Сохранить",
       "saving": "Сохранение…",

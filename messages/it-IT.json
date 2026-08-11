@@ -123,8 +123,7 @@
         "label": "Utente attivo",
         "placeholder": "Seleziona un partecipante",
         "none": "Nessuno",
-        "description": "Utente utilizzato come predefinito per il pagamento delle spese.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Utente utilizzato come predefinito per il pagamento delle spese."
       },
       "save": "Salva",
       "saving": "Salvataggio…",

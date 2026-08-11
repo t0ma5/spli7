@@ -121,8 +121,7 @@
         "label": "Aktywny użytkownik",
         "placeholder": "Wybierz użytkownika",
         "none": "Brak",
-        "description": "Użytkownik używany domyślnie do wprowadzania wydatków.",
-        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
+        "description": "Użytkownik używany domyślnie do wprowadzania wydatków."
       },
       "save": "Zapisz",
       "saving": "Zapisywanie…",
