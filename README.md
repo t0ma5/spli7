@@ -2,6 +2,12 @@
 
 Spliit is a free and open source alternative to Splitwise. This fork is adapted to deploy on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
+## Credits & provenance
+
+- **Original Spliit** — idea, UI, and core expense-splitting product by [Sebastien Castiel](https://github.com/scastiel) and contributors: [spliit-app/spliit](https://github.com/spliit-app/spliit) · [spliit.app](https://spliit.app).
+- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with accounts, sync, migrations, and a clear QoL roadmap. Several UX improvements in *this* Workers/KV fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for denormalized KV documents, not a code port of their Postgres/API stack).
+- This repository is **not affiliated** with Spliit Cloud or the original Spliit project unless stated otherwise.
+
 ## Features
 
 - [x] Create a group and share it with friends
@@ -52,12 +58,17 @@ On the **Groups** page, use **Import JSON** to upload a file produced by **Expor
 
 ## Extra UX on this fork
 
-- **Copy expense** from the expense list or edit screen (opens create prefilled).
-- **Amount math** in the amount field (`12+4.50`, `3*8`, …) — evaluates on blur/save.
-- **Default split mode** stored on the group (device localStorage can still override).
-- **QR code** in the share popover.
-- **Optional group PIN** (4–8 digits) — unlocks per browser session; hashed on the server, not returned to clients.
-- Even splits use **integer cent remainder** allocation so balances don’t drop a cent.
+Ideas below track community demand collected in [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) (and the linked upstream Spliit issues/PRs). Behavior is reimplemented for this Cloudflare KV deploy.
+
+| Feature | Notes | Prior art |
+| --- | --- | --- |
+| **Copy expense** | From the expense list or edit screen (opens create prefilled). | Upstream [#527](https://github.com/spliit-app/spliit/issues/527); shipped in Spliit Cloud |
+| **Amount math** | Expressions in the amount field (`12+4.50`, `3*8`, …) on blur/save. | Upstream [#184](https://github.com/spliit-app/spliit/pull/184); shipped in Spliit Cloud |
+| **Default split mode** | Stored on the group (device localStorage can still override). | Upstream [#366](https://github.com/spliit-app/spliit/pull/366); shipped in Spliit Cloud |
+| **Even-split cents** | Integer remainder allocation so balances don’t drop a cent. | Upstream [#374](https://github.com/spliit-app/spliit/issues/374) / [#427](https://github.com/spliit-app/spliit/pull/427); tracked by Spliit Cloud |
+| **Share QR** | QR in the share popover. | Upstream [#500](https://github.com/spliit-app/spliit/pull/500); on Spliit Cloud roadmap |
+| **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
+| **Notes + history in JSON** | Export/import round-trips expense notes, group information, and activity history (`exportVersion: 2`). Classic upstream JSON and Spliit Cloud’s Spliit importer do not fully preserve the original Activity feed. | Expense notes also appear in Spliit Cloud / upstream [#165](https://github.com/spliit-app/spliit/pull/165); history round-trip is specific to this fork |
 
 ## Removed / disabled upstream features (S3 & OpenAI)
 
@@ -141,4 +152,4 @@ After a successful run, hard-refresh the live site (e.g. `/groups`) so the new U
 
 ## License
 
-MIT, see [LICENSE](./LICENSE).
+MIT, see [LICENSE](./LICENSE). Same license family as upstream Spliit and Spliit Cloud; retain their copyright notices where applicable.
