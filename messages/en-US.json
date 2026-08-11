@@ -75,6 +75,16 @@
       "description": "If a group was shared with you, you can paste its URL here to add it to your list.",
       "error": "Oops, we are not able to find the group from the URL you provided…"
     },
+    "ImportJSON": {
+      "button": "Import JSON",
+      "title": "Import a group from JSON",
+      "description": "Upload a Spliit JSON export to create a new group with its participants and expenses.",
+      "chooseFile": "Choose file",
+      "importing": "Importing…",
+      "invalidJson": "That file is not valid JSON.",
+      "invalidSchema": "That file doesn’t look like a Spliit group export.",
+      "error": "Something went wrong while importing the group."
+    },
     "NotFound": {
       "text": "This group does not exist.",
       "link": "Go to recently visited groups"
