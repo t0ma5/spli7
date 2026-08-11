@@ -1,5 +1,6 @@
 'use client'
 import { AddGroupByUrlButton } from '@/app/groups/add-group-by-url-button'
+import { ImportGroupJsonButton } from '@/app/groups/import-group-json-button'
 import {
   RecentGroups,
   getArchivedGroups,
@@ -228,7 +229,8 @@ function GroupsPage({
         <h1 className="font-bold text-2xl flex-1">
           <Link href="/groups">{t('myGroups')}</Link>
         </h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <ImportGroupJsonButton reload={reload} />
           <AddGroupByUrlButton reload={reload} />
           <Button asChild>
             <Link href="/groups/create">
