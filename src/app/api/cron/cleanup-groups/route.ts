@@ -1,8 +1,6 @@
 import { cleanupExpiredGroups } from '@/lib/api'
 import { NextResponse } from 'next/server'
 
-export const runtime = 'edge'
-
 function isAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) return false
