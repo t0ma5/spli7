@@ -37,11 +37,12 @@ Spliit is a free and open source alternative to Splitwise. This fork is adapted 
 
 ## JSON import
 
-On the **Groups** page, use **Import JSON** to upload a file produced by **Export to JSON**.
+On the **Groups** page, use **Import JSON** to upload a file produced by **Export to JSON** (this fork or upstream Spliit).
 
 - Always creates a **new** group (does not overwrite an existing one).
 - Regenerates group, participant, and expense IDs so imports never collide with live data.
-- Restores participants, expenses, split modes, categories (by id), amounts, and dates.
+- Restores participants, expenses, split modes, amounts, and dates.
+- Categories: match by `id` when present; otherwise by `name` / `grouping` against the seeded list (many exports omit `id`).
 - Does **not** restore expense attachments, notes, activity history, or active recurring-expense links (those were never part of the export format).
 
 ## Removed / disabled upstream features (S3 & OpenAI)
@@ -71,18 +72,53 @@ npx wrangler kv namespace create spliit-db
 npx wrangler kv namespace create spliit-db --preview
 ```
 
-4. Run `npm install`
+4. Run `npm install` (uses `package-lock.json`; CI uses `npm ci`)
 5. Run `npm run dev` for Next.js local development (bindings via OpenNext), or `npm run preview` to build and run in the Workers runtime
 
+**Note:** Local OpenNext/Wrangler needs **workerd**, which does **not** support Windows ARM64. On those machines, develop against the remote Worker or use the GitHub Actions deploy path below (Linux runners).
+
 ## Deploy to Cloudflare
+
+### Option A — local (x64 / Linux / macOS)
+
+Requires **Node.js 22+** (current Wrangler).
 
 ```bash
 npm run deploy
 ```
 
-This runs `opennextjs-cloudflare build` then deploys the Worker. Ensure the `DB` KV binding in `wrangler.jsonc` points at your namespace.
+This runs `opennextjs-cloudflare build` then deploys Worker `spliit`. Ensure the `DB` KV binding in `wrangler.jsonc` points at your namespace. Existing KV data is kept across deploys.
 
-Alternatively, connect the repo to Cloudflare Workers Builds / Pages and use the same build command.
+### Option B — GitHub Actions (recommended for Windows ARM / CI)
+
+Workflow: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (`workflow_dispatch`).
+
+1. Create a Cloudflare API token with at least:
+   - **Workers Scripts:Edit**
+   - **Workers KV Storage:Edit**
+   - **Account Settings:Read**
+2. Add repository secrets (do not commit tokens):
+
+```bash
+gh secret set CLOUDFLARE_API_TOKEN
+gh secret set CLOUDFLARE_ACCOUNT_ID
+```
+
+`CLOUDFLARE_ACCOUNT_ID` is the 32-character Account ID from the Workers dashboard (not the API token).
+
+3. Run deploy:
+
+```bash
+gh workflow run Deploy --ref main
+```
+
+After a successful run, hard-refresh the live site (e.g. `/groups`) so the new UI loads.
+
+### Ops notes
+
+- Pushing code to GitHub does **not** update the live Worker until you deploy (local or Actions).
+- Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories and break CI.
+- API tokens pasted into chat or tickets should be **revoked** and rotated.
 
 ## Health check
 
