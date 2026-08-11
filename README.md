@@ -1,12 +1,11 @@
 [<img alt="Spliit" height="60" src="https://github.com/spliit-app/spliit/blob/main/public/logo-with-text.png?raw=true" />](https://spliit.app)
 
-Spliit is a free and open source alternative to Splitwise. This fork is adapted to deploy on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
+Spliit is an open source expense-tracking app. This fork is adapted to deploy on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
 ## Credits & provenance
 
 - **Original Spliit** — idea, UI, and core expense-splitting product by [Sebastien Castiel](https://github.com/scastiel) and contributors: [spliit-app/spliit](https://github.com/spliit-app/spliit) · [spliit.app](https://spliit.app).
-- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with accounts, sync, migrations, and a clear QoL roadmap. Several UX improvements in *this* Workers/KV fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for denormalized KV documents, not a code port of their Postgres/API stack).
-- This repository is **not affiliated** with Spliit Cloud or the original Spliit project unless stated otherwise.
+- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with new features. Several UX improvements in *this* Workers/KV fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for denormalized KV documents, not a code port of their Postgres/API stack).
 
 ## Features
 
@@ -32,8 +31,8 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Group default split mode
 - [x] 🔴 Optional group PIN
 - [x] 🔴 Share group via QR code
-- [ ] 🟢 Upload and attach images to expenses (removed — see below)
-- [ ] 🟢 Create expense by scanning a receipt (removed — see below)
+- [ ] ❌ Upload and attach images to expenses (removed — see below)
+- [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
 ## Stack
 
