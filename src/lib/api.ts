@@ -17,7 +17,11 @@ import {
   SplitMode,
 } from '@/lib/kv/types'
 import { randomId } from '@/lib/randomId'
-import { ExpenseFormValues, GroupFormValues } from '@/lib/schemas'
+import {
+  ExpenseFormValues,
+  GroupFormValues,
+  GroupImportValues,
+} from '@/lib/schemas'
 
 function toDate(value: string | Date): Date {
   return value instanceof Date ? value : new Date(value)
@@ -154,6 +158,81 @@ export async function createGroup(groupFormValues: GroupFormValues) {
     expenses: [],
     activities: [],
   }
+  await putGroupDocument(group)
+  return mapGroup(group)
+}
+
+/** Create a new group from a Spliit JSON export (new IDs; activities empty). */
+export async function createGroupFromImport(importValues: GroupImportValues) {
+  const groupId = randomId()
+  const participantIdMap = new Map<string, string>()
+
+  const participants = importValues.participants.map((participant) => {
+    const newId = randomId()
+    participantIdMap.set(participant.id, newId)
+    return {
+      id: newId,
+      name: participant.name,
+      groupId,
+    }
+  })
+
+  const expenses: Expense[] = importValues.expenses.map((expense) => {
+    const expenseId = randomId()
+    const paidById = participantIdMap.get(expense.paidById)
+    if (!paidById) {
+      throw new Error(`Invalid paidById: ${expense.paidById}`)
+    }
+
+    const categoryId =
+      expense.category && getCategoryById(expense.category.id)
+        ? expense.category.id
+        : 0
+
+    return {
+      id: expenseId,
+      groupId,
+      expenseDate: toIsoDateOnly(expense.expenseDate),
+      title: expense.title,
+      categoryId,
+      amount: expense.amount,
+      originalAmount: expense.originalAmount ?? null,
+      originalCurrency: expense.originalCurrency ?? null,
+      conversionRate: expense.conversionRate ?? null,
+      paidById,
+      isReimbursement: expense.isReimbursement,
+      splitMode: expense.splitMode as SplitMode,
+      createdAt: expense.createdAt.toISOString(),
+      notes: null,
+      recurrenceRule: (expense.recurrenceRule as RecurrenceRule | null) ?? null,
+      paidFor: expense.paidFor.map(({ participantId, shares }) => {
+        const mappedId = participantIdMap.get(participantId)
+        if (!mappedId) {
+          throw new Error(`Invalid paidFor participantId: ${participantId}`)
+        }
+        return {
+          expenseId,
+          participantId: mappedId,
+          shares,
+        }
+      }),
+      documents: [],
+      recurringExpenseLink: null,
+    }
+  })
+
+  const group: GroupDocument = {
+    id: groupId,
+    name: importValues.name,
+    information: null,
+    currency: importValues.currency,
+    currencyCode: importValues.currencyCode || null,
+    createdAt: new Date().toISOString(),
+    participants,
+    expenses,
+    activities: [],
+  }
+
   await putGroupDocument(group)
   return mapGroup(group)
 }

@@ -215,3 +215,82 @@ export type SplittingOptions = {
   splitMode: SplitMode
   paidFor: ExpenseFormValues['paidFor'] | null
 }
+
+/** Matches the JSON shape produced by getGroupForExport /expenses/export/json */
+export const groupImportSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().min(1).max(50),
+    currency: z.string().min(1).max(5),
+    currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]),
+    participants: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string().min(1).max(50),
+        }),
+      )
+      .min(1),
+    expenses: z
+      .array(
+        z.object({
+          createdAt: z.coerce.date(),
+          expenseDate: z.coerce.date(),
+          title: z.string().min(1),
+          category: z
+            .object({
+              id: z.number().int(),
+              grouping: z.string().optional(),
+              name: z.string().optional(),
+            })
+            .nullish(),
+          amount: z.number().int(),
+          originalAmount: z.number().int().nullish(),
+          originalCurrency: z.string().nullish(),
+          conversionRate: z.number().nullish(),
+          paidById: z.string().min(1),
+          paidFor: z
+            .array(
+              z.object({
+                participantId: z.string().min(1),
+                shares: z.number(),
+              }),
+            )
+            .min(1),
+          isReimbursement: z.boolean(),
+          splitMode: z.enum([
+            'EVENLY',
+            'BY_SHARES',
+            'BY_PERCENTAGE',
+            'BY_AMOUNT',
+          ]),
+          recurrenceRule: z
+            .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
+            .nullish(),
+        }),
+      )
+      .default([]),
+  })
+  .superRefine((data, ctx) => {
+    const participantIds = new Set(data.participants.map((p) => p.id))
+    data.expenses.forEach((expense, expenseIndex) => {
+      if (!participantIds.has(expense.paidById)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'unknownPaidBy',
+          path: ['expenses', expenseIndex, 'paidById'],
+        })
+      }
+      expense.paidFor.forEach((paidFor, paidForIndex) => {
+        if (!participantIds.has(paidFor.participantId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'unknownPaidFor',
+            path: ['expenses', expenseIndex, 'paidFor', paidForIndex, 'participantId'],
+          })
+        }
+      })
+    })
+  })
+
+export type GroupImportValues = z.infer<typeof groupImportSchema>
