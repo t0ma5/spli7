@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Locale } from '@/i18n/request'
+import { evaluateAmountExpression } from '@/lib/amount-expression'
 import { defaultCurrencyList, getCurrency } from '@/lib/currency'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
 import { useActiveUser, useCurrencyRate } from '@/lib/hooks'
@@ -52,9 +53,10 @@ import {
   formatCurrency,
   getCurrencyFromGroup,
 } from '@/lib/utils'
+import { trpc } from '@/trpc/client'
 import { AppRouterOutput } from '@/trpc/routers/_app'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ChevronRight, Save } from 'lucide-react'
+import { ChevronRight, Copy, Save } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -78,7 +80,8 @@ const getDefaultSplittingOptions = (
   group: NonNullable<AppRouterOutput['groups']['get']['group']>,
 ) => {
   const defaultValue = {
-    splitMode: 'EVENLY' as const,
+    splitMode: (group.defaultSplitMode ?? 'EVENLY') as
+      'EVENLY' | 'BY_SHARES' | 'BY_PERCENTAGE' | 'BY_AMOUNT',
     paidFor: group.participants.map(({ id }) => ({
       participant: id,
       shares: '1' as any, // Use string to ensure consistent schema handling
@@ -270,9 +273,48 @@ export function ExpenseForm({
   })
   const [isCategoryLoading, setCategoryLoading] = useState(false)
   const activeUserId = useActiveUser(group.id)
+  const fromExpenseId = isCreate ? searchParams.get('fromExpense') : null
+  const { data: fromExpenseData } = trpc.groups.expenses.get.useQuery(
+    { groupId: group.id, expenseId: fromExpenseId ?? '' },
+    { enabled: Boolean(fromExpenseId) },
+  )
+
+  useEffect(() => {
+    const source = fromExpenseData?.expense
+    if (!isCreate || !source) return
+    form.reset({
+      title: source.title,
+      expenseDate: new Date(),
+      amount: amountAsDecimal(source.amount, groupCurrency),
+      originalCurrency: source.originalCurrency ?? group.currencyCode,
+      originalAmount: source.originalAmount ?? undefined,
+      conversionRate: source.conversionRate ?? undefined,
+      category: source.categoryId,
+      paidBy: source.paidById,
+      paidFor: source.paidFor.map(({ participantId, shares }) => ({
+        participant: participantId,
+        shares: (source.splitMode === 'BY_AMOUNT'
+          ? amountAsDecimal(shares, groupCurrency)
+          : (shares / 100).toString()) as any,
+      })),
+      splitMode: source.splitMode,
+      saveDefaultSplittingOptions: false,
+      isReimbursement: source.isReimbursement,
+      documents: [],
+      notes: source.notes ?? '',
+      recurrenceRule: RecurrenceRule.NONE,
+    })
+  }, [fromExpenseData?.expense, isCreate])
 
   const submit = async (values: ExpenseFormValues) => {
     await persistDefaultSplittingOptions(group.id, values)
+
+    const evaluatedAmount = evaluateAmountExpression(String(values.amount))
+    if (evaluatedAmount === null) {
+      form.setError('amount', { message: 'invalidNumber' })
+      return
+    }
+    values.amount = evaluatedAmount
 
     // Store monetary amounts in minor units (cents)
     values.amount = amountAsMinorUnits(values.amount, groupCurrency)
@@ -683,8 +725,17 @@ export function ExpenseForm({
                         type="text"
                         inputMode="decimal"
                         placeholder="0.00"
+                        {...field}
                         onChange={(event) => {
-                          const v = enforceCurrencyPattern(event.target.value)
+                          onChange(event.target.value)
+                        }}
+                        onBlur={(event) => {
+                          field.onBlur()
+                          const evaluated = evaluateAmountExpression(
+                            event.target.value,
+                          )
+                          if (evaluated === null) return
+                          const v = enforceCurrencyPattern(String(evaluated))
                           const income = Number(v) < 0
                           setIsIncome(income)
                           if (income) form.setValue('isReimbursement', false)
@@ -695,10 +746,10 @@ export function ExpenseForm({
                           const target = e.currentTarget
                           setTimeout(() => target.select(), 1)
                         }}
-                        {...field}
                       />
                     </FormControl>
                   </div>
+                  <FormDescription>{t('amountField.mathHelp')}</FormDescription>
                   <FormMessage />
 
                   {!isIncome && (
@@ -1269,6 +1320,16 @@ export function ExpenseForm({
             <Save className="w-4 h-4 mr-2" />
             {t(isCreate ? 'create' : 'save')}
           </SubmitButton>
+          {!isCreate && expense && (
+            <Button variant="secondary" asChild>
+              <Link
+                href={`/groups/${group.id}/expenses/create?fromExpense=${expense.id}`}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                {t('copy')}
+              </Link>
+            </Button>
+          )}
           {!isCreate && onDelete && (
             <DeletePopup
               onDelete={() => onDelete(activeUserId ?? undefined)}

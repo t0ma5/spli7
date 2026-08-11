@@ -67,6 +67,10 @@ export function GroupForm({
           information: group.information ?? '',
           currency: group.currency ?? '',
           currencyCode: group.currencyCode ?? '',
+          defaultSplitMode: group.defaultSplitMode ?? 'EVENLY',
+          currentPin: '',
+          newPin: '',
+          clearPin: false,
           participants: group.participants,
         }
       : {
@@ -74,6 +78,10 @@ export function GroupForm({
           information: '',
           currency: '',
           currencyCode: process.env.NEXT_PUBLIC_DEFAULT_CURRENCY_CODE || 'USD', // TODO: If NEXT_PUBLIC_DEFAULT_CURRENCY_CODE, is not set, determine the default currency code based on locale
+          defaultSplitMode: 'EVENLY',
+          currentPin: '',
+          newPin: '',
+          clearPin: false,
           participants: [
             { name: t('Participants.John') },
             { name: t('Participants.Jane') },
@@ -229,6 +237,118 @@ export function GroupForm({
                   </FormItem>
                 )}
               />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="defaultSplitMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('DefaultSplitField.label')}</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="EVENLY">
+                        {t('DefaultSplitField.evenly')}
+                      </SelectItem>
+                      <SelectItem value="BY_SHARES">
+                        {t('DefaultSplitField.byShares')}
+                      </SelectItem>
+                      <SelectItem value="BY_PERCENTAGE">
+                        {t('DefaultSplitField.byPercentage')}
+                      </SelectItem>
+                      <SelectItem value="BY_AMOUNT">
+                        {t('DefaultSplitField.byAmount')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    {t('DefaultSplitField.description')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="col-span-2 space-y-3 rounded-md border p-3">
+              <div>
+                <h3 className="font-medium">{t('PinField.title')}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {t('PinField.description')}
+                </p>
+                {group?.hasPin && (
+                  <p className="text-sm mt-1">{t('PinField.enabled')}</p>
+                )}
+              </div>
+              {group?.hasPin && (
+                <FormField
+                  control={form.control}
+                  name="currentPin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('PinField.current')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          className="text-base max-w-xs"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <FormField
+                control={form.control}
+                name="newPin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {group?.hasPin ? t('PinField.new') : t('PinField.set')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        className="text-base max-w-xs"
+                        placeholder="••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('PinField.formatHelp')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {group?.hasPin && (
+                <FormField
+                  control={form.control}
+                  name="clearPin"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      </FormControl>
+                      <FormLabel>{t('PinField.clear')}</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
           </CardContent>
         </Card>

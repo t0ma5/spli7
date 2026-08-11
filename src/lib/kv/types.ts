@@ -94,6 +94,10 @@ export type GroupDocument = {
   information: string | null
   currency: string
   currencyCode: string | null
+  /** SHA-256 hex of `${groupId}:${pin}`; null/absent = unlocked */
+  pinHash?: string | null
+  /** Default split mode for new expenses in this group */
+  defaultSplitMode?: SplitMode | null
   createdAt: string
   participants: Participant[]
   expenses: Expense[]
@@ -106,6 +110,8 @@ export type Group = {
   information: string | null
   currency: string
   currencyCode: string | null
+  hasPin: boolean
+  defaultSplitMode: SplitMode | null
   createdAt: Date
   participants: Participant[]
 }

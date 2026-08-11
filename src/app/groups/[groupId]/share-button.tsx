@@ -12,6 +12,7 @@ import { useBaseUrl } from '@/lib/hooks'
 import { Group } from '@/lib/kv/types'
 import { Share } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useEffect, useState } from 'react'
 
 type Props = {
   group: Group
@@ -21,6 +22,23 @@ export function ShareButton({ group }: Props) {
   const t = useTranslations('Share')
   const baseUrl = useBaseUrl()
   const url = baseUrl && `${baseUrl}/groups/${group.id}/expenses?ref=share`
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!url) {
+      setQrDataUrl(null)
+      return
+    }
+    let cancelled = false
+    void import('qrcode').then((QRCode) =>
+      QRCode.toDataURL(url, { width: 180, margin: 1 }).then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      }),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [url])
 
   return (
     <Popover>
@@ -39,6 +57,18 @@ export function ShareButton({ group }: Props) {
               text={`Join my group ${group.name} on Spliit`}
               url={url}
             />
+          </div>
+        )}
+        {qrDataUrl && (
+          <div className="flex flex-col items-center gap-2">
+            <img
+              src={qrDataUrl}
+              alt={t('qrAlt')}
+              className="rounded-md border bg-white p-2"
+              width={180}
+              height={180}
+            />
+            <p className="text-muted-foreground text-center">{t('qrHelp')}</p>
           </div>
         )}
         <p>

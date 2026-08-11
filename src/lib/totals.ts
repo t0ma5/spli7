@@ -31,31 +31,50 @@ export function calculateShare(
   if (expense.isReimbursement) return 0
 
   const paidFors = expense.paidFor
-  const userPaidFor = paidFors.find(
+  const userIndex = paidFors.findIndex(
     (paidFor) => paidFor.participant.id === participantId,
   )
 
-  if (!userPaidFor) return 0
+  if (userIndex < 0) return 0
 
-  const shares = Number(userPaidFor.shares)
+  const totalPaidForShares = paidFors.reduce(
+    (sum, paidFor) => sum + Number(paidFor.shares),
+    0,
+  )
 
-  switch (expense.splitMode) {
-    case 'EVENLY':
-      return expense.amount / paidFors.length
-    case 'BY_AMOUNT':
-      return shares
-    case 'BY_PERCENTAGE':
-      return (expense.amount * shares) / 10000
-    case 'BY_SHARES': {
-      const totalShares = paidFors.reduce(
-        (sum, paidFor) => sum + Number(paidFor.shares),
-        0,
-      )
-      return (expense.amount * shares) / totalShares
+  let remaining = expense.amount
+  for (let index = 0; index < paidFors.length; index++) {
+    const paidFor = paidFors[index]
+    const isLast = index === paidFors.length - 1
+    let shares: number
+    let totalShares: number
+    switch (expense.splitMode) {
+      case 'EVENLY':
+        shares = 1
+        totalShares = paidFors.length
+        break
+      case 'BY_AMOUNT':
+        return Number(
+          paidFors.find((p) => p.participant.id === participantId)?.shares ?? 0,
+        )
+      case 'BY_PERCENTAGE':
+        shares = Number(paidFor.shares)
+        totalShares = totalPaidForShares
+        break
+      case 'BY_SHARES':
+        shares = Number(paidFor.shares)
+        totalShares = totalPaidForShares
+        break
+      default:
+        return 0
     }
-    default:
-      return 0
+    const dividedAmount = isLast
+      ? remaining
+      : Math.floor((expense.amount * shares) / totalShares)
+    remaining -= dividedAmount
+    if (index === userIndex) return dividedAmount
   }
+  return 0
 }
 
 export function getTotalActiveUserShare(

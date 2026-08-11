@@ -1,5 +1,6 @@
 'use client'
 
+import { GroupPinGate } from '@/app/groups/[groupId]/group-pin-gate'
 import { useToast } from '@/components/ui/use-toast'
 import { trpc } from '@/trpc/client'
 import { useTranslations } from 'next-intl'
@@ -39,11 +40,15 @@ export function GroupLayoutClient({
     )
   }
 
+  const hasPin = Boolean(data?.group?.hasPin)
+
   return (
     <CurrentGroupProvider {...props}>
-      <GroupHeader />
-      {children}
-      <SaveGroupLocally />
+      <GroupPinGate groupId={groupId} hasPin={hasPin}>
+        <GroupHeader />
+        {children}
+        <SaveGroupLocally />
+      </GroupPinGate>
     </CurrentGroupProvider>
   )
 }

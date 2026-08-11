@@ -1,3 +1,4 @@
+import { evaluateAmountExpression } from '@/lib/amount-expression'
 import type { SplitMode } from '@/lib/kv/types'
 import Decimal from 'decimal.js'
 
@@ -9,6 +10,14 @@ export const groupFormSchema = z
     information: z.string().optional(),
     currency: z.string().min(1, 'min1').max(5, 'max5'),
     currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]), // ISO-4217 currency code
+    defaultSplitMode: z
+      .enum(['EVENLY', 'BY_SHARES', 'BY_PERCENTAGE', 'BY_AMOUNT'])
+      .default('EVENLY'),
+    currentPin: z.string().max(32).optional(),
+    newPin: z
+      .union([z.string().regex(/^\d{4,8}$/, 'pinFormat'), z.literal('')])
+      .optional(),
+    clearPin: z.boolean().optional(),
     participants: z
       .array(
         z.object({
@@ -18,7 +27,7 @@ export const groupFormSchema = z
       )
       .min(1),
   })
-  .superRefine(({ participants }, ctx) => {
+  .superRefine(({ participants, newPin, clearPin }, ctx) => {
     participants.forEach((participant, i) => {
       participants.slice(0, i).forEach((otherParticipant) => {
         if (otherParticipant.name === participant.name) {
@@ -30,6 +39,13 @@ export const groupFormSchema = z
         }
       })
     })
+    if (newPin && clearPin) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'pinConflict',
+        path: ['newPin'],
+      })
+    }
   })
 
 export type GroupFormValues = z.infer<typeof groupFormSchema>
@@ -57,13 +73,13 @@ export const expenseFormSchema = z
         [
           z.number(),
           z.string().transform((value, ctx) => {
-            const valueAsNumber = Number(value)
-            if (Number.isNaN(valueAsNumber))
+            const valueAsNumber = evaluateAmountExpression(value)
+            if (valueAsNumber === null)
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: 'invalidNumber',
               })
-            return valueAsNumber
+            return valueAsNumber ?? Number.NaN
           }),
         ],
         { required_error: 'amountRequired' },
@@ -219,10 +235,15 @@ export type SplittingOptions = {
 /** Matches the JSON shape produced by getGroupForExport /expenses/export/json */
 export const groupImportSchema = z
   .object({
+    exportVersion: z.number().int().optional(),
     id: z.string().optional(),
     name: z.string().min(1).max(50),
+    information: z.string().nullish(),
     currency: z.string().min(1).max(5),
     currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]),
+    defaultSplitMode: z
+      .enum(['EVENLY', 'BY_SHARES', 'BY_PERCENTAGE', 'BY_AMOUNT'])
+      .nullish(),
     participants: z
       .array(
         z.object({
@@ -234,6 +255,7 @@ export const groupImportSchema = z
     expenses: z
       .array(
         z.object({
+          id: z.string().optional(),
           createdAt: z.coerce.date(),
           expenseDate: z.coerce.date(),
           title: z.string().min(1),
@@ -267,6 +289,23 @@ export const groupImportSchema = z
           recurrenceRule: z
             .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
             .nullish(),
+          notes: z.string().nullish(),
+        }),
+      )
+      .default([]),
+    activities: z
+      .array(
+        z.object({
+          time: z.coerce.date(),
+          activityType: z.enum([
+            'UPDATE_GROUP',
+            'CREATE_EXPENSE',
+            'UPDATE_EXPENSE',
+            'DELETE_EXPENSE',
+          ]),
+          participantId: z.string().nullish(),
+          expenseId: z.string().nullish(),
+          data: z.string().nullish(),
         }),
       )
       .default([]),

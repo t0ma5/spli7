@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { hashGroupPin } from '@/lib/group-pin'
 import { getCategoryById, resolveCategoryId } from '@/lib/kv/categories'
 import {
   ensureCategories,
@@ -47,6 +48,8 @@ function mapGroup(group: GroupDocument): Group {
     information: group.information,
     currency: group.currency,
     currencyCode: group.currencyCode,
+    hasPin: Boolean(group.pinHash),
+    defaultSplitMode: group.defaultSplitMode ?? null,
     createdAt: toDate(group.createdAt),
     participants: group.participants,
   }
@@ -150,6 +153,11 @@ export async function createGroup(groupFormValues: GroupFormValues) {
     information: groupFormValues.information ?? null,
     currency: groupFormValues.currency,
     currencyCode: groupFormValues.currencyCode || null,
+    pinHash:
+      groupFormValues.newPin && groupFormValues.newPin.length > 0
+        ? await hashGroupPin(groupFormValues.newPin, id)
+        : null,
+    defaultSplitMode: groupFormValues.defaultSplitMode ?? SplitMode.EVENLY,
     createdAt: new Date().toISOString(),
     participants: groupFormValues.participants.map(({ name }) => ({
       id: randomId(),
@@ -163,10 +171,11 @@ export async function createGroup(groupFormValues: GroupFormValues) {
   return mapGroup(group)
 }
 
-/** Create a new group from a Spliit JSON export (new IDs; activities empty). */
+/** Create a new group from a Spliit JSON export (new IDs). */
 export async function createGroupFromImport(importValues: GroupImportValues) {
   const groupId = randomId()
   const participantIdMap = new Map<string, string>()
+  const expenseIdMap = new Map<string, string>()
 
   const participants = importValues.participants.map((participant) => {
     const newId = randomId()
@@ -180,6 +189,8 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
 
   const expenses: Expense[] = importValues.expenses.map((expense) => {
     const expenseId = randomId()
+    if (expense.id) expenseIdMap.set(expense.id, expenseId)
+
     const paidById = participantIdMap.get(expense.paidById)
     if (!paidById) {
       throw new Error(`Invalid paidById: ${expense.paidById}`)
@@ -201,7 +212,7 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
       isReimbursement: expense.isReimbursement,
       splitMode: expense.splitMode as SplitMode,
       createdAt: expense.createdAt.toISOString(),
-      notes: null,
+      notes: expense.notes ?? null,
       recurrenceRule: (expense.recurrenceRule as RecurrenceRule | null) ?? null,
       paidFor: expense.paidFor.map(({ participantId, shares }) => {
         const mappedId = participantIdMap.get(participantId)
@@ -219,16 +230,40 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
     }
   })
 
+  const activities = (importValues.activities ?? []).map((activity) => {
+    const mappedParticipantId = activity.participantId
+      ? (participantIdMap.get(activity.participantId) ?? null)
+      : null
+    const mappedExpenseId = activity.expenseId
+      ? (expenseIdMap.get(activity.expenseId) ?? null)
+      : null
+
+    return {
+      id: randomId(),
+      groupId,
+      time: activity.time.toISOString(),
+      activityType:
+        activity.activityType as (typeof ActivityType)[keyof typeof ActivityType],
+      participantId: mappedParticipantId,
+      expenseId: mappedExpenseId,
+      data: activity.data ?? null,
+    }
+  })
+
   const group: GroupDocument = {
     id: groupId,
     name: importValues.name,
-    information: null,
+    information: importValues.information ?? null,
     currency: importValues.currency,
     currencyCode: importValues.currencyCode || null,
+    pinHash: null,
+    defaultSplitMode:
+      (importValues.defaultSplitMode as SplitMode | null | undefined) ??
+      SplitMode.EVENLY,
     createdAt: new Date().toISOString(),
     participants,
     expenses,
-    activities: [],
+    activities,
   }
 
   await putGroupDocument(group)
@@ -363,6 +398,37 @@ export async function updateGroup(
   group.information = groupFormValues.information ?? null
   group.currency = groupFormValues.currency
   group.currencyCode = groupFormValues.currencyCode || null
+  group.defaultSplitMode = groupFormValues.defaultSplitMode ?? SplitMode.EVENLY
+
+  if (groupFormValues.clearPin) {
+    if (group.pinHash) {
+      if (!groupFormValues.currentPin) {
+        throw new Error('Current PIN required to clear PIN')
+      }
+      const currentHash = await hashGroupPin(
+        groupFormValues.currentPin,
+        groupId,
+      )
+      if (currentHash !== group.pinHash) {
+        throw new Error('Incorrect PIN')
+      }
+    }
+    group.pinHash = null
+  } else if (groupFormValues.newPin) {
+    if (group.pinHash) {
+      if (!groupFormValues.currentPin) {
+        throw new Error('Current PIN required to change PIN')
+      }
+      const currentHash = await hashGroupPin(
+        groupFormValues.currentPin,
+        groupId,
+      )
+      if (currentHash !== group.pinHash) {
+        throw new Error('Incorrect PIN')
+      }
+    }
+    group.pinHash = await hashGroupPin(groupFormValues.newPin, groupId)
+  }
 
   const keptIds = new Set(
     groupFormValues.participants
@@ -386,6 +452,14 @@ export async function updateGroup(
 
   await putGroupDocument(group)
   return mapGroup(group)
+}
+
+export async function verifyGroupPin(groupId: string, pin: string) {
+  const group = await getGroupDocument(groupId)
+  if (!group) return false
+  if (!group.pinHash) return true
+  const hash = await hashGroupPin(pin, groupId)
+  return hash === group.pinHash
 }
 
 export async function getGroup(groupId: string) {
@@ -686,10 +760,13 @@ export async function getGroupForExport(groupId: string) {
   if (!group) return null
 
   return {
+    exportVersion: 2 as const,
     id: group.id,
     name: group.name,
+    information: group.information,
     currency: group.currency,
     currencyCode: group.currencyCode,
+    defaultSplitMode: group.defaultSplitMode ?? SplitMode.EVENLY,
     participants: group.participants.map((p) => ({ id: p.id, name: p.name })),
     expenses: group.expenses
       .slice()
@@ -700,6 +777,7 @@ export async function getGroupForExport(groupId: string) {
         return toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime()
       })
       .map((expense) => ({
+        id: expense.id,
         createdAt: toDate(expense.createdAt),
         expenseDate: toDate(expense.expenseDate),
         title: expense.title,
@@ -716,6 +794,17 @@ export async function getGroupForExport(groupId: string) {
         isReimbursement: expense.isReimbursement,
         splitMode: expense.splitMode,
         recurrenceRule: expense.recurrenceRule,
+        notes: expense.notes,
+      })),
+    activities: group.activities
+      .slice()
+      .sort((a, b) => toDate(a.time).getTime() - toDate(b.time).getTime())
+      .map((activity) => ({
+        time: toDate(activity.time),
+        activityType: activity.activityType,
+        participantId: activity.participantId,
+        expenseId: activity.expenseId,
+        data: activity.data,
       })),
   }
 }

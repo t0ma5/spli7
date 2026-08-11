@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Currency } from '@/lib/currency'
 import type { ExpenseListItem } from '@/lib/kv/types'
 import { cn, formatCurrency, formatDateOnly } from '@/lib/utils'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Copy } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -59,6 +59,7 @@ export function ExpenseCard({
 }: Props) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('ExpenseCard')
 
   return (
     <div
@@ -102,16 +103,27 @@ export function ExpenseCard({
           {formatDateOnly(expense.expenseDate, locale, { dateStyle: 'medium' })}
         </div>
       </div>
-      <Button
-        size="icon"
-        variant="link"
-        className="self-center hidden sm:flex"
-        asChild
-      >
-        <Link href={`/groups/${groupId}/expenses/${expense.id}/edit`}>
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </Button>
+      <div className="self-center hidden sm:flex flex-col gap-1">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          title={t('copy')}
+          onClick={(event) => {
+            event.stopPropagation()
+            router.push(
+              `/groups/${groupId}/expenses/create?fromExpense=${expense.id}`,
+            )
+          }}
+        >
+          <Copy className="w-4 h-4" />
+        </Button>
+        <Button size="icon" variant="link" asChild>
+          <Link href={`/groups/${groupId}/expenses/${expense.id}/edit`}>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </Button>
+      </div>
     </div>
   )
 }

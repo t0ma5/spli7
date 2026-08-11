@@ -7,6 +7,7 @@ import { getGroupProcedure } from '@/trpc/routers/groups/get.procedure'
 import { importGroupProcedure } from '@/trpc/routers/groups/import.procedure'
 import { groupStatsRouter } from '@/trpc/routers/groups/stats'
 import { updateGroupProcedure } from '@/trpc/routers/groups/update.procedure'
+import { verifyGroupPinProcedure } from '@/trpc/routers/groups/verifyPin.procedure'
 import { getGroupDetailsProcedure } from './getDetails.procedure'
 import { listGroupsProcedure } from './list.procedure'
 
@@ -22,4 +23,5 @@ export const groupsRouter = createTRPCRouter({
   create: createGroupProcedure,
   import: importGroupProcedure,
   update: updateGroupProcedure,
+  verifyPin: verifyGroupPinProcedure,
 })

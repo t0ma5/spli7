@@ -45,16 +45,15 @@ export function getBalances(expenses: ExpenseListItem[]): Balances {
 
       const dividedAmount = isLast
         ? remaining
-        : (expense.amount * shares) / totalShares
+        : Math.floor((expense.amount * shares) / totalShares)
       remaining -= dividedAmount
       balances[paidFor.participant.id].paidFor += dividedAmount
     })
   }
 
   for (const participantId in balances) {
-    balances[participantId].paidFor =
-      Math.round(balances[participantId].paidFor) + 0
-    balances[participantId].paid = Math.round(balances[participantId].paid) + 0
+    balances[participantId].paidFor = balances[participantId].paidFor + 0
+    balances[participantId].paid = balances[participantId].paid + 0
 
     balances[participantId].total =
       balances[participantId].paid - balances[participantId].paidFor

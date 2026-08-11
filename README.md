@@ -17,6 +17,9 @@ Spliit is a free and open source alternative to Splitwise. This fork is adapted 
 - [x] Search for expenses in a group
 - [x] Export a group to JSON or CSV
 - [x] Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
+- [x] Copy an existing expense into a new draft
+- [x] Math expressions in the amount field
+- [x] Group default split mode + optional PIN + share QR
 - [ ] Upload and attach images to expenses (removed — see below)
 - [ ] Create expense by scanning a receipt (removed — see below)
 
@@ -41,19 +44,30 @@ On the **Groups** page, use **Import JSON** to upload a file produced by **Expor
 
 - Always creates a **new** group (does not overwrite an existing one).
 - Regenerates group, participant, and expense IDs so imports never collide with live data.
-- Restores participants, expenses, split modes, amounts, and dates.
+- Restores participants, expenses, split modes, amounts, dates, **notes**, group **information**, and **activity history** (when present in the file).
 - Categories: match by `id` when present; otherwise by `name` / `grouping` against the seeded list (many exports omit `id`).
-- Does **not** restore expense attachments, notes, activity history, or active recurring-expense links (those were never part of the export format).
+- Newer exports include `exportVersion: 2` and expense `id`s (needed to re-link history).
+- Does **not** restore expense attachments or active recurring-expense links.
+- Does **not** import a group PIN (PIN must be set again after import).
+
+## Extra UX on this fork
+
+- **Copy expense** from the expense list or edit screen (opens create prefilled).
+- **Amount math** in the amount field (`12+4.50`, `3*8`, …) — evaluates on blur/save.
+- **Default split mode** stored on the group (device localStorage can still override).
+- **QR code** in the share popover.
+- **Optional group PIN** (4–8 digits) — unlocks per browser session; hashed on the server, not returned to clients.
+- Even splits use **integer cent remainder** allocation so balances don’t drop a cent.
 
 ## Removed / disabled upstream features (S3 & OpenAI)
 
 Upstream Spliit optional features that depended on **AWS S3** and **OpenAI** are **not available** in this Cloudflare KV fork:
 
-| Feature | Upstream dependency | Status here |
-| --- | --- | --- |
+| Feature                          | Upstream dependency               | Status here                                                                                   |
+| -------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------- |
 | Expense document / image uploads | S3 (or compatible object storage) | **Removed** from the critical path; UI/API stubs keep flags off. KV is not used for binaries. |
-| Create expense from receipt scan | OpenAI + storage | **Disabled**; no OpenAI client or API keys. |
-| Category extract from text/image | OpenAI | **Disabled**; same as above. |
+| Create expense from receipt scan | OpenAI + storage                  | **Disabled**; no OpenAI client or API keys.                                                   |
+| Category extract from text/image | OpenAI                            | **Disabled**; same as above.                                                                  |
 
 What changed vs upstream:
 
