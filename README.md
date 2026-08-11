@@ -1,6 +1,6 @@
 [<img alt="Spliit" height="60" src="https://github.com/spliit-app/spliit/blob/main/public/logo-with-text.png?raw=true" />](https://spliit.app)
 
-Spliit is a free and open source alternative to Splitwise. This fork is adapted to deploy on **Cloudflare Pages / Workers** with **Cloudflare KV** as the database.
+Spliit is a free and open source alternative to Splitwise. This fork is adapted to deploy on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
 ## Features
 
@@ -15,8 +15,10 @@ Spliit is a free and open source alternative to Splitwise. This fork is adapted 
 - [x] Tell the application who you are when opening a group
 - [x] Assign a category to expenses
 - [x] Search for expenses in a group
-- [ ] Upload and attach images to expenses (deferred on Cloudflare KV deploy)
-- [ ] Create expense by scanning a receipt (deferred on Cloudflare KV deploy)
+- [x] Export a group to JSON or CSV
+- [x] Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
+- [ ] Upload and attach images to expenses (removed — see below)
+- [ ] Create expense by scanning a receipt (removed — see below)
 
 ## Stack
 
@@ -32,6 +34,31 @@ Spliit is a free and open source alternative to Splitwise. This fork is adapted 
 - Categories are seeded under the `categories` key.
 - Concurrent edits to the same group use **last-write-wins** (no Durable Objects / transactions).
 - Friend-sized groups fit this model; very large groups may hit KV value size limits.
+
+## JSON import
+
+On the **Groups** page, use **Import JSON** to upload a file produced by **Export to JSON**.
+
+- Always creates a **new** group (does not overwrite an existing one).
+- Regenerates group, participant, and expense IDs so imports never collide with live data.
+- Restores participants, expenses, split modes, categories (by id), amounts, and dates.
+- Does **not** restore expense attachments, notes, activity history, or active recurring-expense links (those were never part of the export format).
+
+## Removed / disabled upstream features (S3 & OpenAI)
+
+Upstream Spliit optional features that depended on **AWS S3** and **OpenAI** are **not available** in this Cloudflare KV fork:
+
+| Feature | Upstream dependency | Status here |
+| --- | --- | --- |
+| Expense document / image uploads | S3 (or compatible object storage) | **Removed** from the critical path; UI/API stubs keep flags off. KV is not used for binaries. |
+| Create expense from receipt scan | OpenAI + storage | **Disabled**; no OpenAI client or API keys. |
+| Category extract from text/image | OpenAI | **Disabled**; same as above. |
+
+What changed vs upstream:
+
+- Prisma, Postgres, and Vercel-oriented DB wiring were replaced with the KV group-document API.
+- S3/OpenAI packages and env vars were dropped; keep `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS`, `NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT`, and `NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT` unset or `false` (see `.env.example`).
+- Re-enabling uploads later would mean adding something like **R2** (not stuffing files into KV). Receipt/category AI would need a Workers-compatible provider and explicit product work.
 
 ## Run locally
 
@@ -61,10 +88,6 @@ Alternatively, connect the repo to Cloudflare Workers Builds / Pages and use the
 
 - `GET /api/health/readiness` or `GET /api/health` — app ready, including KV connectivity
 - `GET /api/health/liveness` — process alive only
-
-## Opt-in features (not available yet)
-
-Expense documents, receipt extract, and category extract from upstream Spliit depend on S3/OpenAI and are **disabled** on this Cloudflare KV deploy. Keep the related `NEXT_PUBLIC_ENABLE_*` flags unset/false.
 
 ## License
 
