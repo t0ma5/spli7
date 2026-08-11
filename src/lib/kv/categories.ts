@@ -50,3 +50,29 @@ export const SEEDED_CATEGORIES: Category[] = [
 export function getCategoryById(categoryId: number): Category | undefined {
   return SEEDED_CATEGORIES.find((category) => category.id === categoryId)
 }
+
+export function resolveCategoryId(
+  category?: {
+    id?: number | null
+    grouping?: string | null
+    name?: string | null
+  } | null,
+): number {
+  if (!category) return 0
+  if (typeof category.id === 'number' && getCategoryById(category.id)) {
+    return category.id
+  }
+  if (category.name) {
+    const byNameAndGrouping = SEEDED_CATEGORIES.find(
+      (seeded) =>
+        seeded.name === category.name &&
+        (!category.grouping || seeded.grouping === category.grouping),
+    )
+    if (byNameAndGrouping) return byNameAndGrouping.id
+    const byName = SEEDED_CATEGORIES.find(
+      (seeded) => seeded.name === category.name,
+    )
+    if (byName) return byName.id
+  }
+  return 0
+}

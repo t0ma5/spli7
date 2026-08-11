@@ -45,7 +45,12 @@ export function ImportGroupJsonButton({ reload }: Props) {
 
       const validated = groupImportSchema.safeParse(parsed)
       if (!validated.success) {
-        setError(t('invalidSchema'))
+        const firstIssue = validated.error.issues[0]
+        setError(
+          firstIssue
+            ? `${t('invalidSchema')} (${firstIssue.path.join('.') || 'root'}: ${firstIssue.message})`
+            : t('invalidSchema'),
+        )
         return
       }
 

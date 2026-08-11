@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { getCategoryById } from '@/lib/kv/categories'
+import { getCategoryById, resolveCategoryId } from '@/lib/kv/categories'
 import {
   ensureCategories,
   getGroupDocument,
@@ -185,10 +185,7 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
       throw new Error(`Invalid paidById: ${expense.paidById}`)
     }
 
-    const categoryId =
-      expense.category && getCategoryById(expense.category.id)
-        ? expense.category.id
-        : 0
+    const categoryId = resolveCategoryId(expense.category)
 
     return {
       id: expenseId,

@@ -239,7 +239,7 @@ export const groupImportSchema = z
           title: z.string().min(1),
           category: z
             .object({
-              id: z.number().int(),
+              id: z.number().int().optional(),
               grouping: z.string().optional(),
               name: z.string().optional(),
             })
