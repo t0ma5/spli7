@@ -379,7 +379,7 @@ export async function updateExpense(
   participantId?: string,
 ) {
   const group = await getGroupDocument(groupId)
-  if (!group) throw new Error(`Invalid group ID: ${groupId}`)
+  if (!group || group.deletedAt) throw new Error(`Invalid group ID: ${groupId}`)
 
   const existingIndex = group.expenses.findIndex((e) => e.id === expenseId)
   if (existingIndex === -1) throw new Error(`Invalid expense ID: ${expenseId}`)
