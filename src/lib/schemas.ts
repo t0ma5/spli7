@@ -286,7 +286,13 @@ export const groupImportSchema = z
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'unknownPaidFor',
-            path: ['expenses', expenseIndex, 'paidFor', paidForIndex, 'participantId'],
+            path: [
+              'expenses',
+              expenseIndex,
+              'paidFor',
+              paidForIndex,
+              'participantId',
+            ],
           })
         }
       })

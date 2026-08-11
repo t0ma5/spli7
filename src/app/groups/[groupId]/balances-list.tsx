@@ -1,7 +1,7 @@
 import { Balances } from '@/lib/balances'
 import { Currency } from '@/lib/currency'
-import { cn, formatCurrency } from '@/lib/utils'
 import { Participant } from '@/lib/kv/types'
+import { cn, formatCurrency } from '@/lib/utils'
 import { useLocale } from 'next-intl'
 
 type Props = {

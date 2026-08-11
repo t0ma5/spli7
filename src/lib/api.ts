@@ -129,7 +129,8 @@ function buildExpenseFromForm(
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     notes: expenseFormValues.notes ?? null,
     recurrenceRule:
-      (expenseFormValues.recurrenceRule as RecurrenceRule) ?? RecurrenceRule.NONE,
+      (expenseFormValues.recurrenceRule as RecurrenceRule) ??
+      RecurrenceRule.NONE,
     paidFor: expenseFormValues.paidFor.map((paidFor) => ({
       expenseId,
       participantId: paidFor.participant,

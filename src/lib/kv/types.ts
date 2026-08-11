@@ -12,7 +12,8 @@ export const RecurrenceRule = {
   WEEKLY: 'WEEKLY',
   MONTHLY: 'MONTHLY',
 } as const
-export type RecurrenceRule = (typeof RecurrenceRule)[keyof typeof RecurrenceRule]
+export type RecurrenceRule =
+  (typeof RecurrenceRule)[keyof typeof RecurrenceRule]
 
 export const ActivityType = {
   UPDATE_GROUP: 'UPDATE_GROUP',
@@ -21,7 +22,6 @@ export const ActivityType = {
   DELETE_EXPENSE: 'DELETE_EXPENSE',
 } as const
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType]
-
 
 export type Participant = {
   id: string

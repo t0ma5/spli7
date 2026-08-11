@@ -1,7 +1,7 @@
 import 'server-only'
 
-import { CATEGORIES_KEY, getKv, groupKey } from '@/lib/kv/client'
 import { SEEDED_CATEGORIES } from '@/lib/kv/categories'
+import { CATEGORIES_KEY, getKv, groupKey } from '@/lib/kv/client'
 import type { Category, GroupDocument } from '@/lib/kv/types'
 
 export async function getGroupDocument(

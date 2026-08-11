@@ -7,7 +7,10 @@ const interpretEnvVarAsBool = (val: unknown): boolean => {
 
 const envSchema = z
   .object({
-    NEXT_PUBLIC_BASE_URL: z.string().optional().default('http://localhost:3000'),
+    NEXT_PUBLIC_BASE_URL: z
+      .string()
+      .optional()
+      .default('http://localhost:3000'),
     NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS: z.preprocess(
       interpretEnvVarAsBool,
       z.boolean().default(false),

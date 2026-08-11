@@ -31,8 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Locale } from '@/i18n/request'
-import type { Group } from '@/lib/kv/types'
 import { defaultCurrencyList, getCurrency } from '@/lib/currency'
+import type { Group } from '@/lib/kv/types'
 import { GroupFormValues, groupFormSchema } from '@/lib/schemas'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Save, Trash2 } from 'lucide-react'

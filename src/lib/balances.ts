@@ -36,8 +36,9 @@ export function getBalances(expenses: ExpenseListItem[]): Balances {
       const [shares, totalShares] = match(expense.splitMode)
         .with('EVENLY', () => [1, paidFors.length] as const)
         .with('BY_SHARES', () => [paidFor.shares, totalPaidForShares] as const)
-        .with('BY_PERCENTAGE', () =>
-          [paidFor.shares, totalPaidForShares] as const,
+        .with(
+          'BY_PERCENTAGE',
+          () => [paidFor.shares, totalPaidForShares] as const,
         )
         .with('BY_AMOUNT', () => [paidFor.shares, totalPaidForShares] as const)
         .exhaustive()
