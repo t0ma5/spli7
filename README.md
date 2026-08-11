@@ -10,24 +10,30 @@ Spliit is a free and open source alternative to Splitwise. This fork is adapted 
 
 ## Features
 
-- [x] Create a group and share it with friends
-- [x] Create expenses with description
-- [x] Display group balances
-- [x] Create reimbursement expenses
-- [x] Progressive Web App
-- [x] Select all/no participant for expenses
-- [x] Split expenses unevenly
-- [x] Mark a group as favorite
-- [x] Tell the application who you are when opening a group
-- [x] Assign a category to expenses
-- [x] Search for expenses in a group
-- [x] Export a group to JSON or CSV
-- [x] Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
-- [x] Copy an existing expense into a new draft
-- [x] Math expressions in the amount field
-- [x] Group default split mode + optional PIN + share QR
-- [ ] Upload and attach images to expenses (removed — see below)
-- [ ] Create expense by scanning a receipt (removed — see below)
+Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · 🔴 new in this Cloudflare KV fork
+
+- [x] 🟢 Create a group and share it with friends
+- [x] 🟢 Create expenses with description
+- [x] 🟢 Display group balances
+- [x] 🟢 Create reimbursement expenses
+- [x] 🟢 Progressive Web App
+- [x] 🟢 Select all/no participant for expenses
+- [x] 🟢 Split expenses unevenly
+- [x] 🟢 Mark a group as favorite
+- [x] 🟢 Tell the application who you are when opening a group
+- [x] 🟢 Assign a category to expenses
+- [x] 🟢 Search for expenses in a group
+- [x] 🟢 Export a group to JSON or CSV
+- [x] 🔴 Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
+- [x] 🔴 Notes + activity history in JSON export/import (`exportVersion: 2`)
+- [x] 🔴 Copy an existing expense into a new draft
+- [x] 🔴 Math expressions in the amount field
+- [x] 🔴 Even-split cent remainder (no missing cents)
+- [x] 🔴 Group default split mode
+- [x] 🔴 Optional group PIN
+- [x] 🔴 Share group via QR code
+- [ ] 🟢 Upload and attach images to expenses (removed — see below)
+- [ ] 🟢 Create expense by scanning a receipt (removed — see below)
 
 ## Stack
 
