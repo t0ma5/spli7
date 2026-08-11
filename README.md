@@ -37,7 +37,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Optional calendar-month expense grouping
 - [x] 🔴 Drag-reorder / Sort A–Z participants
 - [x] 🔴 Multiple payers per expense (legacy single paidById migrated on read)
-- [x] 🔴 Extra currencies: **ARS**, **TRY**, **COP**, **JOD**, **MKD**, **MOP**, **MYR**, **VND** (ILS removed)
+- [x] 🔴 Extra currencies: **ARS**, **TRY**, **COP**, **JOD**, **MKD**, **MOP**, **MYR**, **VND**
 - [ ] ❌ Upload and attach images to expenses (removed — see below)
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
