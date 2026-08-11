@@ -128,6 +128,10 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "選用的 4–8 位數 PIN。持有連結的人第一次存取群組時仍需要 PIN。"
     }
   },
   "ExpenseForm": {

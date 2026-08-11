@@ -136,6 +136,10 @@
       "label": "首选货币",
       "createDescription": "所有的交易将使用此币种。",
       "customOption": "自定义"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "可选的 4–8 位 PIN。持有链接的人首次访问群组时仍需要 PIN。"
     }
   },
   "ExpenseForm": {

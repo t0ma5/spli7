@@ -128,6 +128,10 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "Valinnainen 4–8-numeroinen PIN. Linkin saajan on silti annettava PIN ensimmäisellä käyttökerralla."
     }
   },
   "ExpenseForm": {

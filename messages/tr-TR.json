@@ -128,6 +128,10 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "İsteğe bağlı 4–8 haneli PIN. Bağlantısı olan herkes grubuna ilk erişimde yine de bir PIN gerektirir."
     }
   },
   "ExpenseForm": {

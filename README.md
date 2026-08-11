@@ -2,11 +2,6 @@
 
 Spliit is an open source expense-tracking app. This fork is adapted to deploy on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
-## Credits & provenance
-
-- **Original Spliit** — idea, UI, and core expense-splitting product by [Sebastien Castiel](https://github.com/scastiel) and contributors: [spliit-app/spliit](https://github.com/spliit-app/spliit) · [spliit.app](https://spliit.app).
-- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with new features. Several UX improvements in *this* Workers/KV fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for denormalized KV documents, not a code port of their Postgres/API stack).
-
 ## Features
 
 Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · 🔴 new in this Cloudflare KV fork
@@ -31,6 +26,10 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Group default split mode
 - [x] 🔴 Optional group PIN
 - [x] 🔴 Share group via QR code
+- [x] 🔴 Soft-delete / restore groups (30-day grace) + **24-month inactivity expiry**
+- [x] 🔴 Security headers, CSV formula escape, Zod input caps, expense date bounds
+- [x] 🔴 Error boundaries + Drawer accessibility titles
+- [x] 🔴 Extra currencies: **ARS**, **TRY** (ILS removed)
 - [ ] ❌ Upload and attach images to expenses (removed — see below)
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
@@ -48,7 +47,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - Categories are seeded under the `categories` key.
 - Concurrent edits to the same group use **last-write-wins** (no Durable Objects / transactions).
 - Friend-sized groups fit this model; very large groups may hit KV value size limits.
-- Groups track `lastActivityAt` on expense create/update/delete and group settings updates. After **24 months** without activity, a daily cleanup job soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted. Call `GET/POST /api/cron/cleanup-groups` with `Authorization: Bearer $CRON_SECRET` (set `CRON_SECRET` in Worker env).
+- Groups track `lastActivityAt` on expense create/update/delete and group settings updates. After **24 months** without activity, cleanup soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted. Call `GET/POST /api/cron/cleanup-groups` with `Authorization: Bearer $CRON_SECRET` (set `CRON_SECRET` in Worker env).
 
 ## JSON import
 
@@ -64,17 +63,19 @@ On the **Groups** page, use **Import JSON** to upload a file produced by **Expor
 
 ## Extra UX on this fork
 
-Ideas below track community demand collected in [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) (and the linked upstream Spliit issues/PRs). Behavior is reimplemented for this Cloudflare KV deploy.
+Ideas below track community demand from [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md), upstream Spliit issues/PRs, and hardening patterns from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (reimplemented for KV — not a code port of their E2EE/auth stack).
 
 | Feature | Notes | Prior art |
 | --- | --- | --- |
-| **Copy expense** | From the expense list or edit screen (opens create prefilled). | Upstream [#527](https://github.com/spliit-app/spliit/issues/527); shipped in Spliit Cloud |
-| **Amount math** | Expressions in the amount field (`12+4.50`, `3*8`, …) on blur/save. | Upstream [#184](https://github.com/spliit-app/spliit/pull/184); shipped in Spliit Cloud |
+| **Copy expense** | From the expense list or edit header icon (opens create prefilled). | Upstream [#527](https://github.com/spliit-app/spliit/issues/527); shipped in Spliit Cloud |
+| **Amount math** | Expressions in the amount field (`10+5.50`, `5*8`, …) on blur/save. | Upstream [#184](https://github.com/spliit-app/spliit/pull/184); shipped in Spliit Cloud |
 | **Default split mode** | Stored on the group (device localStorage can still override). | Upstream [#366](https://github.com/spliit-app/spliit/pull/366); shipped in Spliit Cloud |
 | **Even-split cents** | Integer remainder allocation so balances don’t drop a cent. | Upstream [#374](https://github.com/spliit-app/spliit/issues/374) / [#427](https://github.com/spliit-app/spliit/pull/427); tracked by Spliit Cloud |
 | **Share QR** | QR in the share popover. | Upstream [#500](https://github.com/spliit-app/spliit/pull/500); on Spliit Cloud roadmap |
 | **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
-| **Notes + history in JSON** | Export/import round-trips expense notes, group information, and activity history (`exportVersion: 2`). Classic upstream JSON and Spliit Cloud’s Spliit importer do not fully preserve the original Activity feed. | Expense notes also appear in Spliit Cloud / upstream [#165](https://github.com/spliit-app/spliit/pull/165); history round-trip is specific to this fork |
+| **Notes + history in JSON** | Export/import round-trips expense notes, group information, and activity history (`exportVersion: 2`). | Expense notes also appear in Spliit Cloud / upstream [#165](https://github.com/spliit-app/spliit/pull/165); history round-trip is specific to this fork |
+| **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
+| **Export / input hardening** | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries. | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/KV) |
 
 ## Removed / disabled upstream features (S3 & OpenAI)
 
@@ -150,11 +151,18 @@ After a successful run, hard-refresh the live site (e.g. `/groups`) so the new U
 - Pushing code to GitHub does **not** update the live Worker until you deploy (local or Actions).
 - Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories and break CI.
 - API tokens pasted into chat or tickets should be **revoked** and rotated.
+- Set Worker secret `CRON_SECRET` and schedule a daily call to `/api/cron/cleanup-groups` for inactivity cleanup.
 
 ## Health check
 
 - `GET /api/health/readiness` or `GET /api/health` — app ready, including KV connectivity
 - `GET /api/health/liveness` — process alive only
+
+## Credits & provenance
+
+- **Original Spliit** — idea, UI, and core expense-splitting product by [Sebastien Castiel](https://github.com/scastiel) and contributors: [spliit-app/spliit](https://github.com/spliit-app/spliit) · [spliit.app](https://spliit.app).
+- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with new features. Several UX improvements in *this* Workers/KV fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for denormalized KV documents, not a code port of their Postgres/API stack).
+- **[anon-spliit](https://github.com/sora-grayscale/anon-spliit)** ([sora-grayscale](https://github.com/sora-grayscale)) — privacy-focused fork (E2EE, private instance, deletion/auto-delete). This Workers/KV fork adapted selected **lifecycle and hardening** ideas from that work; it does **not** port their end-to-end encryption or account/2FA stack.
 
 ## License
 

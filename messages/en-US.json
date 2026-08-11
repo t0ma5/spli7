@@ -130,7 +130,7 @@
     },
     "PinField": {
       "title": "Group PIN",
-      "description": "Optional 4–8 digit PIN. Anyone with the link still needs the PIN on this device until they unlock the group.",
+      "description": "Optional 4–8 digit PIN. Anyone with the link still needs a PIN to access the group for the first time",
       "enabled": "A PIN is currently enabled for this group.",
       "current": "Current PIN",
       "set": "Set PIN",

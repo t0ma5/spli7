@@ -137,6 +137,10 @@
       "createDescription": "Totes les quantitats i els balanços es mostraràn en aquesta moneda.",
       "editDescription": "Totes les quantitas i balanços es mostraràn en aquesta moneda. Canviar açò NO convertirà despeses ja enregistrades, excepte quan la moneda tinga \"unitats menors\" diferents que la actual (per exemple, canviar de Dólars estadounidencs a Yens japonesos)",
       "customOption": "Personalitzat"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "PIN opcional de 4–8 dígits. Qui tingui l’enllaç encara necessita un PIN per accedir al grup la primera vegada."
     }
   },
   "ExpenseForm": {

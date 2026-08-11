@@ -137,6 +137,10 @@
       "createDescription": "Todos os valores e saldos estarão nesta moeda.",
       "editDescription": "Todos os valores e saldos estarão nesta moeda. A sua alteração NÃO irá converter despesas já registradas, exceto quando a moeda possuir \"unidades menores\" que a atual (ex. Alterar de Dólar Americano para Yen Japonês)",
       "customOption": "Customizado"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "PIN opcional de 4–8 dígitos. Quem tiver o link ainda precisa de um PIN para acessar o grupo na primeira vez."
     }
   },
   "ExpenseForm": {

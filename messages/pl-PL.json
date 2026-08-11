@@ -129,6 +129,10 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "Opcjonalny PIN 4–8 cyfr. Osoba z linkiem nadal potrzebuje PIN-u przy pierwszym dostępie do grupy."
     }
   },
   "ExpenseForm": {

@@ -137,6 +137,10 @@
       "createDescription": "Alle hoeveelheden en saldi worden in deze valuta weergegeven.",
       "editDescription": "Alle bedragen en saldi worden in deze valuta weergegeven. Als je dit wijzigt, worden reeds ingevoerde uitgaven NIET omgerekend, behalve wanneer de valuta andere \"kleinste eenheden\" heeft dan de huidige (bijvoorbeeld bij een wijziging van Amerikaanse dollar naar Japanse yen)",
       "customOption": "Aangepast"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "Optionele pincode van 4–8 cijfers. Iedereen met de link heeft nog een pincode nodig om de groep de eerste keer te openen."
     }
   },
   "ExpenseForm": {

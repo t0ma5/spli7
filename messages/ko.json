@@ -109,6 +109,10 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "선택 사항인 4–8자리 PIN. 링크가 있는 사람도 그룹에 처음 접근할 때 PIN이 필요합니다."
     }
   },
   "ExpenseForm": {

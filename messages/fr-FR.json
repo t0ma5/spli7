@@ -137,6 +137,10 @@
       "createDescription": "Tous les montants et soldes seront dans cette devise.",
       "editDescription": "Tous les montants et soldes seront exprimés dans cette devise. La modification de cette option n'entraînera PAS la conversion des dépenses déjà saisies, sauf si la devise a des « unités mineures » différentes de celles de la devise actuelle (par exemple, passage du dollar américain au yen japonais)",
       "customOption": "Personnalisée"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "PIN optionnel de 4 à 8 chiffres. Toute personne disposant du lien a encore besoin d’un PIN pour accéder au groupe la première fois."
     }
   },
   "ExpenseForm": {

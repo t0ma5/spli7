@@ -137,6 +137,10 @@
       "createDescription": "Todos los importes y saldos estarán en esta moneda.",
       "editDescription": "Todos los importes y saldos estarán en esta moneda. Al cambiarla, NO se convertirán los gastos ya ingresados, excepto cuando la moneda tenga «unidades menores» diferentes a las actuales (por ejemplo, al cambiar de dólares estadounidenses a yenes japoneses)",
       "customOption": "Personalizado"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "PIN opcional de 4–8 dígitos. Quien tenga el enlace aún necesita un PIN para acceder al grupo por primera vez."
     }
   },
   "ExpenseForm": {

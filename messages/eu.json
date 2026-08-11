@@ -137,6 +137,10 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "Aukerako 4–8 digituko PIN. Esteka duenak taldera lehenengo aldiz sartzeko PIN bat behar du oraindik."
     }
   },
   "ExpenseForm": {

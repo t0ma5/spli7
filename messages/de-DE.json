@@ -137,6 +137,10 @@
       "createDescription": "Alle Beträge und Salden werden in dieser Währung angegeben.",
       "customOption": "benutzerdefiniert",
       "editDescription": "Alle Beträge und Salden werden in dieser Währung angegeben. Bei Änderung dieser, werden bereits eingegebene Ausgaben NICHT umgerechnet, es sei denn, die Währung hat andere \"kleinere Einheiten\" als die aktuelle (z. B. Wechsel von US-Dollar zu Japanischem Yen)"
+    },
+    "PinField": {
+      "title": "Group PIN",
+      "description": "Optionaler 4–8-stelliger PIN. Jeder mit dem Link benötigt beim ersten Zugriff weiterhin einen PIN."
     }
   },
   "ExpenseForm": {
