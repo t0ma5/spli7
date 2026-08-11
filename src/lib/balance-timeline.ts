@@ -17,6 +17,10 @@ type BalanceTimelineSplitMode =
   | 'BY_PERCENTAGE'
   | 'BY_SHARES'
 
+export type BalanceTimelinePaidBy = BalanceTimelineParticipant & {
+  amount: number
+}
+
 export type BalanceTimelineExpense = {
   amount: number
   category: BalanceTimelineCategory | null
@@ -24,7 +28,7 @@ export type BalanceTimelineExpense = {
   expenseDate: Date
   id?: string
   isReimbursement: boolean
-  paidBy: BalanceTimelineParticipant
+  paidBy: BalanceTimelinePaidBy[]
   paidFor: {
     participant: BalanceTimelineParticipant
     shares: number
@@ -37,7 +41,7 @@ export type BalanceTimelineEvent = {
   amount: number
   category: BalanceTimelineCategory | null
   isReimbursement: boolean
-  paidBy: BalanceTimelineParticipant
+  paidBy: BalanceTimelinePaidBy[]
   paidFor: BalanceTimelineParticipant[]
   title?: string
 }
@@ -215,7 +219,9 @@ function getParticipants(expenses: BalanceTimelineExpense[]) {
   const participants = new Map<string, BalanceTimelineParticipant>()
 
   for (const expense of expenses) {
-    participants.set(expense.paidBy.id, expense.paidBy)
+    for (const paidBy of expense.paidBy) {
+      participants.set(paidBy.id, { id: paidBy.id, name: paidBy.name })
+    }
 
     for (const paidFor of expense.paidFor) {
       participants.set(paidFor.participant.id, paidFor.participant)
@@ -293,7 +299,9 @@ function getExpenseDeltas(expense: BalanceTimelineExpense) {
   )
   let remainingAmount = expense.amount
 
-  addDelta(deltas, expense.paidBy.id, expense.amount)
+  for (const paidBy of expense.paidBy) {
+    addDelta(deltas, paidBy.id, paidBy.amount)
+  }
 
   expense.paidFor.forEach((paidFor, index) => {
     const isLast = index === expense.paidFor.length - 1

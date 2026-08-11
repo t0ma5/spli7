@@ -11,6 +11,15 @@ const categories = {
   rent: { id: 18, grouping: 'Home', name: 'Rent' },
 }
 
+type PaidByInput =
+  | BalanceTimelineExpense['paidBy']
+  | { id: string; name: string; amount?: number }
+
+function asPaidBy(paidBy: PaidByInput, amount: number): BalanceTimelineExpense['paidBy'] {
+  if (Array.isArray(paidBy)) return paidBy
+  return [{ id: paidBy.id, name: paidBy.name, amount: paidBy.amount ?? amount }]
+}
+
 function expense({
   amount,
   category = categories.rent,
@@ -29,7 +38,7 @@ function expense({
   createdAt?: string
   date: string
   isReimbursement?: boolean
-  paidBy?: BalanceTimelineExpense['paidBy']
+  paidBy?: PaidByInput
   paidFor?: BalanceTimelineExpense['paidFor']
   splitMode?: BalanceTimelineExpense['splitMode']
 }): BalanceTimelineExpense {
@@ -39,7 +48,7 @@ function expense({
     createdAt: createdAt ? new Date(createdAt) : undefined,
     expenseDate: new Date(date),
     isReimbursement,
-    paidBy,
+    paidBy: asPaidBy(paidBy, amount),
     paidFor,
     splitMode,
   }
@@ -103,7 +112,7 @@ describe('getBalanceTimeline', () => {
       events: [
         {
           isReimbursement: true,
-          paidBy: participants.blair,
+          paidBy: [{ ...participants.blair, amount: 4000 }],
           paidFor: [participants.alex],
         },
       ],
@@ -193,6 +202,31 @@ describe('getBalanceTimeline', () => {
       peakBalance: -3000,
       peakAbsBalance: 3000,
       repaymentCount: 0,
+    })
+  })
+
+  it('attributes paid amounts across multiple payers', () => {
+    const timeline = getBalanceTimeline(
+      [
+        expense({
+          amount: 10000,
+          date: '2026-06-01T00:00:00.000Z',
+          paidBy: [
+            { ...participants.alex, amount: 6000 },
+            { ...participants.blair, amount: 4000 },
+          ],
+          paidFor: [
+            { participant: participants.alex, shares: 1 },
+            { participant: participants.blair, shares: 1 },
+          ],
+        }),
+      ],
+      { range: 'all' },
+    )
+
+    expect(timeline.points[1]?.balances).toMatchObject({
+      alex: 1000,
+      blair: -1000,
     })
   })
 })

@@ -57,6 +57,13 @@ export type ExpensePaidFor = {
   shares: number
 }
 
+export type ExpensePaidBy = {
+  expenseId: string
+  participantId: string
+  /** Amount paid by this participant, in minor units */
+  amount: number
+}
+
 export type Expense = {
   id: string
   groupId: string
@@ -67,7 +74,9 @@ export type Expense = {
   originalAmount: number | null
   originalCurrency: string | null
   conversionRate: number | null
-  paidById: string
+  paidBy: ExpensePaidBy[]
+  /** @deprecated Legacy single-payer field; migrated on read when paidBy is empty */
+  paidById?: string
   isReimbursement: boolean
   splitMode: SplitMode
   createdAt: string
@@ -76,6 +85,28 @@ export type Expense = {
   paidFor: ExpensePaidFor[]
   documents: ExpenseDocument[]
   recurringExpenseLink: RecurringExpenseLink | null
+}
+
+/** Normalize legacy paidById into a paidBy array (migrate-on-read). */
+export function getExpensePaidBy(expense: {
+  id: string
+  amount: number
+  paidBy?: ExpensePaidBy[] | null
+  paidById?: string | null
+}): ExpensePaidBy[] {
+  if (expense.paidBy && expense.paidBy.length > 0) {
+    return expense.paidBy
+  }
+  if (expense.paidById) {
+    return [
+      {
+        expenseId: expense.id,
+        participantId: expense.paidById,
+        amount: expense.amount,
+      },
+    ]
+  }
+  return []
 }
 
 export type Activity = {
@@ -132,7 +163,7 @@ export type ExpenseListItem = {
   expenseDate: Date
   id: string
   isReimbursement: boolean
-  paidBy: { id: string; name: string }
+  paidBy: { id: string; name: string; amount: number }[]
   paidFor: { shares: number; participant: { id: string; name: string } }[]
   splitMode: SplitMode
   recurrenceRule: RecurrenceRule | null

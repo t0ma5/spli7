@@ -18,6 +18,7 @@ import {
 import {
   ActivityType,
   Expense,
+  getExpensePaidBy,
   Group,
   GroupDocument,
   Participant,
@@ -148,7 +149,11 @@ function buildExpenseFromForm(
     originalAmount: expenseFormValues.originalAmount ?? null,
     originalCurrency: expenseFormValues.originalCurrency || null,
     conversionRate: expenseFormValues.conversionRate ?? null,
-    paidById: expenseFormValues.paidBy,
+    paidBy: expenseFormValues.paidBy.map((paidBy) => ({
+      expenseId,
+      participantId: paidBy.participant,
+      amount: Number(paidBy.amount),
+    })),
     isReimbursement: expenseFormValues.isReimbursement,
     splitMode: expenseFormValues.splitMode as SplitMode,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -217,9 +222,26 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
     const expenseId = randomId()
     if (expense.id) expenseIdMap.set(expense.id, expenseId)
 
-    const paidById = participantIdMap.get(expense.paidById)
-    if (!paidById) {
-      throw new Error(`Invalid paidById: ${expense.paidById}`)
+    const legacyPaidBy =
+      expense.paidBy && expense.paidBy.length > 0
+        ? expense.paidBy
+        : expense.paidById
+          ? [{ participantId: expense.paidById, amount: expense.amount }]
+          : []
+
+    const paidBy = legacyPaidBy.map(({ participantId, amount }) => {
+      const mappedId = participantIdMap.get(participantId)
+      if (!mappedId) {
+        throw new Error(`Invalid paidBy participantId: ${participantId}`)
+      }
+      return {
+        expenseId,
+        participantId: mappedId,
+        amount,
+      }
+    })
+    if (paidBy.length === 0) {
+      throw new Error('Expense is missing paidBy')
     }
 
     const categoryId = resolveCategoryId(expense.category)
@@ -234,7 +256,7 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
       originalAmount: expense.originalAmount ?? null,
       originalCurrency: expense.originalCurrency ?? null,
       conversionRate: expense.conversionRate ?? null,
-      paidById,
+      paidBy,
       isReimbursement: expense.isReimbursement,
       splitMode: expense.splitMode as SplitMode,
       createdAt: expense.createdAt.toISOString(),
@@ -345,7 +367,7 @@ export async function createExpense(
   if (!group || group.deletedAt) throw new Error(`Invalid group ID: ${groupId}`)
 
   for (const participant of [
-    expenseFormValues.paidBy,
+    ...expenseFormValues.paidBy.map((p) => p.participant),
     ...expenseFormValues.paidFor.map((p) => p.participant),
   ]) {
     if (!group.participants.some((p) => p.id === participant))
@@ -389,7 +411,7 @@ export async function getGroupExpensesParticipants(groupId: string) {
   return Array.from(
     new Set(
       expenses.flatMap((e) => [
-        e.paidBy.id,
+        ...e.paidBy.map((pb) => pb.id),
         ...e.paidFor.map((pf) => pf.participant.id),
       ]),
     ),
@@ -428,7 +450,7 @@ export async function updateExpense(
   const existingExpense = group.expenses[existingIndex]
 
   for (const participant of [
-    expenseFormValues.paidBy,
+    ...expenseFormValues.paidBy.map((p) => p.participant),
     ...expenseFormValues.paidFor.map((p) => p.participant),
   ]) {
     if (!group.participants.some((p) => p.id === participant))
@@ -631,7 +653,14 @@ export async function getGroupExpenses(
   }
 
   return expenses.map((expense) => {
-    const paidBy = participantById(group, expense.paidById)
+    const paidBy = getExpensePaidBy(expense).map((pb) => {
+      const participant = participantById(group, pb.participantId)
+      return {
+        id: participant?.id ?? pb.participantId,
+        name: participant?.name ?? 'Unknown',
+        amount: pb.amount,
+      }
+    })
     return {
       amount: expense.amount,
       category: getCategoryById(expense.categoryId) ?? null,
@@ -639,9 +668,7 @@ export async function getGroupExpenses(
       expenseDate: toDate(expense.expenseDate),
       id: expense.id,
       isReimbursement: expense.isReimbursement,
-      paidBy: paidBy
-        ? { id: paidBy.id, name: paidBy.name }
-        : { id: expense.paidById, name: 'Unknown' },
+      paidBy,
       paidFor: expense.paidFor.map((paidFor) => {
         const participant = participantById(group, paidFor.participantId)
         return {
@@ -670,17 +697,13 @@ export async function getExpense(groupId: string, expenseId: string) {
   const expense = group.expenses.find((e) => e.id === expenseId)
   if (!expense) return null
 
-  const paidBy = participantById(group, expense.paidById)
+  const paidBy = getExpensePaidBy(expense)
   return {
     ...expense,
     expenseDate: toDate(expense.expenseDate),
     createdAt: toDate(expense.createdAt),
     conversionRate: expense.conversionRate,
-    paidBy: paidBy ?? {
-      id: expense.paidById,
-      name: 'Unknown',
-      groupId,
-    },
+    paidBy,
     paidFor: expense.paidFor,
     category: getCategoryById(expense.categoryId) ?? null,
     documents: expense.documents,
@@ -789,7 +812,11 @@ function createRecurringExpensesForGroup(group: GroupDocument): boolean {
         originalAmount: currentExpenseRecord.originalAmount,
         originalCurrency: currentExpenseRecord.originalCurrency,
         conversionRate: currentExpenseRecord.conversionRate,
-        paidById: currentExpenseRecord.paidById,
+        paidBy: getExpensePaidBy(currentExpenseRecord).map((pb) => ({
+          expenseId: newExpenseId,
+          participantId: pb.participantId,
+          amount: pb.amount,
+        })),
         isReimbursement: currentExpenseRecord.isReimbursement,
         splitMode: currentExpenseRecord.splitMode,
         createdAt,
@@ -914,7 +941,10 @@ export async function getGroupForExport(groupId: string) {
         originalAmount: expense.originalAmount,
         originalCurrency: expense.originalCurrency,
         conversionRate: expense.conversionRate,
-        paidById: expense.paidById,
+        paidBy: getExpensePaidBy(expense).map(({ participantId, amount }) => ({
+          participantId,
+          amount,
+        })),
         paidFor: expense.paidFor.map(({ participantId, shares }) => ({
           participantId,
           shares,

@@ -87,16 +87,18 @@ export async function GET(
         { totalShares: 0, participantShare: 0 },
       )
 
-      const isPaidByParticipant = expense.paidById === participant.id
-      const participantAmountShare = +formatAmountAsDecimal(
+      const paidAmount = expense.paidBy.find(
+        (pb) => pb.participantId === participant.id,
+      )?.amount ?? 0
+      const owedAmount =
         totalShares === 0
           ? 0
-          : (expense.amount / totalShares) * participantShare,
+          : (expense.amount / totalShares) * participantShare
+
+      row[participant.name] = +formatAmountAsDecimal(
+        paidAmount - owedAmount,
         currency,
       )
-
-      row[participant.name] =
-        participantAmountShare * (isPaidByParticipant ? 1 : -1)
     }
 
     return row

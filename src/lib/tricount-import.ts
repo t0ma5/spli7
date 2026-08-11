@@ -134,23 +134,6 @@ export async function parseTricountCsv(
   const paidByIdx = headers.indexOf('Paid by')
   const dateTimeIdx = headers.indexOf('Date & time')
 
-  if (
-    titleIdx === -1 ||
-    amountIdx === -1 ||
-    currencyIdx === -1 ||
-    paidByIdx === -1
-  ) {
-    throw new Error('Invalid Tricount CSV format: missing required columns')
-  }
-
-  let defaultCurrencyCode = 'EUR'
-  if (amountInDefaultIdx !== -1) {
-    const match = headers[amountInDefaultIdx].match(/\(([^)]+)\)/)
-    if (match) defaultCurrencyCode = match[1]
-  }
-
-  const resolvedTarget = (targetCurrencyCode || defaultCurrencyCode).toUpperCase()
-
   const participantNames: string[] = []
   const participantMap = new Map<
     string,
@@ -179,6 +162,27 @@ export async function parseTricountCsv(
       }
     }
   }
+
+  const hasPerPersonPaidBy = Array.from(participantMap.values()).some(
+    (p) => p.paidByIdx !== -1,
+  )
+
+  if (
+    titleIdx === -1 ||
+    amountIdx === -1 ||
+    currencyIdx === -1 ||
+    (paidByIdx === -1 && !hasPerPersonPaidBy)
+  ) {
+    throw new Error('Invalid Tricount CSV format: missing required columns')
+  }
+
+  let defaultCurrencyCode = 'EUR'
+  if (amountInDefaultIdx !== -1) {
+    const match = headers[amountInDefaultIdx].match(/\(([^)]+)\)/)
+    if (match) defaultCurrencyCode = match[1]
+  }
+
+  const resolvedTarget = (targetCurrencyCode || defaultCurrencyCode).toUpperCase()
 
   if (participantNames.length === 0) {
     throw new Error('No participants found in the Tricount CSV')
@@ -235,10 +239,6 @@ export async function parseTricountCsv(
     const categoryName = categoryIdx !== -1 ? row[categoryIdx] : ''
     const categoryId = findCategoryId(categoryName, isReimbursement)
 
-    const paidBy = row[paidByIdx]
-    const paidById = participantDbIds.get(paidBy)
-    if (!paidById) continue
-
     let expenseDate = new Date()
     if (dateTimeIdx !== -1 && row[dateTimeIdx]) {
       const parsedDate = new Date(row[dateTimeIdx])
@@ -288,6 +288,43 @@ export async function parseTricountCsv(
         amountOriginalVal !== 0 ? amountTargetVal / amountOriginalVal : null
     }
 
+    const toTargetCents = (defaultCurrencyAmount: number) =>
+      Math.round(
+        (Math.abs(defaultCurrencyAmount) / targetToDefaultRate) *
+          10 ** targetCurrencyDigits,
+      )
+
+    const paidByList: { participantId: string; amount: number }[] = []
+    for (const name of participantNames) {
+      const pMap = participantMap.get(name)!
+      if (pMap.paidByIdx !== -1 && row[pMap.paidByIdx]) {
+        const paidVal = parseFloat(row[pMap.paidByIdx])
+        if (!Number.isNaN(paidVal) && paidVal > 0) {
+          const paidAmount = toTargetCents(paidVal)
+          if (paidAmount > 0) {
+            paidByList.push({
+              participantId: participantDbIds.get(name)!,
+              amount: paidAmount,
+            })
+          }
+        }
+      }
+    }
+
+    if (paidByList.length === 0) {
+      if (paidByIdx === -1) continue
+      const paidByName = row[paidByIdx]
+      const paidById = participantDbIds.get(paidByName)
+      if (!paidById) continue
+      paidByList.push({ participantId: paidById, amount: amountCents })
+    } else {
+      const paidSum = paidByList.reduce((sum, p) => sum + p.amount, 0)
+      const paidDiscrepancy = amountCents - paidSum
+      if (paidDiscrepancy !== 0) {
+        paidByList[paidByList.length - 1].amount += paidDiscrepancy
+      }
+    }
+
     const paidForList: { participantId: string; shares: number }[] = []
     let sumShares = 0
 
@@ -296,10 +333,7 @@ export async function parseTricountCsv(
       if (pMap.impactedIdx !== -1 && row[pMap.impactedIdx]) {
         const impactedVal = parseFloat(row[pMap.impactedIdx])
         if (impactedVal < 0) {
-          const impactedTargetVal = Math.abs(impactedVal) / targetToDefaultRate
-          const shareAmount = Math.round(
-            impactedTargetVal * 10 ** targetCurrencyDigits,
-          )
+          const shareAmount = toTargetCents(impactedVal)
           if (shareAmount > 0) {
             paidForList.push({
               participantId: participantDbIds.get(name)!,
@@ -317,7 +351,10 @@ export async function parseTricountCsv(
     }
 
     if (paidForList.length === 0) {
-      paidForList.push({ participantId: paidById, shares: amountCents })
+      paidForList.push({
+        participantId: paidByList[0].participantId,
+        shares: amountCents,
+      })
     }
 
     const expenseId = randomId()
@@ -331,7 +368,11 @@ export async function parseTricountCsv(
       originalAmount: originalAmountCents,
       originalCurrency: originalCurrencyCode,
       conversionRate: conversionRateVal,
-      paidById,
+      paidBy: paidByList.map(({ participantId, amount }) => ({
+        expenseId,
+        participantId,
+        amount,
+      })),
       isReimbursement,
       splitMode: SplitMode.BY_AMOUNT,
       createdAt: expenseDate.toISOString(),

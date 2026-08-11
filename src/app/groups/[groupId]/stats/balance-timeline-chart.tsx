@@ -1317,7 +1317,9 @@ function getMarkerEvents({
   showCategoryMarkers: boolean
 }) {
   const paymentEvents = coordinate.point.events.filter(
-    (event) => event.isReimbursement && event.paidBy.id === participantId,
+    (event) =>
+      event.isReimbursement &&
+      event.paidBy.some((pb) => pb.id === participantId),
   )
 
   if (!showCategoryMarkers || coordinate.point.isStart) return paymentEvents
@@ -1325,7 +1327,9 @@ function getMarkerEvents({
   return [
     ...paymentEvents,
     ...coordinate.point.events.filter(
-      (event) => !event.isReimbursement && event.paidBy.id === participantId,
+      (event) =>
+        !event.isReimbursement &&
+        event.paidBy.some((pb) => pb.id === participantId),
     ),
   ]
 }
@@ -1377,7 +1381,9 @@ function getPaymentEventLabel({
     .map((participant) => participant.name)
     .join(', ')
 
-  return `${event.paidBy.name} paid ${formatChartCurrency({
+  const paidByNames = event.paidBy.map((pb) => pb.name).join(', ')
+
+  return `${paidByNames} paid ${formatChartCurrency({
     amount: Math.abs(event.amount),
     currency,
     locale,
@@ -1403,7 +1409,9 @@ function getExpenseEventLabel({
     ? `${event.title} (${categoryLabel})`
     : categoryLabel
 
-  return `${eventLabel}: ${event.paidBy.name} paid ${formatChartCurrency({
+  const paidByNames = event.paidBy.map((pb) => pb.name).join(', ')
+
+  return `${eventLabel}: ${paidByNames} paid ${formatChartCurrency({
     amount: Math.abs(event.amount),
     currency,
     locale,

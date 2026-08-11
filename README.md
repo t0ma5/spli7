@@ -36,6 +36,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Monthly category spending charts + balance timeline on Stats
 - [x] 🔴 Optional calendar-month expense grouping
 - [x] 🔴 Drag-reorder / Sort A–Z participants
+- [x] 🔴 Multiple payers per expense (legacy single paidById migrated on read)
 - [x] 🔴 Extra currencies: **ARS**, **TRY**, **COP**, **JOD**, **MKD**, **MOP**, **MYR**, **VND** (ILS removed)
 - [ ] ❌ Upload and attach images to expenses (removed — see below)
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
@@ -71,7 +72,7 @@ Shared behavior:
 
 ### Spliit JSON
 
-- Restores participants, expenses, split modes, amounts, dates, **notes**, group **information**, and **activity history** (when present in the file).
+- Restores participants, expenses (including **multiple payers** when present), split modes, amounts, dates, **notes**, group **information**, and **activity history** (when present in the file).
 - Categories: match by `id` when present; otherwise by `name` / `grouping` against the seeded list (many exports omit `id`).
 - Newer exports include `exportVersion: 2` and expense `id`s (needed to re-link history).
 - Does **not** restore expense attachments or active recurring-expense links.
@@ -102,6 +103,7 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Mobile tab icons** | Icon-only tabs on small screens; labels from sm. | Upstream [#539](https://github.com/spliit-app/spliit/pull/539) |
 | **Monthly spending charts** | CSS stacked category charts + balance timeline on Stats. | Upstream [#532](https://github.com/spliit-app/spliit/pull/532) |
 | **Calendar month grouping** | Optional group setting for roommate-style monthly lists. | Upstream [#530](https://github.com/spliit-app/spliit/pull/530) |
+| **Multiple payers** | Split who paid an expense across several participants; balances/export/import aware. Legacy paidById migrates on read. | Upstream [#396](https://github.com/spliit-app/spliit/pull/396) |
 | **Reorder participants** | Drag-and-drop + Sort A–Z; order persisted in KV. | Upstream [#416](https://github.com/spliit-app/spliit/pull/416) |
 | **Tricount import** | GDPR CSV export via the same Import control as Spliit JSON. | Upstream [#526](https://github.com/spliit-app/spliit/pull/526) |
 | **Export / input hardening** | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries. | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/KV) |

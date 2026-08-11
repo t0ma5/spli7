@@ -65,6 +65,25 @@ const inputCoercedToNumber = z.union([
   }),
 ])
 
+const paidByAmountSchema = z
+  .union(
+    [
+      z.number(),
+      z.string().transform((value, ctx) => {
+        const valueAsNumber = evaluateAmountExpression(value)
+        if (valueAsNumber === null)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'invalidNumber',
+          })
+        return valueAsNumber ?? Number.NaN
+      }),
+    ],
+    { required_error: 'amountRequired' },
+  )
+  .refine((amount) => amount != 0, 'amountNotZero')
+  .refine((amount) => amount <= 10_000_000_00, 'amountTenMillion')
+
 export const expenseFormSchema = z
   .object({
     expenseDate: z.coerce
@@ -84,24 +103,21 @@ export const expenseFormSchema = z
       .min(2, 'min2')
       .max(200, 'max200'),
     category: z.coerce.number().default(0),
+    /** Synced from sum of paidBy in the form; overwritten by transform. */
     amount: z
-      .union(
-        [
-          z.number(),
-          z.string().transform((value, ctx) => {
-            const valueAsNumber = evaluateAmountExpression(value)
-            if (valueAsNumber === null)
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'invalidNumber',
-              })
-            return valueAsNumber ?? Number.NaN
-          }),
-        ],
-        { required_error: 'amountRequired' },
-      )
-      .refine((amount) => amount != 0, 'amountNotZero')
-      .refine((amount) => amount <= 10_000_000_00, 'amountTenMillion'),
+      .union([
+        z.number(),
+        z.string().transform((value, ctx) => {
+          const valueAsNumber = evaluateAmountExpression(value)
+          if (valueAsNumber === null)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'invalidNumber',
+            })
+          return valueAsNumber ?? Number.NaN
+        }),
+      ])
+      .optional(),
     originalAmount: z
       .union([
         z.literal('').transform(() => undefined),
@@ -117,7 +133,14 @@ export const expenseFormSchema = z
         inputCoercedToNumber.refine((amount) => amount > 0, 'ratePositive'),
       ])
       .optional(),
-    paidBy: z.string({ required_error: 'paidByRequired' }).max(30),
+    paidBy: z
+      .array(
+        z.object({
+          participant: z.string({ required_error: 'paidByRequired' }).max(30),
+          amount: paidByAmountSchema,
+        }),
+      )
+      .min(1, 'paidByRequired'),
     paidFor: z
       .array(
         z.object({
@@ -173,6 +196,25 @@ export const expenseFormSchema = z
       .default('NONE'),
   })
   .superRefine((expense, ctx) => {
+    const totalAmount = expense.paidBy.reduce(
+      (sum, { amount }) => sum + Number(amount),
+      0,
+    )
+    if (totalAmount === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'amountNotZero',
+        path: ['paidBy'],
+      })
+    }
+    if (Math.abs(totalAmount) > 10_000_000_00) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'amountTenMillion',
+        path: ['paidBy'],
+      })
+    }
+
     switch (expense.splitMode) {
       case 'EVENLY':
         break // noop
@@ -183,11 +225,7 @@ export const expenseFormSchema = z
           (sum, { shares }) => new Decimal(shares).add(sum),
           new Decimal(0),
         )
-        if (!sum.equals(new Decimal(expense.amount))) {
-          // const detail =
-          //   sum < expense.amount
-          //     ? `${((expense.amount - sum) / 100).toFixed(2)} missing`
-          //     : `${((sum - expense.amount) / 100).toFixed(2)} surplus`
+        if (!sum.equals(new Decimal(totalAmount))) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'amountSum',
@@ -206,10 +244,6 @@ export const expenseFormSchema = z
           0,
         )
         if (sum !== 10000) {
-          const detail =
-            sum < 10000
-              ? `${((10000 - sum) / 100).toFixed(0)}% missing`
-              : `${((sum - 10000) / 100).toFixed(0)}% surplus`
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'percentageSum',
@@ -221,19 +255,21 @@ export const expenseFormSchema = z
     }
   })
   .transform((expense) => {
-    // Format the share split as a number (if from form submission)
+    const amount = expense.paidBy.reduce(
+      (sum, { amount }) => sum + Number(amount),
+      0,
+    )
     return {
       ...expense,
+      amount,
       paidFor: expense.paidFor.map((paidFor) => {
         const shares = paidFor.shares
         if (typeof shares === 'string' && expense.splitMode !== 'BY_AMOUNT') {
-          // For splitting not by amount, preserve the previous behaviour of multiplying the share by 100
           return {
             ...paidFor,
             shares: Math.round(Number(shares) * 100),
           }
         }
-        // Otherwise, no need as the number will have been formatted according to currency.
         return {
           ...paidFor,
           shares: Number(shares),
@@ -249,6 +285,11 @@ export type SplittingOptions = {
   splitMode: SplitMode
   paidFor: ExpenseFormValues['paidFor'] | null
 }
+
+const importPaidByEntrySchema = z.object({
+  participantId: z.string().min(1),
+  amount: z.number().int(),
+})
 
 /** Matches the JSON shape produced by getGroupForExport /expenses/export/json */
 export const groupImportSchema = z
@@ -288,7 +329,8 @@ export const groupImportSchema = z
           originalAmount: z.number().int().nullish(),
           originalCurrency: z.string().nullish(),
           conversionRate: z.number().nullish(),
-          paidById: z.string().min(1),
+          paidBy: z.array(importPaidByEntrySchema).min(1).optional(),
+          paidById: z.string().min(1).optional(),
           paidFor: z
             .array(
               z.object({
@@ -331,13 +373,31 @@ export const groupImportSchema = z
   .superRefine((data, ctx) => {
     const participantIds = new Set(data.participants.map((p) => p.id))
     data.expenses.forEach((expense, expenseIndex) => {
-      if (!participantIds.has(expense.paidById)) {
+      const paidByEntries =
+        expense.paidBy && expense.paidBy.length > 0
+          ? expense.paidBy
+          : expense.paidById
+            ? [{ participantId: expense.paidById, amount: expense.amount }]
+            : []
+
+      if (paidByEntries.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'unknownPaidBy',
-          path: ['expenses', expenseIndex, 'paidById'],
+          path: ['expenses', expenseIndex, 'paidBy'],
         })
       }
+
+      paidByEntries.forEach((entry, paidByIndex) => {
+        if (!participantIds.has(entry.participantId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'unknownPaidBy',
+            path: ['expenses', expenseIndex, 'paidBy', paidByIndex, 'participantId'],
+          })
+        }
+      })
+
       expense.paidFor.forEach((paidFor, paidForIndex) => {
         if (!participantIds.has(paidFor.participantId)) {
           ctx.addIssue({

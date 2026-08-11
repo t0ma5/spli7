@@ -12,13 +12,14 @@ export function getTotalActiveUserPaidFor(
   activeUserId: string | null,
   expenses: ExpenseListItem[],
 ): number {
-  return expenses.reduce(
-    (total, expense) =>
-      expense.paidBy.id === activeUserId && !expense.isReimbursement
-        ? total + expense.amount
-        : total,
-    0,
-  )
+  return expenses.reduce((total, expense) => {
+    const userPaidBy = expense.paidBy.find(
+      (paidBy) => paidBy.id === activeUserId,
+    )
+    return userPaidBy && !expense.isReimbursement
+      ? total + userPaidBy.amount
+      : total
+  }, 0)
 }
 
 export function calculateShare(
