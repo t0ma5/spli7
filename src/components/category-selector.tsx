@@ -9,7 +9,7 @@ import {
   CommandInput,
   CommandItem,
 } from '@/components/ui/command'
-import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import {
   Popover,
   PopoverContent,
@@ -37,6 +37,7 @@ export function CategorySelector({
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState<number>(defaultValue)
   const isDesktop = useMediaQuery('(min-width: 768px)')
+  const t = useTranslations('Categories')
 
   // allow overwriting currently selected category from outside
   useEffect(() => {
@@ -81,6 +82,7 @@ export function CategorySelector({
         />
       </DrawerTrigger>
       <DrawerContent className="p-0">
+        <DrawerTitle className="sr-only">{t('search')}</DrawerTitle>
         <CategoryCommand
           categories={categories}
           onValueChange={(id) => {

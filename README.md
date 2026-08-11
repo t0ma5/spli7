@@ -48,6 +48,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - Categories are seeded under the `categories` key.
 - Concurrent edits to the same group use **last-write-wins** (no Durable Objects / transactions).
 - Friend-sized groups fit this model; very large groups may hit KV value size limits.
+- Groups track `lastActivityAt` on expense create/update/delete and group settings updates. After **24 months** without activity, a daily cleanup job soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted. Call `GET/POST /api/cron/cleanup-groups` with `Authorization: Bearer $CRON_SECRET` (set `CRON_SECRET` in Worker env).
 
 ## JSON import
 

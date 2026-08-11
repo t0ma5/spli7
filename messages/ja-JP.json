@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "このグループは存在しません。",
       "link": "最近訪れたグループへ移動"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -113,13 +120,17 @@
         "label": "アクティブユーザー",
         "placeholder": "参加者を選択",
         "none": "なし",
-        "description": "支出の支払いのデフォルトとして使用されるユーザー。"
+        "description": "支出の支払いのデフォルトとして使用されるユーザー。",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "保存",
       "saving": "保存中…",
       "create": "作成",
       "creating": "作成中…",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     },
     "CurrencyCodeField": {
       "label": "主な通貨",

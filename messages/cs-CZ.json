@@ -76,6 +76,13 @@
     "NotFound": {
       "text": "Tato skupina neexistuje.",
       "link": "Přejít na nedávno navštívené skupiny"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -111,13 +118,17 @@
         "label": "Aktivní uživatel",
         "placeholder": "Vyberte účastníka",
         "none": "Žádný",
-        "description": "Uživatel použitý jako výchozí pro placení výdajů."
+        "description": "Uživatel použitý jako výchozí pro placení výdajů.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Uložit",
       "saving": "Ukládání…",
       "create": "Vytvořit",
       "creating": "Vytváření…",
-      "cancel": "Zrušit"
+      "cancel": "Zrušit",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

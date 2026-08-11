@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "Este grupo não existe.",
       "link": "Ir para os grupos visitados recentemente"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -119,9 +126,13 @@
         "label": "Utilizador ativo",
         "placeholder": "Selecionar um participante",
         "none": "Nenhum",
-        "description": "Utilizador usado por defeito para pagar despesas."
+        "description": "Utilizador usado por defeito para pagar despesas.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
-      "save": "Gravar"
+      "save": "Gravar",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   }
 }

@@ -75,6 +75,13 @@
     "NotFound": {
       "text": "Bu grup mevcut değil.",
       "link": "Son ziyaret ettiğiniz gruplara dön"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -110,13 +117,17 @@
         "label": "Aktif kullanıcı",
         "placeholder": "Bir katılımcı seçin",
         "none": "Yok",
-        "description": "Masrafların varsayılan olarak kimin adına ekleneceği."
+        "description": "Masrafların varsayılan olarak kimin adına ekleneceği.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Kaydet",
       "saving": "Kaydediliyor…",
       "create": "Oluştur",
       "creating": "Oluşturuluyor…",
-      "cancel": "İptal"
+      "cancel": "İptal",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

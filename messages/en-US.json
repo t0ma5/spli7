@@ -89,6 +89,13 @@
     "NotFound": {
       "text": "This group does not exist.",
       "link": "Go to recently visited groups"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -148,13 +155,17 @@
         "label": "Active user",
         "placeholder": "Select a participant",
         "none": "None",
-        "description": "User used as default for paying expenses."
+        "description": "User used as default for paying expenses.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Save",
       "saving": "Saving…",
       "create": "Create",
       "creating": "Creating…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {
@@ -393,6 +404,9 @@
     "min2": "Enter at least two characters.",
     "max5": "Enter at most five characters.",
     "max50": "Enter at most 50 characters.",
+    "max200": "Enter at most 200 characters.",
+    "expenseDateTooFar": "Expense date cannot be more than 1 year in the future.",
+    "expenseDateTooOld": "Expense date cannot be more than 5 years in the past.",
     "duplicateParticipantName": "Another participant already has this name.",
     "titleRequired": "Please enter a title.",
     "invalidNumber": "Invalid number.",

@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "Grup ini tidak dapat ditemukan.",
       "link": "Buka grup yang baru saja dikunjungi"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -119,13 +126,17 @@
         "label": "Pengguna aktif",
         "placeholder": "Pilih peserta",
         "none": "Tidak ada",
-        "description": "Pengguna digunakan sebagai default untuk membayar pengeluaran."
+        "description": "Pengguna digunakan sebagai default untuk membayar pengeluaran.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Simpan",
       "saving": "Meyimpan…",
       "create": "Buat",
       "creating": "Membuat…",
-      "cancel": "Batalkan"
+      "cancel": "Batalkan",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

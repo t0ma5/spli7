@@ -75,6 +75,13 @@
     "NotFound": {
       "text": "Acest grup nu există.",
       "link": "Mergi la ultimele grupuri vizitate"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -110,13 +117,17 @@
         "label": "Utilizator activ",
         "placeholder": "Selectează un membru",
         "none": "Niciunul",
-        "description": "Utilizatorul implicit pentru plata cheltuielilor."
+        "description": "Utilizatorul implicit pentru plata cheltuielilor.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Salvează",
       "saving": "Se salvează…",
       "create": "Adaugă",
       "creating": "Se adaugă…",
-      "cancel": "Anulează"
+      "cancel": "Anulează",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

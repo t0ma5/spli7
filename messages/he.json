@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "קבוצה זו אינה קיימת.",
       "link": "עבור לקבוצות שביקרת בהן לאחרונה"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -119,13 +126,17 @@
         "label": "משתמש פעיל",
         "placeholder": "בחר משתתף",
         "none": "אף אחד",
-        "description": "משתמש המשמש כברירת מחדל לתשלום הוצאות."
+        "description": "משתמש המשמש כברירת מחדל לתשלום הוצאות.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "שמור",
       "saving": "שומר…",
       "create": "צור",
       "creating": "יוצר…",
-      "cancel": "ביטול"
+      "cancel": "ביטול",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

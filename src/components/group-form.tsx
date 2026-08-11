@@ -49,12 +49,14 @@ export type Props = {
     groupFormValues: GroupFormValues,
     participantId?: string,
   ) => Promise<void>
+  onDelete?: () => Promise<void> | void
   protectedParticipantIds?: string[]
 }
 
 export function GroupForm({
   group,
   onSubmit,
+  onDelete,
   protectedParticipantIds = [],
 }: Props) {
   const locale = useLocale()
@@ -274,82 +276,84 @@ export function GroupForm({
               )}
             />
 
-            <div className="col-span-2 space-y-3 rounded-md border p-3">
-              <div>
-                <h3 className="font-medium">{t('PinField.title')}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {t('PinField.description')}
-                </p>
-                {group?.hasPin && (
-                  <p className="text-sm mt-1">{t('PinField.enabled')}</p>
-                )}
-              </div>
-              {group?.hasPin && (
-                <FormField
-                  control={form.control}
-                  name="currentPin"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('PinField.current')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          inputMode="numeric"
-                          autoComplete="off"
-                          className="text-base max-w-xs"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>{t('PinField.title')}</CardTitle>
+            <CardDescription>{t('PinField.description')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {group?.hasPin && (
+              <p className="text-sm">{t('PinField.enabled')}</p>
+            )}
+            {group?.hasPin && (
               <FormField
                 control={form.control}
-                name="newPin"
+                name="currentPin"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      {group?.hasPin ? t('PinField.new') : t('PinField.set')}
-                    </FormLabel>
+                    <FormLabel>{t('PinField.current')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
                         inputMode="numeric"
                         autoComplete="off"
                         className="text-base max-w-xs"
-                        placeholder="••••"
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription>
-                      {t('PinField.formatHelp')}
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              {group?.hasPin && (
-                <FormField
-                  control={form.control}
-                  name="clearPin"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={field.value}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      </FormControl>
-                      <FormLabel>{t('PinField.clear')}</FormLabel>
-                    </FormItem>
-                  )}
-                />
+            )}
+            <FormField
+              control={form.control}
+              name="newPin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {group?.hasPin ? t('PinField.new') : t('PinField.set')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className="text-base max-w-xs"
+                      placeholder="••••"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('PinField.formatHelp')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
+            />
+            {group?.hasPin && (
+              <FormField
+                control={form.control}
+                name="clearPin"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={field.value}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                      />
+                    </FormControl>
+                    <FormLabel>{t('PinField.clear')}</FormLabel>
+                  </FormItem>
+                )}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -472,6 +476,9 @@ export function GroupForm({
                   </FormControl>
                   <FormDescription>
                     {t('Settings.ActiveUserField.description')}
+                    <br />
+                    <br />
+                    {t('Settings.ActiveUserField.privacyNote')}
                   </FormDescription>
                 </FormItem>
               )}
@@ -479,7 +486,7 @@ export function GroupForm({
           </CardContent>
         </Card>
 
-        <div className="flex mt-4 gap-2">
+        <div className="flex mt-4 gap-2 flex-wrap">
           <SubmitButton
             loadingContent={t(group ? 'Settings.saving' : 'Settings.creating')}
             onClick={updateActiveUser}
@@ -490,6 +497,15 @@ export function GroupForm({
           {!group && (
             <Button variant="ghost" asChild>
               <Link href="/groups">{t('Settings.cancel')}</Link>
+            </Button>
+          )}
+          {group && onDelete && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => onDelete()}
+            >
+              {t('Settings.delete')}
             </Button>
           )}
         </div>

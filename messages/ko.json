@@ -54,7 +54,14 @@
       "link": "최근에 방문한 그룹 보기"
     },
     "unarchive": "그룹 다시 불러오기",
-    "removeRecent": "최근 그룹 목록에서 삭제하기"
+    "removeRecent": "최근 그룹 목록에서 삭제하기",
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
+    }
   },
   "GroupForm": {
     "title": "그룹 정보",
@@ -91,13 +98,17 @@
         "description": "사용자가 기본 지출 결제자로 사용돼요.",
         "placeholder": "참가자를 선택해 주세요",
         "label": "활성 사용자",
-        "none": "없음"
+        "none": "없음",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "저장",
       "saving": "저장중…",
       "description": "이 설정들은 기기별로 저장되며, 사용자 경험을 맞춤화하는 데 사용돼요.",
       "cancel": "취소",
-      "creating": "만드는 중…"
+      "creating": "만드는 중…",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

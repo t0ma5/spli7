@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "Talde hori ez da existitzen.",
       "link": "Joan bisitatutako azken taldeetara"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -119,13 +126,17 @@
         "label": "Erabiltzaile aktiboa",
         "placeholder": "Hautatu kide bat",
         "none": "Bat ere ez",
-        "description": "Gastuak ordaintzeko lehenetsi gisa erabiltzen den erabiltzailea."
+        "description": "Gastuak ordaintzeko lehenetsi gisa erabiltzen den erabiltzailea.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Gorde",
       "saving": "Gordetzen…",
       "create": "Sortu",
       "creating": "Sortzen…",
-      "cancel": "Utzi"
+      "cancel": "Utzi",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {

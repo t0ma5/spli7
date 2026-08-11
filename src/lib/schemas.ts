@@ -21,11 +21,12 @@ export const groupFormSchema = z
     participants: z
       .array(
         z.object({
-          id: z.string().optional(),
+          id: z.string().max(30).optional(),
           name: z.string().min(2, 'min2').max(50, 'max50'),
         }),
       )
-      .min(1),
+      .min(1)
+      .max(100),
   })
   .superRefine(({ participants, newPin, clearPin }, ctx) => {
     participants.forEach((participant, i) => {
@@ -65,8 +66,22 @@ const inputCoercedToNumber = z.union([
 
 export const expenseFormSchema = z
   .object({
-    expenseDate: z.coerce.date(),
-    title: z.string({ required_error: 'titleRequired' }).min(2, 'min2'),
+    expenseDate: z.coerce
+      .date()
+      .refine((date) => {
+        const max = new Date()
+        max.setUTCFullYear(max.getUTCFullYear() + 1)
+        return date <= max
+      }, 'expenseDateTooFar')
+      .refine((date) => {
+        const min = new Date()
+        min.setUTCFullYear(min.getUTCFullYear() - 5)
+        return date >= min
+      }, 'expenseDateTooOld'),
+    title: z
+      .string({ required_error: 'titleRequired' })
+      .min(2, 'min2')
+      .max(200, 'max200'),
     category: z.coerce.number().default(0),
     amount: z
       .union(
@@ -101,11 +116,11 @@ export const expenseFormSchema = z
         inputCoercedToNumber.refine((amount) => amount > 0, 'ratePositive'),
       ])
       .optional(),
-    paidBy: z.string({ required_error: 'paidByRequired' }),
+    paidBy: z.string({ required_error: 'paidByRequired' }).max(30),
     paidFor: z
       .array(
         z.object({
-          participant: z.string(),
+          participant: z.string().max(30),
           originalAmount: z.string().optional(), // For converting shares by amounts in original currency, not saved.
           shares: z.union([
             z.number(),
@@ -123,6 +138,7 @@ export const expenseFormSchema = z
         }),
       )
       .min(1, 'paidForMin1')
+      .max(500)
       .superRefine((paidFor, ctx) => {
         for (const { shares } of paidFor) {
           const shareNumber = Number(shares)
@@ -142,14 +158,15 @@ export const expenseFormSchema = z
     documents: z
       .array(
         z.object({
-          id: z.string(),
-          url: z.string().url(),
-          width: z.number().int().min(1),
-          height: z.number().int().min(1),
+          id: z.string().max(30),
+          url: z.string().url().max(2000),
+          width: z.number().int().min(1).max(10000),
+          height: z.number().int().min(1).max(10000),
         }),
       )
+      .max(100)
       .default([]),
-    notes: z.string().optional(),
+    notes: z.string().max(5000).optional(),
     recurrenceRule: z
       .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
       .default('NONE'),

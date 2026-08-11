@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "Este grupo no existe.",
       "link": "Ir a los grupos visitados recientemente"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -113,13 +120,17 @@
         "label": "Usuario activo",
         "placeholder": "Selecciona un participante",
         "none": "Ninguno",
-        "description": "Usuario que paga los gastos por defecto."
+        "description": "Usuario que paga los gastos por defecto.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Guardar",
       "saving": "Guardando…",
       "create": "Crear",
       "creating": "Creando…",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     },
     "CurrencyCodeField": {
       "label": "Moneda principal",

@@ -8,7 +8,7 @@ import {
   CommandInput,
   CommandItem,
 } from '@/components/ui/command'
-import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import {
   Popover,
   PopoverContent,
@@ -36,6 +36,7 @@ export function CurrencySelector({
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState<string>(defaultValue)
   const isDesktop = useMediaQuery('(min-width: 768px)')
+  const t = useTranslations('Currencies')
 
   // allow overwriting currently selected currency from outside
   useEffect(() => {
@@ -81,6 +82,7 @@ export function CurrencySelector({
         />
       </DrawerTrigger>
       <DrawerContent className="p-0">
+        <DrawerTitle className="sr-only">{t('search')}</DrawerTitle>
         <CurrencyCommand
           currencies={currencies}
           onValueChange={(id) => {
@@ -124,6 +126,13 @@ function CurrencyCommand({
     }),
     {},
   )
+
+  // Keep "Other currencies" in A–Z code order (ARS, TRY, …).
+  if (currenciesByGroup.other) {
+    currenciesByGroup.other = [...currenciesByGroup.other].sort((a, b) =>
+      a.code.localeCompare(b.code),
+    )
+  }
 
   return (
     <Command>

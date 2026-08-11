@@ -22,6 +22,21 @@ export async function deleteGroupDocument(groupId: string): Promise<void> {
   await kv.delete(groupKey(groupId))
 }
 
+/** List all `group:*` keys (paginated). Listing is eventually consistent. */
+export async function listGroupKeys(): Promise<string[]> {
+  const kv = await getKv()
+  const keys: string[] = []
+  let cursor: string | undefined
+  do {
+    const page = await kv.list({ prefix: 'group:', cursor, limit: 1000 })
+    for (const key of page.keys) {
+      keys.push(key.name)
+    }
+    cursor = page.list_complete ? undefined : page.cursor
+  } while (cursor)
+  return keys
+}
+
 export async function ensureCategories(): Promise<Category[]> {
   const kv = await getKv()
   const existing = await kv.get(CATEGORIES_KEY, 'json')

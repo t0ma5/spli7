@@ -78,6 +78,13 @@
     "NotFound": {
       "text": "Deze groep bestaat niet.",
       "link": "Ga naar je recente groepen"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -113,13 +120,17 @@
         "label": "Huidige gebruiker",
         "placeholder": "Selecteer een deelnemer",
         "none": "Geen",
-        "description": "De deelnemer die automatisch wordt geselecteerd als je een uitgave maakt."
+        "description": "De deelnemer die automatisch wordt geselecteerd als je een uitgave maakt.",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "Opslaan",
       "saving": "Aan het opslaan…",
       "create": "Groep maken",
       "creating": "Aan het maken…",
-      "cancel": "Annuleren"
+      "cancel": "Annuleren",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     },
     "CurrencyCodeField": {
       "label": "Hoofdvaluta",

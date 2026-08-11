@@ -99,6 +99,10 @@ export type GroupDocument = {
   /** Default split mode for new expenses in this group */
   defaultSplitMode?: SplitMode | null
   createdAt: string
+  /** ISO timestamp of last mutating activity; falls back to createdAt when absent */
+  lastActivityAt?: string | null
+  /** ISO timestamp when soft-deleted; null/absent = active */
+  deletedAt?: string | null
   participants: Participant[]
   expenses: Expense[]
   activities: Activity[]
@@ -113,6 +117,8 @@ export type Group = {
   hasPin: boolean
   defaultSplitMode: SplitMode | null
   createdAt: Date
+  lastActivityAt: Date | null
+  deletedAt: Date | null
   participants: Participant[]
 }
 

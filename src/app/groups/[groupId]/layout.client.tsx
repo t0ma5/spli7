@@ -1,5 +1,4 @@
-'use client'
-
+import { GroupDeletedScreen } from '@/app/groups/[groupId]/group-deleted-screen'
 import { GroupPinGate } from '@/app/groups/[groupId]/group-pin-gate'
 import { useToast } from '@/components/ui/use-toast'
 import { trpc } from '@/trpc/client'
@@ -36,6 +35,17 @@ export function GroupLayoutClient({
       <CurrentGroupProvider {...props}>
         <GroupHeader />
         {children}
+      </CurrentGroupProvider>
+    )
+  }
+
+  if (data?.group?.deletedAt) {
+    return (
+      <CurrentGroupProvider {...props}>
+        <GroupDeletedScreen
+          groupId={groupId}
+          groupName={data.group.name}
+        />
       </CurrentGroupProvider>
     )
   }

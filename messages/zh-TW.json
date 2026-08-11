@@ -75,6 +75,13 @@
     "NotFound": {
       "text": "該群組不存在。",
       "link": "前往最近訪問的群組"
+    },
+    "Deleted": {
+      "title": "Group scheduled for deletion",
+      "description": "“{name}” was soft-deleted. You can restore it within 30 days, or it will be permanently removed. Inactive groups also expire after 2 years without activity.",
+      "restore": "Restore group",
+      "restored": "Group restored",
+      "back": "Back to groups"
     }
   },
   "GroupForm": {
@@ -110,13 +117,17 @@
         "label": "當前使用者",
         "placeholder": "選擇一位群組成員",
         "none": "無",
-        "description": "用於支付消費的預設用戶"
+        "description": "用於支付消費的預設用戶",
+        "privacyNote": "Privacy note: groups expire 2 years since the last activity (creating, updating, deleting an expense or updating settings)."
       },
       "save": "保存",
       "saving": "保存中……",
       "create": "建立",
       "creating": "建立中……",
-      "cancel": "取消"
+      "cancel": "取消",
+      "delete": "Delete group",
+      "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
+      "deleted": "Group scheduled for deletion"
     }
   },
   "ExpenseForm": {
