@@ -38,7 +38,8 @@
       "lastMonth": "Last month",
       "earlierThisYear": "Earlier this year",
       "lastYear": "Last year",
-      "older": "Older"
+      "older": "Older",
+      "currentMonth": "Current Month"
     }
   },
   "ExpenseCard": {
@@ -144,6 +145,7 @@
       "protectedParticipant": "This participant is part of expenses, and can not be removed.",
       "new": "New",
       "add": "Add participant",
+      "sort": "Sort A–Z",
       "John": "John",
       "Jane": "Jane",
       "Jack": "Jack"
@@ -166,6 +168,14 @@
       "delete": "Delete group",
       "deleteConfirm": "Soft-delete this group? You can restore it within 30 days.",
       "deleted": "Group scheduled for deletion"
+    },
+    "GroupSettings": {
+      "title": "Group settings",
+      "description": "These settings are shared with everyone who uses this group.",
+      "FixedExpenseDateGroupsField": {
+        "label": "Group expenses by calendar month",
+        "description": "Useful for recurring monthly expenses for roommates and shared bills."
+      }
     }
   },
   "ExpenseForm": {
@@ -353,6 +363,42 @@
       "yourSpendings": "Your total spendings",
       "yourEarnings": "Your total earnings",
       "yourShare": "Your total share"
+    },
+    "MonthlySpending": {
+      "title": "Monthly spending",
+      "description": "Spending by month and category.",
+      "rangeLabel": "Range",
+      "groupingLabel": "Category grouping",
+      "chartTypeLabel": "Chart type",
+      "stackedTitle": "Monthly categories",
+      "breakdownTitle": "{range} category breakdown",
+      "balanceTimelineTitle": "Balance timeline",
+      "categoryMarkers": "Category markers",
+      "isOwedMoney": "Is owed money",
+      "owesMoney": "Owes money",
+      "payment": "Reimbursement",
+      "roundAmountsLabel": "Round amounts",
+      "stackOrderLabel": "Stack order",
+      "income": "Income",
+      "noData": "No spending data yet.",
+      "ChartTypes": {
+        "bars": "Stacked bars",
+        "columns": "Stacked columns"
+      },
+      "StackOrders": {
+        "smallInside": "Smaller debt inside",
+        "smallOutside": "Smaller debt outside"
+      },
+      "RangeOptions": {
+        "three": "3 months",
+        "six": "6 months",
+        "twelve": "12 months",
+        "all": "All"
+      },
+      "GroupingOptions": {
+        "categoryGroup": "Categories",
+        "category": "Detailed"
+      }
     }
   },
   "Activity": {

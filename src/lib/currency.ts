@@ -22,6 +22,7 @@ export const supportedCurrencyCodes = [
   'CAD',
   'CHF',
   'CNY',
+  'COP',
   'CZK',
   'DKK',
   'GBP',
@@ -30,8 +31,12 @@ export const supportedCurrencyCodes = [
   'IDR',
   'INR',
   'ISK',
+  'JOD',
   'KRW',
+  'MKD',
+  'MOP',
   'MXN',
+  'MYR',
   'NOK',
   'NZD',
   'PHP',
@@ -41,6 +46,7 @@ export const supportedCurrencyCodes = [
   'SGD',
   'THB',
   'TRY',
+  'VND',
   'ZAR',
 ] as const
 export type supportedCurrencyCodeType = (typeof supportedCurrencyCodes)[number]

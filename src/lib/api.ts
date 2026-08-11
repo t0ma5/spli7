@@ -59,6 +59,7 @@ function mapGroup(group: GroupDocument): Group {
     currencyCode: group.currencyCode,
     hasPin: Boolean(group.pinHash),
     defaultSplitMode: group.defaultSplitMode ?? null,
+    fixedExpenseDateGroups: group.fixedExpenseDateGroups ?? false,
     createdAt: toDate(group.createdAt),
     lastActivityAt: group.lastActivityAt
       ? toDate(group.lastActivityAt)
@@ -179,6 +180,8 @@ export async function createGroup(groupFormValues: GroupFormValues) {
         ? await hashGroupPin(groupFormValues.newPin, id)
         : null,
     defaultSplitMode: groupFormValues.defaultSplitMode ?? SplitMode.EVENLY,
+    fixedExpenseDateGroups:
+      groupFormValues.fixedExpenseDateGroups ?? false,
     createdAt: new Date().toISOString(),
     lastActivityAt: new Date().toISOString(),
     deletedAt: null,
@@ -283,6 +286,7 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
     defaultSplitMode:
       (importValues.defaultSplitMode as SplitMode | null | undefined) ??
       SplitMode.EVENLY,
+    fixedExpenseDateGroups: false,
     createdAt: new Date().toISOString(),
     lastActivityAt: new Date().toISOString(),
     deletedAt: null,
@@ -310,6 +314,7 @@ export async function createGroupFromTricountCsv(
     currencyCode: parsed.currencyCode,
     pinHash: null,
     defaultSplitMode: SplitMode.EVENLY,
+    fixedExpenseDateGroups: false,
     createdAt: now,
     lastActivityAt: now,
     deletedAt: null,
@@ -462,6 +467,8 @@ export async function updateGroup(
   group.currency = groupFormValues.currency
   group.currencyCode = groupFormValues.currencyCode || null
   group.defaultSplitMode = groupFormValues.defaultSplitMode ?? SplitMode.EVENLY
+  group.fixedExpenseDateGroups =
+    groupFormValues.fixedExpenseDateGroups ?? false
 
   if (groupFormValues.clearPin) {
     if (group.pinHash) {
@@ -493,25 +500,21 @@ export async function updateGroup(
     group.pinHash = await hashGroupPin(groupFormValues.newPin, groupId)
   }
 
-  const keptIds = new Set(
-    groupFormValues.participants
-      .map((p) => p.id)
-      .filter((id): id is string => Boolean(id)),
-  )
-  group.participants = group.participants.filter((p) => keptIds.has(p.id))
-
-  for (const participant of groupFormValues.participants) {
+  // Rebuild in form order so drag/sort order is persisted (stable IDs preserved).
+  const existingById = new Map(group.participants.map((p) => [p.id, p]))
+  group.participants = groupFormValues.participants.map((participant) => {
     if (participant.id) {
-      const existing = group.participants.find((p) => p.id === participant.id)
-      if (existing) existing.name = participant.name
-    } else {
-      group.participants.push({
-        id: randomId(),
-        name: participant.name,
-        groupId,
-      })
+      const existing = existingById.get(participant.id)
+      if (existing) {
+        return { ...existing, name: participant.name }
+      }
     }
-  }
+    return {
+      id: randomId(),
+      name: participant.name,
+      groupId,
+    }
+  })
 
   await persistGroup(group)
   return mapGroup(group)
@@ -891,6 +894,7 @@ export async function getGroupForExport(groupId: string) {
     currency: group.currency,
     currencyCode: group.currencyCode,
     defaultSplitMode: group.defaultSplitMode ?? SplitMode.EVENLY,
+    fixedExpenseDateGroups: group.fixedExpenseDateGroups ?? false,
     participants: group.participants.map((p) => ({ id: p.id, name: p.name })),
     expenses: group.expenses
       .slice()

@@ -98,6 +98,8 @@ export type GroupDocument = {
   pinHash?: string | null
   /** Default split mode for new expenses in this group */
   defaultSplitMode?: SplitMode | null
+  /** When true, expense list groups by calendar month */
+  fixedExpenseDateGroups?: boolean | null
   createdAt: string
   /** ISO timestamp of last mutating activity; falls back to createdAt when absent */
   lastActivityAt?: string | null
@@ -116,6 +118,7 @@ export type Group = {
   currencyCode: string | null
   hasPin: boolean
   defaultSplitMode: SplitMode | null
+  fixedExpenseDateGroups: boolean
   createdAt: Date
   lastActivityAt: Date | null
   deletedAt: Date | null

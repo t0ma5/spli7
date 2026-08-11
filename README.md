@@ -30,7 +30,13 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Soft-delete / restore groups (30-day grace) + **24-month inactivity expiry**
 - [x] 🔴 Security headers, CSV formula escape, Zod input caps, expense date bounds
 - [x] 🔴 Error boundaries + Drawer accessibility titles
-- [x] 🔴 Extra currencies: **ARS**, **TRY** (ILS removed)
+- [x] 🔴 Paste-friendly amount parsing (US/EU grouped currency)
+- [x] 🔴 Keyboard navigation restored in category/currency selectors
+- [x] 🔴 Mobile group tab icons
+- [x] 🔴 Monthly category spending charts + balance timeline on Stats
+- [x] 🔴 Optional calendar-month expense grouping
+- [x] 🔴 Drag-reorder / Sort A–Z participants
+- [x] 🔴 Extra currencies: **ARS**, **TRY**, **COP**, **JOD**, **MKD**, **MOP**, **MYR**, **VND** (ILS removed)
 - [ ] ❌ Upload and attach images to expenses (removed — see below)
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
@@ -91,6 +97,12 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
 | **Notes + history in JSON** | Export/import round-trips expense notes, group information, and activity history (`exportVersion: 2`). | Expense notes also appear in Spliit Cloud / upstream [#165](https://github.com/spliit-app/spliit/pull/165); history round-trip is specific to this fork |
 | **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
+| **Paste amount parsing** | Normalizes pasted US/EU currency amounts in number fields. | Upstream [#531](https://github.com/spliit-app/spliit/pull/531) |
+| **Selector keyboard nav** | Category/currency pickers use cmdk CommandList. | Upstream [#491](https://github.com/spliit-app/spliit/pull/491) |
+| **Mobile tab icons** | Icon-only tabs on small screens; labels from sm. | Upstream [#539](https://github.com/spliit-app/spliit/pull/539) |
+| **Monthly spending charts** | CSS stacked category charts + balance timeline on Stats. | Upstream [#532](https://github.com/spliit-app/spliit/pull/532) |
+| **Calendar month grouping** | Optional group setting for roommate-style monthly lists. | Upstream [#530](https://github.com/spliit-app/spliit/pull/530) |
+| **Reorder participants** | Drag-and-drop + Sort A–Z; order persisted in KV. | Upstream [#416](https://github.com/spliit-app/spliit/pull/416) |
 | **Tricount import** | GDPR CSV export via the same Import control as Spliit JSON. | Upstream [#526](https://github.com/spliit-app/spliit/pull/526) |
 | **Export / input hardening** | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries. | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/KV) |
 

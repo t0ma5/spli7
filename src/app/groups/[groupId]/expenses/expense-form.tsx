@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/select'
 import { Locale } from '@/i18n/request'
 import { evaluateAmountExpression } from '@/lib/amount-expression'
+import { normalizeNumberInput } from '@/lib/number-input'
 import { defaultCurrencyList, getCurrency } from '@/lib/currency'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
 import { useActiveUser, useCurrencyRate } from '@/lib/hooks'
@@ -66,15 +67,6 @@ import { match } from 'ts-pattern'
 import { DeletePopup } from '../../../../components/delete-popup'
 import { extractCategoryFromTitle } from '../../../../components/expense-form-actions'
 import { Textarea } from '../../../../components/ui/textarea'
-
-const enforceCurrencyPattern = (value: string) =>
-  value
-    .replace(/^\s*-/, '_') // replace leading minus with _
-    .replace(/[.,]/, '#') // replace first comma with #
-    .replace(/[-.,]/g, '') // remove other minus and commas characters
-    .replace(/_/, '-') // change back _ to minus
-    .replace(/#/, '.') // change back # to dot
-    .replace(/[^-\d.]/g, '') // remove all non-numeric characters
 
 const getDefaultSplittingOptions = (
   group: NonNullable<AppRouterOutput['groups']['get']['group']>,
@@ -435,7 +427,7 @@ export function ExpenseForm({
       const rate = Number(conversionRate)
       const convertedAmount = originalAmount * rate
       if (!Number.isNaN(convertedAmount)) {
-        const v = enforceCurrencyPattern(
+        const v = normalizeNumberInput(
           convertedAmount.toFixed(groupCurrency.decimal_digits),
         )
         const income = Number(v) < 0
@@ -614,7 +606,7 @@ export function ExpenseForm({
                           inputMode="decimal"
                           placeholder="0.00"
                           onChange={(event) => {
-                            const v = enforceCurrencyPattern(event.target.value)
+                            const v = normalizeNumberInput(event.target.value)
                             onChange(v)
                           }}
                           {...field}
@@ -685,7 +677,7 @@ export function ExpenseForm({
                               inputMode="decimal"
                               placeholder="0.00"
                               onChange={(event) => {
-                                const v = enforceCurrencyPattern(
+                                const v = normalizeNumberInput(
                                   event.target.value,
                                 )
                                 onChange(v)
@@ -751,7 +743,7 @@ export function ExpenseForm({
                             event.target.value,
                           )
                           if (evaluated === null) return
-                          const v = enforceCurrencyPattern(String(evaluated))
+                          const v = normalizeNumberInput(String(evaluated))
                           const income = Number(v) < 0
                           setIsIncome(income)
                           if (income) form.setValue('isReimbursement', false)
@@ -1089,7 +1081,7 @@ export function ExpenseForm({
                                                               event.target
                                                                 .value,
                                                             shares:
-                                                              enforceCurrencyPattern(
+                                                              normalizeNumberInput(
                                                                 convertedAmount,
                                                               ),
                                                           }
@@ -1176,7 +1168,7 @@ export function ExpenseForm({
                                                       ? {
                                                           participant: id,
                                                           shares:
-                                                            enforceCurrencyPattern(
+                                                            normalizeNumberInput(
                                                               event.target
                                                                 .value,
                                                             ),

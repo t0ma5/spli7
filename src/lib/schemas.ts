@@ -18,6 +18,7 @@ export const groupFormSchema = z
       .union([z.string().regex(/^\d{4,8}$/, 'pinFormat'), z.literal('')])
       .optional(),
     clearPin: z.boolean().optional(),
+    fixedExpenseDateGroups: z.boolean().default(false),
     participants: z
       .array(
         z.object({

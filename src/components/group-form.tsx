@@ -1,5 +1,7 @@
+import { SortableParticipant } from '@/app/groups/[groupId]/edit/sortable-participants'
 import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Card,
   CardContent,
@@ -34,6 +36,8 @@ import { Locale } from '@/i18n/request'
 import { defaultCurrencyList, getCurrency } from '@/lib/currency'
 import type { Group } from '@/lib/kv/types'
 import { GroupFormValues, groupFormSchema } from '@/lib/schemas'
+import { DndContext, closestCenter } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Save, Trash2 } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -73,6 +77,7 @@ export function GroupForm({
           currentPin: '',
           newPin: '',
           clearPin: false,
+          fixedExpenseDateGroups: group.fixedExpenseDateGroups ?? false,
           participants: group.participants,
         }
       : {
@@ -84,6 +89,7 @@ export function GroupForm({
           currentPin: '',
           newPin: '',
           clearPin: false,
+          fixedExpenseDateGroups: false,
           participants: [
             { name: t('Participants.John') },
             { name: t('Participants.Jane') },
@@ -91,7 +97,7 @@ export function GroupForm({
           ],
         },
   })
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move, replace } = useFieldArray({
     control: form.control,
     name: 'participants',
     keyName: 'key',
@@ -275,8 +281,6 @@ export function GroupForm({
                 </FormItem>
               )}
             />
-
-            />
           </CardContent>
         </Card>
 
@@ -357,71 +361,140 @@ export function GroupForm({
           </CardContent>
         </Card>
 
-        <Card className="mb-4">
+                <Card className="mb-4">
           <CardHeader>
-            <CardTitle>{t('Participants.title')}</CardTitle>
-            <CardDescription>{t('Participants.description')}</CardDescription>
+            <CardTitle>{t('GroupSettings.title')}</CardTitle>
+            <CardDescription>{t('GroupSettings.description')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="flex flex-col gap-2">
-              {fields.map((item, index) => (
-                <li key={item.key}>
-                  <FormField
-                    control={form.control}
-                    name={`participants.${index}.name`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="sr-only">
-                          Participant #{index + 1}
-                        </FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input
-                              className="text-base"
-                              {...field}
-                              placeholder={t('Participants.new')}
-                            />
-                            {item.id &&
-                            protectedParticipantIds.includes(item.id) ? (
-                              <HoverCard>
-                                <HoverCardTrigger>
-                                  <Button
-                                    variant="ghost"
-                                    className="text-destructive-"
-                                    type="button"
-                                    size="icon"
-                                    disabled
-                                  >
-                                    <Trash2 className="w-4 h-4 text-destructive opacity-50" />
-                                  </Button>
-                                </HoverCardTrigger>
-                                <HoverCardContent
-                                  align="end"
-                                  className="text-sm"
-                                >
-                                  {t('Participants.protectedParticipant')}
-                                </HoverCardContent>
-                              </HoverCard>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                className="text-destructive"
-                                onClick={() => remove(index)}
-                                type="button"
-                                size="icon"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </li>
-              ))}
-            </ul>
+            <FormField
+              control={form.control}
+              name="fixedExpenseDateGroups"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) =>
+                        field.onChange(checked === true)
+                      }
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      {t('GroupSettings.FixedExpenseDateGroupsField.label')}
+                    </FormLabel>
+                    <FormDescription>
+                      {t(
+                        'GroupSettings.FixedExpenseDateGroupsField.description',
+                      )}
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+<Card className="mb-4">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{t('Participants.title')}</CardTitle>
+              <CardDescription>{t('Participants.description')}</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => {
+                const currentValues = form.getValues('participants')
+                const sorted = [...currentValues].sort((a, b) =>
+                  (a.name || '').localeCompare(b.name || ''),
+                )
+                replace(sorted)
+              }}
+            >
+              {t('Participants.sort')}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragEnd={({ active, over }) => {
+                if (over && active.id !== over.id) {
+                  const oldIndex = Number(active.id)
+                  const newIndex = Number(over.id)
+                  move(oldIndex, newIndex)
+                }
+              }}
+            >
+              <SortableContext
+                items={fields.map((_, index) => String(index))}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="flex flex-col gap-2">
+                  {fields.map((item, index) => (
+                    <SortableParticipant key={item.key} id={String(index)}>
+                      <li>
+                        <FormField
+                          control={form.control}
+                          name={`participants.${index}.name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="sr-only">
+                                Participant #{index + 1}
+                              </FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2 !mt-0">
+                                  <Input
+                                    className="text-base"
+                                    {...field}
+                                    placeholder={t('Participants.new')}
+                                  />
+                                  {item.id &&
+                                  protectedParticipantIds.includes(item.id) ? (
+                                    <HoverCard>
+                                      <HoverCardTrigger>
+                                        <Button
+                                          variant="ghost"
+                                          className="text-destructive-"
+                                          type="button"
+                                          size="icon"
+                                          disabled
+                                        >
+                                          <Trash2 className="w-4 h-4 text-destructive opacity-50" />
+                                        </Button>
+                                      </HoverCardTrigger>
+                                      <HoverCardContent
+                                        align="end"
+                                        className="text-sm"
+                                      >
+                                        {t('Participants.protectedParticipant')}
+                                      </HoverCardContent>
+                                    </HoverCard>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      className="text-destructive"
+                                      onClick={() => remove(index)}
+                                      type="button"
+                                      size="icon"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </li>
+                    </SortableParticipant>
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           </CardContent>
           <CardFooter>
             <Button
