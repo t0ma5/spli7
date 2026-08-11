@@ -195,7 +195,8 @@
       "attachDescription": "ראה וצרף קבלות להוצאה."
     },
     "amountField": {
-      "label": "סכום"
+      "label": "סכום",
+      "mathHelp": "אפשר להשתמש בנוסחאות. דוגמה: 10+5.50 או 5*8"
     },
     "conversionUnavailable": "כדי להגדיר מטבע שונה לכל הוצאה ולהמיר סכומים, בחר מטבע לא מותאם אישית לקבוצה.",
     "originalAmountField": {
@@ -291,7 +292,7 @@
     }
   },
   "Balances": {
-    "title": "יתרות",
+    "title": "יתרה",
     "description": "זה הסכום שכל משתתף שילם או קיבל.",
     "Reimbursements": {
       "title": "החזרים מוצעים",
@@ -314,7 +315,7 @@
     }
   },
   "Activity": {
-    "title": "פעילות",
+    "title": "היסטוריה",
     "description": "סקירה של כל הפעילות בקבוצה זו.",
     "noActivity": "עדיין אין פעילות בקבוצה שלך.",
     "someone": "מישהו",

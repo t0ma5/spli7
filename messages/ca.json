@@ -203,7 +203,8 @@
       }
     },
     "amountField": {
-      "label": "Quantitat"
+      "label": "Quantitat",
+      "mathHelp": "Pots usar fórmules. Exemple: 10+5.50 o 5*8"
     },
     "isReimbursementField": {
       "label": "Això és un reemborsament"
@@ -322,7 +323,7 @@
     }
   },
   "Activity": {
-    "title": "Activitat",
+    "title": "Historial",
     "description": "Aquí trobaràs totes les activitats recents del grup.",
     "noActivity": "No hi ha activitat recent a aquest grup.",
     "someone": "Algú",
@@ -343,7 +344,7 @@
     }
   },
   "Information": {
-    "title": "Informació",
+    "title": "Info",
     "description": "Utilitza aquest apartat per afegir informació rellevant per als participants del grup.",
     "empty": "Encara no hi ha informació sobre el grup."
   },

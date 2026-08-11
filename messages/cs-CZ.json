@@ -178,7 +178,8 @@
       "attachDescription": "Zobrazit a připojit účtenky k výdaji."
     },
     "amountField": {
-      "label": "Částka"
+      "label": "Částka",
+      "mathHelp": "Můžete používat vzorce. Příklad: 10+5.50 nebo 5*8"
     },
     "isReimbursementField": {
       "label": "Toto je proplacení"
@@ -253,7 +254,7 @@
     }
   },
   "Balances": {
-    "title": "Zůstatky",
+    "title": "Zůstatek",
     "description": "Toto je částka, kterou každý účastník zaplatil nebo za kterou bylo zaplaceno.",
     "Reimbursements": {
       "title": "Navrhovaná proplacení",
@@ -276,7 +277,7 @@
     }
   },
   "Activity": {
-    "title": "Aktivita",
+    "title": "Historie",
     "description": "Přehled veškeré aktivity v této skupině.",
     "noActivity": "Ve vaší skupině zatím není žádná aktivita.",
     "someone": "Někdo",
@@ -297,7 +298,7 @@
     }
   },
   "Information": {
-    "title": "Informace",
+    "title": "Info",
     "description": "Použijte toto místo k přidání informací, které mohou být důležité pro účastníky skupiny.",
     "empty": "Zatím žádné informace o skupině."
   },

@@ -211,7 +211,6 @@
       "recurrenceRule": {
         "label": "Expense Recurrence",
         "description": "Select how often the expense should repeat.",
-
         "none": "None",
         "daily": "Daily",
         "weekly": "Weekly",
@@ -226,7 +225,7 @@
     },
     "amountField": {
       "label": "Amount",
-      "mathHelp": "You can enter a formula such as 12+4.50 or 3*8. It evaluates when you leave the field."
+      "mathHelp": "You can use formulas. Example: 10+5.50 or 5*8"
     },
     "conversionUnavailable": "To set a different currency per expense and convert amounts, select a non-custom currency for the group.",
     "originalAmountField": {
@@ -323,7 +322,7 @@
     }
   },
   "Balances": {
-    "title": "Balances",
+    "title": "Balance",
     "description": "This is the amount that each participant paid or was paid for.",
     "Reimbursements": {
       "title": "Suggested reimbursements",
@@ -346,7 +345,7 @@
     }
   },
   "Activity": {
-    "title": "Activity",
+    "title": "History",
     "description": "Overview of all activity in this group.",
     "noActivity": "There is not yet any activity in your group.",
     "someone": "Someone",
@@ -367,7 +366,7 @@
     }
   },
   "Information": {
-    "title": "Information",
+    "title": "Info",
     "description": "Use this place to add any information that can be relevant to the group participants.",
     "empty": "No group information yet."
   },

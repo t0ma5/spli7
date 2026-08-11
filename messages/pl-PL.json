@@ -178,7 +178,8 @@
       "attachDescription": "Zobacz i załącz rachunki do wydatku."
     },
     "amountField": {
-      "label": "Suma"
+      "label": "Suma",
+      "mathHelp": "Możesz używać formuł. Przykład: 10+5.50 lub 5*8"
     },
     "isReimbursementField": {
       "label": "Oznacz jako zwrot kosztów"
@@ -253,7 +254,7 @@
     }
   },
   "Balances": {
-    "title": "Salda",
+    "title": "Saldo",
     "description": "Jest to kwota, którą każdy członek zapłacił lub otrzymał.",
     "Reimbursements": {
       "title": "Sugerowane zwroty",
@@ -276,7 +277,7 @@
     }
   },
   "Activity": {
-    "title": "Aktywność",
+    "title": "Historia",
     "description": "Przegląd wszystkich działań w tej grupie.",
     "noActivity": "W grupie nie ma jeszcze żadnej aktywności.",
     "someone": "Ktoś",
@@ -297,7 +298,7 @@
     }
   },
   "Information": {
-    "title": "Informacje",
+    "title": "Info",
     "description": "Użyj tego miejsca, aby dodać wszelkie informacje, które mogą być istotne dla uczestników grupy.",
     "empty": "Jeszcze nic tu nie ma."
   },

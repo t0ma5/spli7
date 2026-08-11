@@ -189,7 +189,8 @@
       "attachDescription": "Vedi ed allega la ricevuta per la spesa."
     },
     "amountField": {
-      "label": "Importo"
+      "label": "Importo",
+      "mathHelp": "Puoi usare formule. Esempio: 10+5.50 oppure 5*8"
     },
     "isReimbursementField": {
       "label": "Questo è un rimborso"
@@ -267,7 +268,7 @@
     }
   },
   "Balances": {
-    "title": "Bilanci",
+    "title": "Saldo",
     "description": "Questo è l'importo che ciascun partecipante ha pagato o deve pagare.",
     "Reimbursements": {
       "title": "Rimborsi suggeriti",
@@ -290,7 +291,7 @@
     }
   },
   "Activity": {
-    "title": "Attività",
+    "title": "Cronologia",
     "description": "Panoramica di tutte le attività in questo gruppo.",
     "noActivity": "Non c'è ancora alcuna attività nel tuo gruppo.",
     "someone": "Qualcuno",
@@ -311,7 +312,7 @@
     }
   },
   "Information": {
-    "title": "Informazioni",
+    "title": "Info",
     "description": "Utilizza questo posto per aggiungere qualsiasi informazione che possa essere rilevante per i partecipanti al gruppo.",
     "empty": "Ancora nessuna informazione sul gruppo."
   },

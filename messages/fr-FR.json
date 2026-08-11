@@ -203,7 +203,8 @@
       }
     },
     "amountField": {
-      "label": "Montant"
+      "label": "Montant",
+      "mathHelp": "Vous pouvez utiliser des formules. Exemple : 10+5.50 ou 5*8"
     },
     "isReimbursementField": {
       "label": "C'est un remboursement"
@@ -299,7 +300,7 @@
     }
   },
   "Balances": {
-    "title": "Équilibres",
+    "title": "Solde",
     "description": "Voici le montant que chaque participant a payé ou doit rembourser.",
     "Reimbursements": {
       "title": "Remboursements suggérés",
@@ -322,7 +323,7 @@
     }
   },
   "Activity": {
-    "title": "Activité",
+    "title": "Historique",
     "description": "Vue d'ensemble de toute l'activité dans ce groupe.",
     "noActivity": "Il n'y a pas encore d'activité dans votre groupe.",
     "someone": "Quelqu'un",
@@ -343,7 +344,7 @@
     }
   },
   "Information": {
-    "title": "Information",
+    "title": "Infos",
     "description": "Utilisez cet espace pour ajouter toute information qui pourrait être pertinente pour les participants du groupe.",
     "empty": "Aucune information pour le moment."
   },

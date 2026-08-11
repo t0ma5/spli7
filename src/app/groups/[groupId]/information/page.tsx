@@ -2,7 +2,7 @@ import GroupInformation from '@/app/groups/[groupId]/information/group-informati
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Group Information',
+  title: 'Info',
 }
 
 export default async function InformationPage({

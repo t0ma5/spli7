@@ -169,7 +169,8 @@
       "attachDescription": "查看／附上此筆消費的收據。"
     },
     "amountField": {
-      "label": "金額"
+      "label": "金額",
+      "mathHelp": "可以使用公式。例如：10+5.50 或 5*8"
     },
     "isReimbursementField": {
       "label": "這是一筆報銷款"
@@ -244,7 +245,7 @@
     }
   },
   "Balances": {
-    "title": "總覽",
+    "title": "餘額",
     "description": "這是每個成員已支付及需支付的金額",
     "Reimbursements": {
       "title": "建議核銷",
@@ -267,7 +268,7 @@
     }
   },
   "Activity": {
-    "title": "明細",
+    "title": "歷史",
     "description": "群組所有活動總覽",
     "noActivity": "你的全組目前沒有任何活動",
     "someone": "某人",

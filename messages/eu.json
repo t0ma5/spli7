@@ -195,7 +195,8 @@
       "attachDescription": "Ikusi eta erantsi gastuaren ordainagiriak."
     },
     "amountField": {
-      "label": "Zenbatekoa"
+      "label": "Zenbatekoa",
+      "mathHelp": "Formulak erabil ditzakezu. Adibidea: 10+5.50 edo 5*8"
     },
     "conversionUnavailable": "Gastu bakoitzeko moneta bat ezartzeko eta zenbatekoak bihurtzeko, hautatu taldearentzako moneta ez-pertsonalizatu bat.",
     "originalAmountField": {
@@ -291,7 +292,7 @@
     }
   },
   "Balances": {
-    "title": "Saldoak",
+    "title": "Saldoa",
     "description": "Hau da kide bakoitzak ordaindu edo jaso duen zenbatekoa.",
     "Reimbursements": {
       "title": "Proposatutako diru-itzulketak",
@@ -314,7 +315,7 @@
     }
   },
   "Activity": {
-    "title": "Jarduera",
+    "title": "Historia",
     "description": "Talde honetako jarduera guztien ikuspegi orokorra.",
     "noActivity": "Oraindik ez dago jarduerarik zure taldean.",
     "someone": "Norbait",
@@ -335,7 +336,7 @@
     }
   },
   "Information": {
-    "title": "Informazioa",
+    "title": "Info",
     "description": "Erabili leku hau taldeko kideentzat garrantzitsua izan daitekeen edozein informazio gehitzeko.",
     "empty": "Oraindik ez dago taldearen informaziorik."
   },

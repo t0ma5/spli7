@@ -195,7 +195,8 @@
       "attachDescription": "Lihat dan lampirkan tanda terima pada pengeluaran."
     },
     "amountField": {
-      "label": "Jumlah"
+      "label": "Jumlah",
+      "mathHelp": "Anda dapat memakai rumus. Contoh: 10+5.50 atau 5*8"
     },
     "conversionUnavailable": "Untuk menetapkan mata uang yang berbeda per pengeluaran dan mengonversi jumlahnya, pilih mata uang non-kustom untuk grup tersebut.",
     "originalAmountField": {
@@ -327,7 +328,7 @@
     }
   },
   "Activity": {
-    "title": "Aktivitas",
+    "title": "Riwayat",
     "description": "Overview semua aktivitas dalam grup ini.",
     "noActivity": "Belum ada aktivitas di grup Anda.",
     "someone": "Seseorang",
@@ -348,7 +349,7 @@
     }
   },
   "Information": {
-    "title": "Informasi",
+    "title": "Info",
     "description": "Gunakan tempat ini untuk menambahkan informasi apa pun yang relevan bagi peserta grup.",
     "empty": "Belum ada informasi grup."
   },

@@ -169,7 +169,8 @@
       "attachDescription": "Vizualizează și atașează bonul pentru cheltuială."
     },
     "amountField": {
-      "label": "Sumă"
+      "label": "Sumă",
+      "mathHelp": "Poți folosi formule. Exemplu: 10+5.50 sau 5*8"
     },
     "isReimbursementField": {
       "label": "Aceasta este o rambursare."
@@ -244,7 +245,7 @@
     }
   },
   "Balances": {
-    "title": "Solduri",
+    "title": "Sold",
     "description": "Aceasta este suma pe care fiecare membru a plătit-o sau cu care a fost plătit.",
     "Reimbursements": {
       "title": "Rambursări sugerate",
@@ -267,7 +268,7 @@
     }
   },
   "Activity": {
-    "title": "Activități",
+    "title": "Istoric",
     "description": "Rezumatul întregii activități a grupului.",
     "noActivity": "Nu este nicio activitate în grupul tău încă.",
     "someone": "Cineva",
@@ -288,7 +289,7 @@
     }
   },
   "Information": {
-    "title": "Informații",
+    "title": "Info",
     "description": "Adaugă aici orice informație care poate să fie relevantă pentru membrii grupului.",
     "empty": "Nicio informație de grup încă."
   },

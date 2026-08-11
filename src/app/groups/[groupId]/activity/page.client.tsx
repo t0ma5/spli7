@@ -10,7 +10,7 @@ import { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
 
 export const metadata: Metadata = {
-  title: 'Activity',
+  title: 'History',
 }
 
 export function ActivityPageClient() {

@@ -169,7 +169,8 @@
       "attachDescription": "Katso ja liitä kuluun liittyviä kuitteja."
     },
     "amountField": {
-      "label": "Summa"
+      "label": "Summa",
+      "mathHelp": "Voit käyttää kaavoja. Esimerkki: 10+5.50 tai 5*8"
     },
     "isReimbursementField": {
       "label": "Tämä on velanmaksu"
@@ -257,7 +258,7 @@
     }
   },
   "Activity": {
-    "title": "Tapahtumat",
+    "title": "Historia",
     "description": "Yleisnäkymä ryhmän kaikista tapahtumista.",
     "noActivity": "Ryhmässäsi ei ole vielä tapahtumia.",
     "someone": "Tuntematon",
@@ -278,7 +279,7 @@
     }
   },
   "Information": {
-    "title": "Tiedot",
+    "title": "Info",
     "description": "Käytä tätä paikkaa lisätäksesi kaikki tiedot, joilla voi olla merkitystä ryhmän osallistujille.",
     "empty": "Ryhmätietoja ei vielä ole."
   },

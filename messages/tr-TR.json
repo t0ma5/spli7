@@ -169,7 +169,8 @@
       "attachDescription": "Masrafa makbuz ekleyin ve görüntüleyin."
     },
     "amountField": {
-      "label": "Tutar"
+      "label": "Tutar",
+      "mathHelp": "Formül kullanabilirsiniz. Örnek: 10+5.50 veya 5*8"
     },
     "isReimbursementField": {
       "label": "Bu bir geri ödeme"
@@ -244,7 +245,7 @@
     }
   },
   "Balances": {
-    "title": "Bakiyeler",
+    "title": "Bakiye",
     "description": "Her katılımcının ödediği veya kendisi için ödenen tutar burada gösterilir.",
     "Reimbursements": {
       "title": "Önerilen geri ödemeler",
@@ -267,7 +268,7 @@
     }
   },
   "Activity": {
-    "title": "Etkinlik",
+    "title": "Geçmiş",
     "description": "Bu gruptaki tüm etkinliklerin genel görünümü.",
     "noActivity": "Grubunuzda henüz bir etkinlik yok.",
     "someone": "Birisi",

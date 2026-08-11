@@ -203,7 +203,8 @@
       }
     },
     "amountField": {
-      "label": "Betrag"
+      "label": "Betrag",
+      "mathHelp": "Du kannst Formeln verwenden. Beispiel: 10+5.50 oder 5*8"
     },
     "isReimbursementField": {
       "label": "Das ist eine Rückzahlung"
@@ -322,7 +323,7 @@
     }
   },
   "Activity": {
-    "title": "Aktivitäten",
+    "title": "Verlauf",
     "description": "Zusammenfassung aller Aktivitäten in dieser Gruppe.",
     "noActivity": "Es gab noch keine Aktivität in dieser Gruppe.",
     "someone": "Jemand",
@@ -343,7 +344,7 @@
     }
   },
   "Information": {
-    "title": "Informationen",
+    "title": "Info",
     "description": "Nutze diesen Ort, um Informationen hinzuzufügen, die für die Gruppenmitglieder wichtig sein könnten.",
     "empty": "Noch keine Gruppeninformationen vorhanden."
   },

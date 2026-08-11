@@ -203,7 +203,8 @@
       }
     },
     "amountField": {
-      "label": "Bedrag"
+      "label": "Bedrag",
+      "mathHelp": "Je kunt formules gebruiken. Voorbeeld: 10+5.50 of 5*8"
     },
     "isReimbursementField": {
       "label": "Dit is een terugbetaling"
@@ -322,7 +323,7 @@
     }
   },
   "Activity": {
-    "title": "Gebeurtenissen",
+    "title": "Geschiedenis",
     "description": "Overzicht van de gebeurtenissen in je groep.",
     "noActivity": "Er zijn geen gebeurtenissen in deze groep.",
     "someone": "Iemand",
@@ -343,7 +344,7 @@
     }
   },
   "Information": {
-    "title": "Informatie",
+    "title": "Info",
     "description": "Gebruike deze plek om informatie toe te voegen die relevant kan zijn voor de groepsleden.",
     "empty": "Nog geen informatie toegevoegd."
   },

@@ -137,7 +137,8 @@
       "splitModeDescription": "지출을 어떻게 나눌지 선택해 주세요."
     },
     "amountField": {
-      "label": "금액"
+      "label": "금액",
+      "mathHelp": "수식을 사용할 수 있어요. 예: 10+5.50 또는 5*8"
     },
     "conversionRateField": {
       "useApi": "Frankfurter의 환율을 사용해요",
@@ -207,7 +208,7 @@
     }
   },
   "Activity": {
-    "title": "활동 내역",
+    "title": "기록",
     "description": "이 그룹의 모든 활동 개요예요.",
     "noActivity": "아직 그룹에 활동 내역이 없어요.",
     "Groups": {

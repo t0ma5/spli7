@@ -195,7 +195,8 @@
       }
     },
     "amountField": {
-      "label": "金額"
+      "label": "金額",
+      "mathHelp": "計算式を使えます。例: 10+5.50 または 5*8"
     },
     "isReimbursementField": {
       "label": "これは払い戻しです"
@@ -314,7 +315,7 @@
     }
   },
   "Activity": {
-    "title": "アクティビティ",
+    "title": "履歴",
     "description": "このグループのすべてのアクティビティの概要。",
     "noActivity": "グループにはまだアクティビティがありません。",
     "someone": "誰か",

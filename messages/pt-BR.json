@@ -187,7 +187,8 @@
       }
     },
     "amountField": {
-      "label": "Valor"
+      "label": "Valor",
+      "mathHelp": "Você pode usar fórmulas. Exemplo: 10+5.50 ou 5*8"
     },
     "isReimbursementField": {
       "label": "Isso é um reembolso"
@@ -270,7 +271,7 @@
     }
   },
   "Balances": {
-    "title": "Saldos",
+    "title": "Saldo",
     "description": "Este é o valor que cada participante pagou ou recebeu.",
     "Reimbursements": {
       "title": "Reembolsos sugeridos",
@@ -293,7 +294,7 @@
     }
   },
   "Activity": {
-    "title": "Atividade",
+    "title": "Histórico",
     "description": "Visão geral de toda a atividade neste grupo.",
     "noActivity": "Ainda não há atividades no seu grupo.",
     "someone": "Alguém",
@@ -314,7 +315,7 @@
     }
   },
   "Information": {
-    "title": "Informação",
+    "title": "Info",
     "description": "Use este espaço para adicionar qualquer informação que possa ser relevante para os participantes do grupo.",
     "empty": "Nenhuma informação do grupo ainda."
   },

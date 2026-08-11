@@ -192,7 +192,8 @@
       }
     },
     "amountField": {
-      "label": "金额"
+      "label": "金额",
+      "mathHelp": "可以使用公式。例如：10+5.50 或 5*8"
     },
     "isReimbursementField": {
       "label": "这是一笔报销款"
@@ -306,7 +307,7 @@
     }
   },
   "Activity": {
-    "title": "活动",
+    "title": "历史",
     "description": "该群组所有活动总览",
     "noActivity": "你的群组目前没有任何活动。",
     "someone": "某人",
