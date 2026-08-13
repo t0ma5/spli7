@@ -577,7 +577,7 @@ export function ExpenseForm({
               control={form.control}
               name="title"
               render={({ field }) => (
-                <FormItem className="">
+                <FormItem className="order-1 sm:col-start-1">
                   <FormLabel>{t(`${sExpense}.TitleField.label`)}</FormLabel>
                   <FormControl>
                     <Input
@@ -609,7 +609,7 @@ export function ExpenseForm({
               control={form.control}
               name="expenseDate"
               render={({ field }) => (
-                <FormItem className="sm:order-1">
+                <FormItem className="order-2 sm:col-start-2">
                   <FormLabel>{t(`${sExpense}.DateField.label`)}</FormLabel>
                   <FormControl>
                     <Input
@@ -632,7 +632,7 @@ export function ExpenseForm({
             <FormField
               name="originalCurrency"
               render={({ field: { onChange, ...field } }) => (
-                <FormItem className="sm:order-3">
+                <FormItem className="order-3 sm:col-start-2">
                   <FormLabel>{t(`${sExpense}.currencyField.label`)}</FormLabel>
                   <FormControl>
                     {group.currencyCode ? (
@@ -661,9 +661,9 @@ export function ExpenseForm({
             />
 
             <div
-              className={`sm:order-4 ${
-                !conversionRequired ? 'max-sm:hidden sm:invisible' : ''
-              } col-span-2 md:col-span-1 space-y-2`}
+              className={`order-4 sm:col-start-2 ${
+                !conversionRequired ? 'hidden' : ''
+              } space-y-2`}
             >
               <FormField
                 control={form.control}
@@ -732,13 +732,7 @@ export function ExpenseForm({
                     control={form.control}
                     name="conversionRate"
                     render={({ field: { onChange, ...field } }) => (
-                      <FormItem
-                        className={`sm:order-4 ${
-                          !conversionRequired
-                            ? 'max-sm:hidden sm:invisible'
-                            : ''
-                        }`}
-                      >
+                      <FormItem>
                         <FormLabel>{t('conversionRateField.label')}</FormLabel>
                         <div className="flex items-baseline gap-2">
                           <span>
@@ -775,7 +769,7 @@ export function ExpenseForm({
               control={form.control}
               name="category"
               render={({ field }) => (
-                <FormItem className="order-3 sm:order-2">
+                <FormItem className="order-5 sm:col-start-1">
                   <FormLabel>{t('categoryField.label')}</FormLabel>
                   <CategorySelector
                     categories={categories}
@@ -797,7 +791,7 @@ export function ExpenseForm({
               control={form.control}
               name="paidBy"
               render={({ field }) => (
-                <FormItem className="sm:order-5">
+                <FormItem className="order-8 sm:col-start-2">
                   <FormLabel>{t(`${sExpense}.paidByField.label`)}</FormLabel>
                   <FormDescription>
                     {t(`${sExpense}.paidByField.description`)}
@@ -960,7 +954,7 @@ export function ExpenseForm({
               control={form.control}
               name="notes"
               render={({ field }) => (
-                <FormItem className="sm:order-6">
+                <FormItem className="order-7 sm:col-start-1">
                   <FormLabel>{t('notesField.label')}</FormLabel>
                   <FormControl>
                     <Textarea className="text-base" {...field} />
@@ -972,7 +966,7 @@ export function ExpenseForm({
               control={form.control}
               name="recurrenceRule"
               render={({ field }) => (
-                <FormItem className="sm:order-5">
+                <FormItem className="order-6 sm:col-start-2">
                   <FormLabel>{t(`${sExpense}.recurrenceRule.label`)}</FormLabel>
                   <Select
                     onValueChange={(value) => {
