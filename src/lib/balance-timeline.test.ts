@@ -15,7 +15,10 @@ type PaidByInput =
   | BalanceTimelineExpense['paidBy']
   | { id: string; name: string; amount?: number }
 
-function asPaidBy(paidBy: PaidByInput, amount: number): BalanceTimelineExpense['paidBy'] {
+function asPaidBy(
+  paidBy: PaidByInput,
+  amount: number,
+): BalanceTimelineExpense['paidBy'] {
   if (Array.isArray(paidBy)) return paidBy
   return [{ id: paidBy.id, name: paidBy.name, amount: paidBy.amount ?? amount }]
 }
@@ -162,7 +165,7 @@ describe('getBalanceTimeline', () => {
     })
   })
 
-  it('summarizes peak balances and reimbursement activity by participant', () => {
+  it('returns participants present on the timeline without unused summary fields', () => {
     const timeline = getBalanceTimeline(
       [
         expense({
@@ -187,21 +190,12 @@ describe('getBalanceTimeline', () => {
     )
 
     expect(
-      timeline.participants.find((participant) => participant.id === 'alex'),
-    ).toMatchObject({
-      maxPositiveBalance: 6000,
-      peakBalance: 6000,
-      peakAbsBalance: 6000,
-      repaymentCount: 1,
-      currentBalance: 3000,
-    })
-    expect(
-      timeline.participants.find((participant) => participant.id === 'casey'),
-    ).toMatchObject({
-      maxNegativeBalance: -3000,
-      peakBalance: -3000,
-      peakAbsBalance: 3000,
-      repaymentCount: 0,
+      timeline.participants.map((participant) => participant.id).sort(),
+    ).toEqual(['alex', 'blair', 'casey'])
+    expect(timeline.points.at(-1)?.balances).toMatchObject({
+      alex: 3000,
+      blair: 0,
+      casey: -3000,
     })
   })
 

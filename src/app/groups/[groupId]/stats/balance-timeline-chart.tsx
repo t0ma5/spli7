@@ -1,16 +1,22 @@
 'use client'
 
 import { CategoryIcon } from '@/app/groups/[groupId]/expenses/category-icon'
+import {
+  formatParticipantBalance,
+  getExpenseEventLabel,
+  getPaymentEventLabel,
+} from '@/app/groups/[groupId]/stats/balance-timeline/labels'
 import { Button } from '@/components/ui/button'
 import { formatChartCurrency } from '@/lib/chart-currency'
+import { Category } from '@/lib/kv/types'
 import { cn, formatCurrency } from '@/lib/utils'
 import { AppRouterOutput } from '@/trpc/routers/_app'
-import { Category } from '@/lib/kv/types'
 import { Banknote } from 'lucide-react'
 import { useState, type PointerEvent } from 'react'
 
-type BalanceTimeline =
+type BalanceTimeline = NonNullable<
   AppRouterOutput['groups']['stats']['get']['balanceTimeline']
+>
 type BalanceTimelineParticipant = BalanceTimeline['participants'][number]
 type BalanceTimelinePoint = BalanceTimeline['points'][number]
 type BalanceTimelineEvent = BalanceTimelinePoint['events'][number]
@@ -138,12 +144,14 @@ export function BalanceTimelineChart({
   locale,
   roundAmounts,
   t,
+  tCategories,
 }: {
   balanceTimeline: BalanceTimeline
   currency: Parameters<typeof formatCurrency>[0]
   locale: string
   roundAmounts: boolean
-  t: (key: string) => string
+  t: (key: string, values?: Record<string, string>) => string
+  tCategories: (key: string) => string
 }) {
   const [showCategoryMarkers, setShowCategoryMarkers] = useState(false)
   const [stackOrder, setStackOrder] =
@@ -200,6 +208,7 @@ export function BalanceTimelineChart({
           showCategoryMarkers={showCategoryMarkers}
           stackOrder={stackOrder}
           t={t}
+          tCategories={tCategories}
         />
         <TimelineMonthAxis
           locale={locale}
@@ -267,6 +276,7 @@ function BalanceTimelineLinesChart({
   showCategoryMarkers,
   stackOrder,
   t,
+  tCategories,
 }: {
   balanceTimeline: BalanceTimeline
   currency: Parameters<typeof formatCurrency>[0]
@@ -275,7 +285,8 @@ function BalanceTimelineLinesChart({
   roundAmounts: boolean
   showCategoryMarkers: boolean
   stackOrder: TimelineStackOrder
-  t: (key: string) => string
+  t: (key: string, values?: Record<string, string>) => string
+  tCategories: (key: string) => string
 }) {
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(
     null,
@@ -342,7 +353,7 @@ function BalanceTimelineLinesChart({
     >
       <svg
         aria-label={t('balanceTimelineTitle')}
-        className="absolute inset-0 h-full w-full overflow-visible rounded-sm bg-white"
+        className="absolute inset-0 h-full w-full overflow-visible rounded-sm bg-background"
         preserveAspectRatio="none"
         role="img"
         viewBox={`0 0 ${TIMELINE_CHART_WIDTH} ${TIMELINE_CHART_HEIGHT}`}
@@ -373,6 +384,7 @@ function BalanceTimelineLinesChart({
           locale={locale}
           participantSeries={participantSeries}
           roundAmounts={roundAmounts}
+          t={t}
           yAxisMaxBalance={yAxisMaxBalance}
         />
         <line
@@ -401,6 +413,8 @@ function BalanceTimelineLinesChart({
         participantSeries={participantSeries}
         roundAmounts={roundAmounts}
         showCategoryMarkers={showCategoryMarkers}
+        t={t}
+        tCategories={tCategories}
       />
       <TimelineHoverTooltip
         currency={currency}
@@ -469,7 +483,7 @@ function TimelineBalanceAreaLabels({ t }: { t: (key: string) => string }) {
         return (
           <g key={label.key}>
             <rect
-              className="fill-white"
+              className="fill-background"
               height="18"
               opacity="0.86"
               rx="4"
@@ -498,12 +512,14 @@ function TimelineBalanceColumns({
   locale,
   participantSeries,
   roundAmounts,
+  t,
   yAxisMaxBalance,
 }: {
   currency: Parameters<typeof formatCurrency>[0]
   locale: string
   participantSeries: BalanceTimelineParticipantSeries[]
   roundAmounts: boolean
+  t: (key: string, values?: Record<string, string>) => string
   yAxisMaxBalance: number
 }) {
   const timelineCoordinates = participantSeries[0]?.coordinates ?? []
@@ -575,6 +591,7 @@ function TimelineBalanceColumns({
                     locale,
                     participant,
                     roundAmounts,
+                    t,
                   })}
                 </title>
               </rect>
@@ -633,7 +650,7 @@ function TimelineHoverTooltip({
   hoveredParticipantCoordinates: TimelineParticipantCoordinate[]
   locale: string
   roundAmounts: boolean
-  t: (key: string) => string
+  t: (key: string, values?: Record<string, string>) => string
 }) {
   const point = hoveredParticipantCoordinates[0]?.coordinate.point
 
@@ -686,6 +703,7 @@ function TimelineHoverTooltip({
           locale={locale}
           participantCoordinates={owingParticipantCoordinates}
           roundAmounts={roundAmounts}
+          t={t}
           textClassName="text-red-700 dark:text-red-200"
           title={t('owesMoney')}
         />
@@ -695,6 +713,7 @@ function TimelineHoverTooltip({
           locale={locale}
           participantCoordinates={owedParticipantCoordinates}
           roundAmounts={roundAmounts}
+          t={t}
           textClassName="text-green-700 dark:text-green-200"
           title={t('isOwedMoney')}
         />
@@ -709,6 +728,7 @@ function TimelineHoverBalanceSection({
   locale,
   participantCoordinates,
   roundAmounts,
+  t,
   textClassName,
   title,
 }: {
@@ -717,6 +737,7 @@ function TimelineHoverBalanceSection({
   locale: string
   participantCoordinates: TimelineParticipantCoordinate[]
   roundAmounts: boolean
+  t: (key: string, values?: Record<string, string>) => string
   textClassName: string
   title: string
 }) {
@@ -757,6 +778,7 @@ function TimelineHoverBalanceSection({
               locale,
               participantName: participant.name,
               roundAmounts,
+              t,
             })}
           </span>
         </div>
@@ -771,12 +793,16 @@ function TimelineEventMarkerLayer({
   participantSeries,
   roundAmounts,
   showCategoryMarkers,
+  t,
+  tCategories,
 }: {
   currency: Parameters<typeof formatCurrency>[0]
   locale: string
   participantSeries: BalanceTimelineParticipantSeries[]
   roundAmounts: boolean
   showCategoryMarkers: boolean
+  t: (key: string, values?: Record<string, string>) => string
+  tCategories: (key: string) => string
 }) {
   const markers = getTimelineEventMarkers({
     currency,
@@ -784,6 +810,8 @@ function TimelineEventMarkerLayer({
     participantSeries,
     roundAmounts,
     showCategoryMarkers,
+    t,
+    tCategories,
   })
 
   return (
@@ -851,12 +879,16 @@ function getTimelineEventMarkers({
   participantSeries,
   roundAmounts,
   showCategoryMarkers,
+  t,
+  tCategories,
 }: {
   currency: Parameters<typeof formatCurrency>[0]
   locale: string
   participantSeries: BalanceTimelineParticipantSeries[]
   roundAmounts: boolean
   showCategoryMarkers: boolean
+  t: (key: string, values?: Record<string, string>) => string
+  tCategories: (key: string) => string
 }): TimelineEventMarker[] {
   const markers = participantSeries.flatMap(
     ({ color, coordinates, participant }) =>
@@ -877,8 +909,15 @@ function getTimelineEventMarkers({
           key: `${participant.id}-${coordinate.point.key}-${eventIndex}-event`,
           railX: coordinate.x,
           title: event.isReimbursement
-            ? getPaymentEventLabel({ currency, event, locale, roundAmounts })
-            : getExpenseEventLabel({ currency, event, locale, roundAmounts }),
+            ? getPaymentEventLabel({ currency, event, locale, roundAmounts, t })
+            : getExpenseEventLabel({
+                currency,
+                event,
+                locale,
+                roundAmounts,
+                t,
+                tCategories,
+              }),
         }))
       }),
   )
@@ -1334,103 +1373,20 @@ function getMarkerEvents({
   ]
 }
 
-function formatParticipantBalance({
-  amount,
-  currency,
-  includeCurrently,
-  locale,
-  participantName,
-  roundAmounts,
-}: {
-  amount: number
-  currency: Parameters<typeof formatCurrency>[0]
-  includeCurrently: boolean
-  locale: string
-  participantName: string
-  roundAmounts: boolean
-}) {
-  const formattedAmount = formatChartCurrency({
-    amount: Math.abs(amount),
-    currency,
-    locale,
-    roundAmounts,
-  })
-  const currently = includeCurrently ? ' currently' : ''
-
-  if (amount < 0)
-    return `${participantName} owes ${formattedAmount}${currently}`
-  if (amount > 0) {
-    return `${participantName} is owed ${formattedAmount}${currently}`
-  }
-
-  return `${participantName} is settled${currently}`
-}
-
-function getPaymentEventLabel({
-  currency,
-  event,
-  locale,
-  roundAmounts,
-}: {
-  currency: Parameters<typeof formatCurrency>[0]
-  event: BalanceTimelineEvent
-  locale: string
-  roundAmounts: boolean
-}) {
-  const paidForNames = event.paidFor
-    .map((participant) => participant.name)
-    .join(', ')
-
-  const paidByNames = event.paidBy.map((pb) => pb.name).join(', ')
-
-  return `${paidByNames} paid ${formatChartCurrency({
-    amount: Math.abs(event.amount),
-    currency,
-    locale,
-    roundAmounts,
-  })} to ${paidForNames}`
-}
-
-function getExpenseEventLabel({
-  currency,
-  event,
-  locale,
-  roundAmounts,
-}: {
-  currency: Parameters<typeof formatCurrency>[0]
-  event: BalanceTimelineEvent
-  locale: string
-  roundAmounts: boolean
-}) {
-  const categoryLabel = event.category
-    ? `${event.category.grouping}: ${event.category.name}`
-    : 'Expense'
-  const eventLabel = event.title
-    ? `${event.title} (${categoryLabel})`
-    : categoryLabel
-
-  const paidByNames = event.paidBy.map((pb) => pb.name).join(', ')
-
-  return `${eventLabel}: ${paidByNames} paid ${formatChartCurrency({
-    amount: Math.abs(event.amount),
-    currency,
-    locale,
-    roundAmounts,
-  })}`
-}
-
 function getBalanceTimelinePointLabel({
   balance,
   currency,
   locale,
   participant,
   roundAmounts,
+  t,
 }: {
   balance: number
   currency: Parameters<typeof formatCurrency>[0]
   locale: string
   participant: BalanceTimelineParticipant
   roundAmounts: boolean
+  t: (key: string, values?: Record<string, string>) => string
 }) {
   return formatParticipantBalance({
     amount: balance,
@@ -1439,6 +1395,7 @@ function getBalanceTimelinePointLabel({
     locale,
     participantName: participant.name,
     roundAmounts,
+    t,
   })
 }
 

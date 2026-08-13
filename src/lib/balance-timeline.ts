@@ -1,3 +1,4 @@
+import { allocatePaidForAmounts } from '@/lib/expense-shares'
 import { MonthlySpendingRange } from './monthly-spending'
 
 type BalanceTimelineParticipant = {
@@ -12,10 +13,7 @@ type BalanceTimelineCategory = {
 }
 
 type BalanceTimelineSplitMode =
-  | 'EVENLY'
-  | 'BY_AMOUNT'
-  | 'BY_PERCENTAGE'
-  | 'BY_SHARES'
+  'EVENLY' | 'BY_AMOUNT' | 'BY_PERCENTAGE' | 'BY_SHARES'
 
 export type BalanceTimelinePaidBy = BalanceTimelineParticipant & {
   amount: number
@@ -58,18 +56,9 @@ export type BalanceTimelinePoint = {
   isStart: boolean
 }
 
-export type BalanceTimelineParticipantSummary = BalanceTimelineParticipant & {
-  currentBalance: number
-  maxPositiveBalance: number
-  maxNegativeBalance: number
-  peakBalance: number
-  peakAbsBalance: number
-  repaymentCount: number
-}
-
 export type BalanceTimeline = {
   points: BalanceTimelinePoint[]
-  participants: BalanceTimelineParticipantSummary[]
+  participants: BalanceTimelineParticipant[]
   maxAbsBalance: number
   rangeEnd: { year: number; month: number; day: number }
   rangeStart: { year: number; month: number; day: number }
@@ -119,20 +108,6 @@ export function getBalanceTimeline(
     }
   }
 
-  const participantSummaries = new Map(
-    participants.map((participant) => [
-      participant.id,
-      {
-        ...participant,
-        currentBalance: 0,
-        maxNegativeBalance: 0,
-        maxPositiveBalance: 0,
-        peakBalance: 0,
-        peakAbsBalance: 0,
-        repaymentCount: 0,
-      },
-    ]),
-  )
   const points: BalanceTimelinePoint[] = []
   let maxAbsBalance = 0
 
@@ -142,11 +117,6 @@ export function getBalanceTimeline(
       participants.map((participant) => [participant.id, 0]),
     )
 
-    updateParticipantSummaries({
-      balances: startBalances,
-      participantSummaries,
-      participants,
-    })
     maxAbsBalance = getMaxAbsBalance(startBalances, maxAbsBalance)
 
     points.push({
@@ -168,13 +138,6 @@ export function getBalanceTimeline(
     const pointBalances = mapToRoundedRecord(balances)
     const pointDeltas = mapToRoundedRecord(day.deltas)
 
-    updateParticipantSummaries({
-      balances: pointBalances,
-      deltas: pointDeltas,
-      hasRepayment: day.hasRepayment,
-      participantSummaries,
-      participants,
-    })
     maxAbsBalance = getMaxAbsBalance(pointBalances, maxAbsBalance)
 
     points.push({
@@ -190,15 +153,9 @@ export function getBalanceTimeline(
     })
   }
 
-  const currentBalances = points.at(-1)?.balances ?? {}
-  for (const participant of participants) {
-    const summary = participantSummaries.get(participant.id)
-    if (summary) summary.currentBalance = currentBalances[participant.id] ?? 0
-  }
-
   return {
     points,
-    participants: Array.from(participantSummaries.values()),
+    participants,
     maxAbsBalance,
     rangeEnd: timelineRange.end,
     rangeStart: timelineRange.start,
@@ -293,90 +250,25 @@ function getTimelineEvent(expense: BalanceTimelineExpense) {
 
 function getExpenseDeltas(expense: BalanceTimelineExpense) {
   const deltas = new Map<string, number>()
-  const totalPaidForShares = expense.paidFor.reduce(
-    (sum, paidFor) => sum + paidFor.shares,
-    0,
-  )
-  let remainingAmount = expense.amount
 
   for (const paidBy of expense.paidBy) {
     addDelta(deltas, paidBy.id, paidBy.amount)
   }
 
-  expense.paidFor.forEach((paidFor, index) => {
-    const isLast = index === expense.paidFor.length - 1
-    const dividedAmount = isLast
-      ? remainingAmount
-      : (expense.amount *
-          getPaidForShares({
-            paidForShares: paidFor.shares,
-            splitMode: expense.splitMode,
-          })) /
-        getTotalShares({
-          paidForCount: expense.paidFor.length,
-          splitMode: expense.splitMode,
-          totalPaidForShares,
-        })
-
-    remainingAmount -= dividedAmount
-    addDelta(deltas, paidFor.participant.id, -dividedAmount)
+  const allocations = allocatePaidForAmounts({
+    amount: expense.amount,
+    paidFor: expense.paidFor.map((paidFor) => ({
+      participantId: paidFor.participant.id,
+      shares: paidFor.shares,
+    })),
+    splitMode: expense.splitMode,
   })
 
-  return deltas
-}
-
-function getPaidForShares({
-  paidForShares,
-  splitMode,
-}: {
-  paidForShares: number
-  splitMode: BalanceTimelineSplitMode
-}) {
-  if (splitMode === 'EVENLY') return 1
-  return paidForShares
-}
-
-function getTotalShares({
-  paidForCount,
-  splitMode,
-  totalPaidForShares,
-}: {
-  paidForCount: number
-  splitMode: BalanceTimelineSplitMode
-  totalPaidForShares: number
-}) {
-  if (splitMode === 'EVENLY') return paidForCount
-  return totalPaidForShares
-}
-
-function updateParticipantSummaries({
-  balances,
-  deltas = {},
-  hasRepayment = false,
-  participantSummaries,
-  participants,
-}: {
-  balances: Record<string, number>
-  deltas?: Record<string, number>
-  hasRepayment?: boolean
-  participantSummaries: Map<string, BalanceTimelineParticipantSummary>
-  participants: BalanceTimelineParticipant[]
-}) {
-  for (const participant of participants) {
-    const balance = balances[participant.id] ?? 0
-    const summary = participantSummaries.get(participant.id)
-    if (!summary) continue
-
-    summary.maxPositiveBalance = Math.max(summary.maxPositiveBalance, balance)
-    summary.maxNegativeBalance = Math.min(summary.maxNegativeBalance, balance)
-    summary.peakAbsBalance = Math.max(summary.peakAbsBalance, Math.abs(balance))
-    if (Math.abs(balance) > Math.abs(summary.peakBalance)) {
-      summary.peakBalance = balance
-    }
-    if (hasRepayment && (deltas[participant.id] ?? 0) !== 0) {
-      summary.repaymentCount += 1
-    }
+  for (const allocation of allocations) {
+    addDelta(deltas, allocation.participantId, -allocation.amount)
   }
+
+  return deltas
 }
 
 function getMaxAbsBalance(

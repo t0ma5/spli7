@@ -18,10 +18,12 @@ export const getGroupStatsProcedure = baseProcedure
     z.object({
       groupId: z.string().min(1),
       participantId: z.string().optional(),
+      // Optional on purpose: Totals does not pass these, so we skip monthly /
+      // timeline aggregation and avoid a second heavy payload on stats load.
       monthlySpendingGrouping: z
         .enum(monthlySpendingGroupingOptions)
-        .default('categoryGroup'),
-      monthlySpendingRange: z.enum(monthlySpendingRangeOptions).default('6'),
+        .optional(),
+      monthlySpendingRange: z.enum(monthlySpendingRangeOptions).optional(),
     }),
   )
   .query(
@@ -35,13 +37,22 @@ export const getGroupStatsProcedure = baseProcedure
     }) => {
       const expenses = await getGroupExpenses(groupId)
       const totalGroupSpendings = getTotalGroupSpending(expenses)
-      const monthlyCategorySpending = getMonthlyCategorySpending(expenses, {
-        grouping: monthlySpendingGrouping,
-        range: monthlySpendingRange,
-      })
-      const balanceTimeline = getBalanceTimeline(expenses, {
-        range: monthlySpendingRange,
-      })
+
+      const includeCharts =
+        monthlySpendingGrouping !== undefined &&
+        monthlySpendingRange !== undefined
+
+      const monthlyCategorySpending = includeCharts
+        ? getMonthlyCategorySpending(expenses, {
+            grouping: monthlySpendingGrouping,
+            range: monthlySpendingRange,
+          })
+        : undefined
+      const balanceTimeline = includeCharts
+        ? getBalanceTimeline(expenses, {
+            range: monthlySpendingRange,
+          })
+        : undefined
 
       const totalParticipantSpendings =
         participantId !== undefined

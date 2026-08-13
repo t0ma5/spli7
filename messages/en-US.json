@@ -385,6 +385,15 @@
       "stackOrderLabel": "Stack order",
       "income": "Income",
       "noData": "No spending data yet.",
+      "participantOwes": "{name} owes {amount}",
+      "participantIsOwed": "{name} is owed {amount}",
+      "participantSettled": "{name} is settled",
+      "participantOwesCurrently": "{name} owes {amount} currently",
+      "participantIsOwedCurrently": "{name} is owed {amount} currently",
+      "participantSettledCurrently": "{name} is settled currently",
+      "paymentEvent": "{paidBy} paid {amount} to {paidFor}",
+      "expenseEvent": "{event}: {paidBy} paid {amount}",
+      "expenseFallback": "Expense",
       "ChartTypes": {
         "bars": "Stacked bars",
         "columns": "Stacked columns"

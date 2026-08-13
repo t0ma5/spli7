@@ -1,5 +1,5 @@
+import { allocatePaidForAmounts } from '@/lib/expense-shares'
 import type { ExpenseListItem, Participant } from '@/lib/kv/types'
-import { match } from 'ts-pattern'
 
 export type Balances = Record<
   Participant['id'],
@@ -23,33 +23,21 @@ export function getBalances(expenses: ExpenseListItem[]): Balances {
       balances[pb.id].paid += pb.amount
     }
 
-    const totalPaidForShares = paidFors.reduce(
-      (sum, paidFor) => sum + paidFor.shares,
-      0,
-    )
-    let remaining = expense.amount
-    paidFors.forEach((paidFor, index) => {
-      if (!balances[paidFor.participant.id])
-        balances[paidFor.participant.id] = { paid: 0, paidFor: 0, total: 0 }
-
-      const isLast = index === paidFors.length - 1
-
-      const [shares, totalShares] = match(expense.splitMode)
-        .with('EVENLY', () => [1, paidFors.length] as const)
-        .with('BY_SHARES', () => [paidFor.shares, totalPaidForShares] as const)
-        .with(
-          'BY_PERCENTAGE',
-          () => [paidFor.shares, totalPaidForShares] as const,
-        )
-        .with('BY_AMOUNT', () => [paidFor.shares, totalPaidForShares] as const)
-        .exhaustive()
-
-      const dividedAmount = isLast
-        ? remaining
-        : Math.floor((expense.amount * shares) / totalShares)
-      remaining -= dividedAmount
-      balances[paidFor.participant.id].paidFor += dividedAmount
+    const allocations = allocatePaidForAmounts({
+      amount: expense.amount,
+      paidFor: paidFors.map((paidFor) => ({
+        participantId: paidFor.participant.id,
+        shares: paidFor.shares,
+      })),
+      splitMode: expense.splitMode,
     })
+
+    for (const allocation of allocations) {
+      if (!balances[allocation.participantId]) {
+        balances[allocation.participantId] = { paid: 0, paidFor: 0, total: 0 }
+      }
+      balances[allocation.participantId].paidFor += allocation.amount
+    }
   }
 
   for (const participantId in balances) {
