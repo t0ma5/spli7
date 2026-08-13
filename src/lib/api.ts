@@ -273,7 +273,13 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
           shares,
         }
       }),
-      documents: [],
+      documents: (expense.documents ?? []).map((document) => ({
+        id: randomId(),
+        url: document.url,
+        width: document.width,
+        height: document.height,
+        expenseId,
+      })),
       recurringExpenseLink: null,
     }
   })
@@ -914,7 +920,7 @@ export async function getGroupForExport(groupId: string) {
   if (!group) return null
 
   return {
-    exportVersion: 2 as const,
+    exportVersion: 3 as const,
     id: group.id,
     name: group.name,
     information: group.information,
@@ -953,6 +959,12 @@ export async function getGroupForExport(groupId: string) {
         splitMode: expense.splitMode,
         recurrenceRule: expense.recurrenceRule,
         notes: expense.notes,
+        documents: (expense.documents ?? []).map((document) => ({
+          id: document.id,
+          url: document.url,
+          width: document.width,
+          height: document.height,
+        })),
       })),
     activities: group.activities
       .slice()

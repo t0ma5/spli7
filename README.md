@@ -20,7 +20,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🟢 Export a group to JSON or CSV
 - [x] 🔴 Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
 - [x] 🔴 Import a group from a **Tricount** GDPR CSV export (participants + expenses)
-- [x] 🔴 Notes + activity history in JSON export/import (`exportVersion: 2`)
+- [x] 🔴 Notes + activity history + **document links** in JSON export/import (`exportVersion: 3`)
 - [x] 🔴 Copy an existing expense into a new draft
 - [x] 🔴 Math expressions in the amount field
 - [x] 🔴 Even-split cent remainder (no missing cents)
@@ -74,8 +74,8 @@ Shared behavior:
 
 - Restores participants, expenses (including **multiple payers** when present), split modes, amounts, dates, **notes**, group **information**, and **activity history** (when present in the file).
 - Categories: match by `id` when present; otherwise by `name` / `grouping` against the seeded list (many exports omit `id`).
-- Newer exports include `exportVersion: 2` and expense `id`s (needed to re-link history).
-- Does **not** restore expense attachments or active recurring-expense links.
+- Newer exports include `exportVersion: 3`, expense `id`s (needed to re-link history), and expense **document links** (`url` / dimensions — not file bytes).
+- Document URLs round-trip for migration between Spliit forks; binaries are not embedded, and links may 404 if the original storage expires. Recurring-expense links are still not restored.
 
 ### Tricount CSV
 
@@ -96,7 +96,7 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Even-split cents** | Integer remainder allocation so balances don’t drop a cent. | Upstream [#374](https://github.com/spliit-app/spliit/issues/374) / [#427](https://github.com/spliit-app/spliit/pull/427); tracked by Spliit Cloud |
 | **Share QR** | QR in the share popover. | Upstream [#500](https://github.com/spliit-app/spliit/pull/500); on Spliit Cloud roadmap |
 | **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
-| **Notes + history in JSON** | Export/import round-trips expense notes, group information, and activity history (`exportVersion: 2`). | Expense notes also appear in Spliit Cloud / upstream [#165](https://github.com/spliit-app/spliit/pull/165); history round-trip is specific to this fork |
+| **Notes + history + document links in JSON** | Export/import round-trips expense notes, group information, activity history, and document **URLs** (`exportVersion: 3`). | Follow-up to upstream [#546](https://github.com/spliit-app/spliit/pull/546); expense notes also in [#165](https://github.com/spliit-app/spliit/pull/165) |
 | **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
 | **Paste amount parsing** | Normalizes pasted US/EU currency amounts in number fields. | Upstream [#531](https://github.com/spliit-app/spliit/pull/531) |
 | **Selector keyboard nav** | Category/currency pickers use cmdk CommandList. | Upstream [#491](https://github.com/spliit-app/spliit/pull/491) |

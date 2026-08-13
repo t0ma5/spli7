@@ -80,7 +80,7 @@
     "ImportJSON": {
       "button": "Import JSON",
       "title": "Import a group from JSON",
-      "description": "Upload a Spliit or Tricount JSON export to create a new group with its participants, expenses, notes and history",
+      "description": "Upload a Spliit or Tricount JSON export to create a new group with its participants, expenses, notes, history, and document links",
       "chooseFile": "Choose file",
       "importing": "Importing…",
       "invalidJson": "That file is not valid JSON.",

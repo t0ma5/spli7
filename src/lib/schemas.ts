@@ -350,6 +350,18 @@ export const groupImportSchema = z
             .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
             .nullish(),
           notes: z.string().nullish(),
+          documents: z
+            .array(
+              z.object({
+                id: z.string().min(1).max(30).optional(),
+                url: z.string().url().max(2000),
+                width: z.number().int().min(1).max(10000),
+                height: z.number().int().min(1).max(10000),
+              }),
+            )
+            .max(100)
+            .optional()
+            .default([]),
         }),
       )
       .default([]),
