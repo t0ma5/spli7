@@ -4,7 +4,7 @@
 
 **Live:** [https://spl1t.pages.dev](https://spl1t.pages.dev)
 
-> `spl1t.pages.dev` is a Pages project that reverse-proxies Worker `spl1t`. OpenNext still deploys the Worker. App `NEXT_PUBLIC_BASE_URL` remains https://spl1t.USER.workers.dev until a Worker rebuild.
+> `spl1t.pages.dev` is a Pages project that reverse-proxies Worker `spl1t`. OpenNext still deploys the Worker. App `NEXT_PUBLIC_BASE_URL` remains `https://spl1t.USER.workers.dev` until a Worker rebuild.
 
 ## Features
 
