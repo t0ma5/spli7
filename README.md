@@ -1,4 +1,4 @@
-[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spl1t.pages.dev)
+[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spl1t.contti.workers.dev)
 
 **spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
