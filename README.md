@@ -2,9 +2,7 @@
 
 **spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
-**Live:** [https://spl1t.pages.dev](https://spl1t.pages.dev) · **Worker:** [spl1t.contti.workers.dev](https://spl1t.contti.workers.dev) · **KV:** `94eaadc98e2246d7989b734acf2cb461` · **Repo:** [t0ma5/spl1t](https://github.com/t0ma5/spl1t)
-
-> `spl1t.pages.dev` is a Pages project that reverse-proxies Worker `spl1t`. OpenNext still deploys the Worker. App `NEXT_PUBLIC_BASE_URL` remains https://spl1t.contti.workers.dev until a Worker rebuild.
+**Live:** [https://spl1t.pages.dev](https://spl1t.pages.dev) · **Worker:** `spl1t`
 
 ## Features
 
