@@ -1,10 +1,8 @@
-[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spl1t.contti.workers.dev)
+[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spl1t.pages.dev)
 
 **spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
-**Live:** [https://spl1t.contti.workers.dev](https://spl1t.contti.workers.dev) · **Worker:** `spl1t` · **KV:** `94eaadc98e2246d7989b734acf2cb461` · **Repo:** [t0ma5/spl1t](https://github.com/t0ma5/spl1t)
-
-> **Hostname note:** OpenNext deploys this fork as a **Worker** (`spl1t.*.workers.dev`). An empty Cloudflare Pages project can reserve `spl1t.pages.dev` and return **522** until removed or given a real Pages deployment. API cannot attach `*.pages.dev` to a Worker while Pages owns that DNS. Prefer the workers.dev URL, or attach a domain you control under Worker → Settings → Domains & Routes.
+**Live:** [https://spl1t.pages.dev](https://spl1t.pages.dev) · **Worker:** `spl1t`
 
 ## Features
 
@@ -45,15 +43,6 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [ ] ❌ Upload and attach images to expenses (removed — see below)
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
-## Stats (this fork)
-
-On each group’s **Stats** tab:
-
-- **Monthly spending** — stacked category chart for calendar months, with a category breakdown and legend controls.
-- **Balance timeline** — cumulative balances over time for participants (engineering fixes on this fork for share math / timeline consistency).
-
-Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555); reimplemented for denormalized KV documents.
-
 ## Stack
 
 - [Next.js](https://nextjs.org/) for the web application
@@ -70,7 +59,40 @@ Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#5
 - Friend-sized groups fit this model; very large groups may hit KV value size limits.
 - Groups track `lastActivityAt` on expense create/update/delete and group settings updates. After **24 months** without activity, cleanup soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted. Call `GET/POST /api/cron/cleanup-groups` with `Authorization: Bearer $CRON_SECRET` (set `CRON_SECRET` in Worker env).
 
-## Group import (JSON / Tricount)
+## Extra UX (this fork)
+
+Ideas below track community demand from [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md), upstream Spliit issues/PRs, and hardening patterns from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (reimplemented for KV — not a code port of their E2EE/auth stack).
+
+| Feature | Notes | Prior art |
+| --- | --- | --- |
+| **Copy expense** | From the expense list or edit header icon (opens create prefilled). | Upstream [#527](https://github.com/spliit-app/spliit/issues/527); shipped in Spliit Cloud |
+| **Amount math** | Expressions in the amount field (`10+5.50`, `5*8`, …) on blur/save. | Upstream [#184](https://github.com/spliit-app/spliit/pull/184); shipped in Spliit Cloud |
+| **Default split mode** | Stored on the group (device localStorage can still override). | Upstream [#366](https://github.com/spliit-app/spliit/pull/366); shipped in Spliit Cloud |
+| **Even-split cents** | Integer remainder allocation so balances don’t drop a cent. | Upstream [#374](https://github.com/spliit-app/spliit/issues/374) / [#427](https://github.com/spliit-app/spliit/pull/427); tracked by Spliit Cloud |
+| **Share QR** | QR in the share popover. | Upstream [#500](https://github.com/spliit-app/spliit/pull/500); on Spliit Cloud roadmap |
+| **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
+| **Notes + history + document links in JSON** | Export/import round-trips expense notes, group information, activity history, and document **URLs** (`exportVersion: 3`). | Follow-up to upstream [#546](https://github.com/spliit-app/spliit/pull/546); expense notes also in [#165](https://github.com/spliit-app/spliit/pull/165) |
+| **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
+| **Paste amount parsing** | Normalizes pasted US/EU currency amounts in number fields. | Upstream [#531](https://github.com/spliit-app/spliit/pull/531) |
+| **Selector keyboard nav** | Category/currency pickers use cmdk CommandList. | Upstream [#491](https://github.com/spliit-app/spliit/pull/491) |
+| **Mobile tab icons** | Icon-only tabs on small screens; labels from sm. | Upstream [#539](https://github.com/spliit-app/spliit/pull/539) |
+| **Monthly spending + balance timeline** | CSS stacked category charts, category breakdown, and balance timeline on Stats. | Upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555) |
+| **Calendar month grouping** | Optional group setting for roommate-style monthly lists. | Upstream [#530](https://github.com/spliit-app/spliit/pull/530) |
+| **Multiple payers** | Split who paid an expense across several participants; balances/export/import aware. Legacy paidById migrates on read. | Upstream [#396](https://github.com/spliit-app/spliit/pull/396) |
+| **Reorder participants** | Drag-and-drop + Sort A–Z; order persisted in KV. | Upstream [#416](https://github.com/spliit-app/spliit/pull/416) |
+| **Tricount import** | GDPR CSV export via the same Import control as Spliit JSON. | Upstream [#526](https://github.com/spliit-app/spliit/pull/526) |
+| **Export / input hardening** | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries. | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/KV) |
+
+## Stats (this fork)
+
+On each group’s **Stats** tab:
+
+- **Monthly spending** — stacked category chart for calendar months, with a category breakdown and legend controls.
+- **Balance timeline** — cumulative balances over time for participants (engineering fixes on this fork for share math / timeline consistency).
+
+Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555); reimplemented for denormalized KV documents.
+
+## Group import JSON / Tricount (this fork)
 
 On the **Groups** page, use **Import JSON** to upload:
 
@@ -96,30 +118,6 @@ Shared behavior:
 - Uses the CSV default currency (Frankfurter `.dev` for missing cross-rates).
 - Notes and activity history are Spliit-only; Tricount imports leave them empty.
 - Prior art: upstream [#526](https://github.com/spliit-app/spliit/pull/526).
-
-## Extra UX on this fork
-
-Ideas below track community demand from [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md), upstream Spliit issues/PRs, and hardening patterns from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (reimplemented for KV — not a code port of their E2EE/auth stack).
-
-| Feature | Notes | Prior art |
-| --- | --- | --- |
-| **Copy expense** | From the expense list or edit header icon (opens create prefilled). | Upstream [#527](https://github.com/spliit-app/spliit/issues/527); shipped in Spliit Cloud |
-| **Amount math** | Expressions in the amount field (`10+5.50`, `5*8`, …) on blur/save. | Upstream [#184](https://github.com/spliit-app/spliit/pull/184); shipped in Spliit Cloud |
-| **Default split mode** | Stored on the group (device localStorage can still override). | Upstream [#366](https://github.com/spliit-app/spliit/pull/366); shipped in Spliit Cloud |
-| **Even-split cents** | Integer remainder allocation so balances don’t drop a cent. | Upstream [#374](https://github.com/spliit-app/spliit/issues/374) / [#427](https://github.com/spliit-app/spliit/pull/427); tracked by Spliit Cloud |
-| **Share QR** | QR in the share popover. | Upstream [#500](https://github.com/spliit-app/spliit/pull/500); on Spliit Cloud roadmap |
-| **Optional group PIN** | 4–8 digits; unlocks per browser session; hashed on the server, not returned to clients. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
-| **Notes + history + document links in JSON** | Export/import round-trips expense notes, group information, activity history, and document **URLs** (`exportVersion: 3`). | Follow-up to upstream [#546](https://github.com/spliit-app/spliit/pull/546); expense notes also in [#165](https://github.com/spliit-app/spliit/pull/165) |
-| **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
-| **Paste amount parsing** | Normalizes pasted US/EU currency amounts in number fields. | Upstream [#531](https://github.com/spliit-app/spliit/pull/531) |
-| **Selector keyboard nav** | Category/currency pickers use cmdk CommandList. | Upstream [#491](https://github.com/spliit-app/spliit/pull/491) |
-| **Mobile tab icons** | Icon-only tabs on small screens; labels from sm. | Upstream [#539](https://github.com/spliit-app/spliit/pull/539) |
-| **Monthly spending + balance timeline** | CSS stacked category charts, category breakdown, and balance timeline on Stats. | Upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555) |
-| **Calendar month grouping** | Optional group setting for roommate-style monthly lists. | Upstream [#530](https://github.com/spliit-app/spliit/pull/530) |
-| **Multiple payers** | Split who paid an expense across several participants; balances/export/import aware. Legacy paidById migrates on read. | Upstream [#396](https://github.com/spliit-app/spliit/pull/396) |
-| **Reorder participants** | Drag-and-drop + Sort A–Z; order persisted in KV. | Upstream [#416](https://github.com/spliit-app/spliit/pull/416) |
-| **Tricount import** | GDPR CSV export via the same Import control as Spliit JSON. | Upstream [#526](https://github.com/spliit-app/spliit/pull/526) |
-| **Export / input hardening** | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries. | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/KV) |
 
 ## Removed / disabled upstream features (S3 & OpenAI)
 
@@ -148,10 +146,8 @@ npx wrangler kv namespace create spl1t-db
 npx wrangler kv namespace create spl1t-db --preview
 ```
 
-This fork’s production Worker already binds KV namespace id `94eaadc98e2246d7989b734acf2cb461`.
-
 4. Run `npm install` (uses `package-lock.json`; CI uses `npm ci`)
-5. Set `NEXT_PUBLIC_BASE_URL` (production default in `wrangler.jsonc` `vars` is `https://spl1t.contti.workers.dev`)
+5. Set `NEXT_PUBLIC_BASE_URL` (production default in `wrangler.jsonc` `vars` is `https://spl1t.pages.dev`)
 6. Run `npm run dev` for Next.js local development (bindings via OpenNext), or `npm run preview` to build and run in the Workers runtime
 
 **Note:** Local OpenNext/Wrangler needs **workerd**, which does **not** support Windows ARM64. On those machines, develop against the remote Worker or deploy from an x64/Linux host.
@@ -169,7 +165,7 @@ npm run deploy
 This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
 
 - `DB` KV binding in `wrangler.jsonc` points at your namespace (existing id kept so group data survives).
-- `vars.NEXT_PUBLIC_BASE_URL` matches the URL users open (workers.dev or a custom domain on the Worker).
+- `vars.NEXT_PUBLIC_BASE_URL` matches the URL users open (`https://spl1t.pages.dev`).
 
 ### Ops notes
 

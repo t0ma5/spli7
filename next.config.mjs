@@ -11,11 +11,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      allowedOrigins: [
-        'localhost:3000',
-        'spl1t.pages.dev',
-        'spl1t.contti.workers.dev',
-      ],
+      allowedOrigins: ['localhost:3000', 'spl1t.pages.dev'],
     },
   },
   async headers() {

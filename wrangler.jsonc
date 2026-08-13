@@ -22,6 +22,6 @@
     }
   ],
   "vars": {
-    "NEXT_PUBLIC_BASE_URL": "https://spl1t.contti.workers.dev"
+    "NEXT_PUBLIC_BASE_URL": "https://spl1t.pages.dev"
   }
 }
