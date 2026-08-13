@@ -18,15 +18,15 @@ import './globals.css'
 export const metadata: Metadata = {
   metadataBase: new URL(env.NEXT_PUBLIC_BASE_URL),
   title: {
-    default: 'Spliit · Share Expenses with Friends & Family',
-    template: '%s · Spliit',
+    default: 'spl1t · Share Expenses with Friends & Family',
+    template: '%s · spl1t',
   },
   description:
-    'Spliit is a minimalist web application to share expenses with friends and family. No ads, no account, no problem.',
+    'spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
   openGraph: {
-    title: 'Spliit · Share Expenses with Friends & Family',
+    title: 'spl1t · Share Expenses with Friends & Family',
     description:
-      'Spliit is a minimalist web application to share expenses with friends and family. No ads, no account, no problem.',
+      'spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
     images: `/banner.png`,
     type: 'website',
     url: '/',
@@ -36,15 +36,15 @@ export const metadata: Metadata = {
     creator: '@scastiel',
     site: '@scastiel',
     images: `/banner.png`,
-    title: 'Spliit · Share Expenses with Friends & Family',
+    title: 'spl1t · Share Expenses with Friends & Family',
     description:
-      'Spliit is a minimalist web application to share expenses with friends and family. No ads, no account, no problem.',
+      'spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
   },
   appleWebApp: {
     capable: true,
-    title: 'Spliit',
+    title: 'spl1t',
   },
-  applicationName: 'Spliit',
+  applicationName: 'spl1t',
   icons: [
     {
       url: '/android-chrome-192x192.png',
@@ -78,7 +78,7 @@ function Content({ children }: { children: React.ReactNode }) {
               className="h-8 w-auto max-h-8 object-contain"
               width={102}
               height={35}
-              alt="Spliit"
+              alt="spl1t"
               priority
             />
           </h1>

@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
-  "name": "spliit",
+  "name": "spl1t",
   "compatibility_date": "2026-08-10",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -11,7 +11,7 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "spliit"
+      "service": "spl1t"
     }
   ],
   "kv_namespaces": [
@@ -20,5 +20,8 @@
       "id": "94eaadc98e2246d7989b734acf2cb461",
       "preview_id": "94eaadc98e2246d7989b734acf2cb461"
     }
-  ]
+  ],
+  "vars": {
+    "NEXT_PUBLIC_BASE_URL": "https://spl1t.pages.dev"
+  }
 }
