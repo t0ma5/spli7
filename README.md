@@ -148,7 +148,7 @@ npx wrangler kv namespace create spl1t-db
 npx wrangler kv namespace create spl1t-db --preview
 ```
 
-4. Run `npm install` (uses `package-lock.json`; CI uses `npm ci`)
+4. Run `npm install` (uses `package-lock.json`)
 5. Set `NEXT_PUBLIC_BASE_URL` (production default in `wrangler.jsonc` `vars` is `https://spl1t.pages.dev`)
 6. Run `npm run dev` for Next.js local development (bindings via OpenNext), or `npm run preview` to build and run in the Workers runtime
 
@@ -156,7 +156,7 @@ npx wrangler kv namespace create spl1t-db --preview
 
 ## Deploy to Cloudflare
 
-Deploy **directly** to Cloudflare (no standing GitHub Actions deploy workflow).
+Deploy **directly** to Cloudflare (no GitHub Actions).
 
 Requires **Node.js 22+** and a host where Wrangler/workerd runs (Linux / macOS / Windows x64 — not Windows ARM64).
 
@@ -172,7 +172,7 @@ This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
 ### Ops notes
 
 - Pushing code to GitHub does **not** update the live Worker until you run `npm run deploy` (or equivalent OpenNext/Wrangler upload) against Cloudflare.
-- Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories and break CI.
+- Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories.
 - Set Worker secret `CRON_SECRET` and schedule a daily call to `/api/cron/cleanup-groups` for inactivity cleanup.
 
 ## Health check
