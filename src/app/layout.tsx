@@ -76,8 +76,8 @@ function Content({ children }: { children: React.ReactNode }) {
             <Image
               src="/logo-with-text.png"
               className="h-8 w-auto max-h-8 object-contain"
-              width={102}
-              height={35}
+              width={413}
+              height={180}
               alt="spl1t"
               priority
             />
