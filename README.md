@@ -2,7 +2,9 @@
 
 **spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Cloudflare Workers** (via OpenNext) with **Cloudflare KV** as the database — not Vercel Postgres / Prisma.
 
-**Live:** [https://spl1t.pages.dev](https://spl1t.pages.dev) · **Worker:** `spl1t` · **Repo:** [t0ma5/spl1t](https://github.com/t0ma5/spl1t)
+**Live:** [https://spl1t.contti.workers.dev](https://spl1t.contti.workers.dev) · **Worker:** `spl1t` · **KV:** `94eaadc98e2246d7989b734acf2cb461` · **Repo:** [t0ma5/spl1t](https://github.com/t0ma5/spl1t)
+
+> **Hostname note:** OpenNext deploys this fork as a **Worker** (`spl1t.*.workers.dev`). An empty Cloudflare Pages project can reserve `spl1t.pages.dev` and return **522** until removed or given a real Pages deployment. API cannot attach `*.pages.dev` to a Worker while Pages owns that DNS. Prefer the workers.dev URL, or attach a domain you control under Worker → Settings → Domains & Routes.
 
 ## Features
 
@@ -149,14 +151,14 @@ npx wrangler kv namespace create spl1t-db --preview
 This fork’s production Worker already binds KV namespace id `94eaadc98e2246d7989b734acf2cb461`.
 
 4. Run `npm install` (uses `package-lock.json`; CI uses `npm ci`)
-5. Set `NEXT_PUBLIC_BASE_URL` (e.g. `https://spl1t.pages.dev` in `wrangler.jsonc` `vars` / `.dev.vars`)
+5. Set `NEXT_PUBLIC_BASE_URL` (production default in `wrangler.jsonc` `vars` is `https://spl1t.contti.workers.dev`)
 6. Run `npm run dev` for Next.js local development (bindings via OpenNext), or `npm run preview` to build and run in the Workers runtime
 
 **Note:** Local OpenNext/Wrangler needs **workerd**, which does **not** support Windows ARM64. On those machines, develop against the remote Worker or deploy from an x64/Linux host.
 
 ## Deploy to Cloudflare
 
-Deploy **directly** to Cloudflare (no GitHub Actions deploy workflow).
+Deploy **directly** to Cloudflare (no standing GitHub Actions deploy workflow).
 
 Requires **Node.js 22+** and a host where Wrangler/workerd runs (Linux / macOS / Windows x64 — not Windows ARM64).
 
@@ -167,8 +169,7 @@ npm run deploy
 This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
 
 - `DB` KV binding in `wrangler.jsonc` points at your namespace (existing id kept so group data survives).
-- `vars.NEXT_PUBLIC_BASE_URL` is `https://spl1t.pages.dev` (or your custom domain).
-- Hostname `spl1t.pages.dev` is attached to Worker `spl1t` (Workers custom domain / Pages project routing in the Cloudflare dashboard if API binding is unavailable).
+- `vars.NEXT_PUBLIC_BASE_URL` matches the URL users open (workers.dev or a custom domain on the Worker).
 
 ### Ops notes
 

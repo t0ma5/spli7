@@ -1,0 +1,60 @@
+name: Cutover final once
+
+# Temporary final cutover: optional Pages cleanup + redeploy Worker vars. Delete after run.
+on:
+  workflow_dispatch:
+
+jobs:
+  final:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Free pages.dev DNS if empty Pages project exists
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          ACCT="$CLOUDFLARE_ACCOUNT_ID"
+          echo "ACCOUNT_ID length=${#ACCT}"
+          echo "=== Pages projects ==="
+          curl -sS "${AUTH[@]}" "https://api.cloudflare.com/client/v4/accounts/${ACCT}/pages/projects?per_page=50" | tee /tmp/pages.json | jq '{success, errors, names: [.result[]?.name]}'
+          if jq -e '.result[]? | select(.name=="spl1t")' /tmp/pages.json >/dev/null 2>&1; then
+            echo "Deleting Pages project spl1t to free spl1t.pages.dev DNS..."
+            curl -sS -X DELETE "${AUTH[@]}" "https://api.cloudflare.com/client/v4/accounts/${ACCT}/pages/projects/spl1t" | jq '{success, errors}'
+            sleep 3
+            echo "Attempting Workers custom domain attach..."
+            curl -sS -X PUT "${AUTH[@]}" "https://api.cloudflare.com/client/v4/accounts/${ACCT}/workers/domains" \
+              --data '{"hostname":"spl1t.pages.dev","service":"spl1t","environment":"production"}' | jq .
+          else
+            echo "No Pages project named spl1t (or list failed). Trying domain attach anyway..."
+            curl -sS -X PUT "${AUTH[@]}" "https://api.cloudflare.com/client/v4/accounts/${ACCT}/workers/domains" \
+              --data '{"hostname":"spl1t.pages.dev","service":"spl1t","environment":"production"}' | jq . || true
+          fi
+
+      - name: Redeploy Worker spl1t
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy
+
+      - name: Smoke
+        run: |
+          for url in \
+            "https://spl1t.contti.workers.dev/api/health/liveness" \
+            "https://spl1t.contti.workers.dev/api/health/readiness" \
+            "https://spl1t.pages.dev/api/health/liveness"
+          do
+            echo "GET $url"
+            curl -sS -o /tmp/b -w "HTTP %{http_code}\n" --max-time 25 "$url" || echo "curl failed"
+            head -c 250 /tmp/b; echo; echo
+          done
