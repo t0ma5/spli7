@@ -256,6 +256,7 @@ function getExpenseDeltas(expense: BalanceTimelineExpense) {
   }
 
   const allocations = allocatePaidForAmounts({
+    id: expense.id,
     amount: expense.amount,
     paidFor: expense.paidFor.map((paidFor) => ({
       participantId: paidFor.participant.id,

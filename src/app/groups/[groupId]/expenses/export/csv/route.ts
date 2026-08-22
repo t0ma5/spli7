@@ -1,6 +1,7 @@
 import { getGroupForExport } from '@/lib/api'
 import { escapeCsvCell } from '@/lib/csv-escape'
 import { getCurrency } from '@/lib/currency'
+import { getExpenseShares } from '@/lib/shares'
 import { formatAmountAsDecimal, getCurrencyFromGroup } from '@/lib/utils'
 import { Parser } from '@json2csv/plainjs'
 import contentDisposition from 'content-disposition'
@@ -41,10 +42,10 @@ export async function GET(
     { label: 'Original cost', value: 'originalAmount' },
     { label: 'Original currency', value: 'originalCurrency' },
     { label: 'Conversion rate', value: 'conversionRate' },
-    { label: 'Is Reimbursement', value: 'isReimbursement' },
     { label: 'Split mode', value: 'splitMode' },
+    { label: 'Paid By', value: 'paidBy' },
     ...group.participants.map((participant) => ({
-      label: participant.name,
+      label: escapeCsvCell(participant.name),
       value: participant.name,
     })),
   ]
@@ -52,12 +53,32 @@ export async function GET(
   const currency = getCurrencyFromGroup(group)
 
   const expenses = group.expenses.map((expense) => {
+    const shares = getExpenseShares({
+      id: expense.id,
+      amount: expense.amount,
+      splitMode: expense.splitMode,
+      paidFor: expense.paidFor,
+    })
+
+    const payerNames = expense.paidBy
+      .map((pb) => {
+        const participant = group.participants.find(
+          (p) => p.id === pb.participantId,
+        )
+        return participant?.name ?? ''
+      })
+      .filter(Boolean)
+      .join(', ')
+
     const row: Record<string, string | number | null> = {
       date: formatDate(expense.expenseDate),
       title: escapeCsvCell(expense.title),
       categoryName: escapeCsvCell(expense.category?.name || ''),
       currency: escapeCsvCell(group.currencyCode ?? group.currency),
-      amount: formatAmountAsDecimal(expense.amount, currency),
+      amount: formatAmountAsDecimal(
+        expense.isReimbursement ? 0 : expense.amount,
+        currency,
+      ),
       originalAmount: expense.originalAmount
         ? formatAmountAsDecimal(
             expense.originalAmount,
@@ -71,32 +92,17 @@ export async function GET(
         expense.conversionRate !== null && expense.conversionRate !== undefined
           ? String(expense.conversionRate)
           : null,
-      isReimbursement: expense.isReimbursement ? 'Yes' : 'No',
       splitMode: splitModeLabel[expense.splitMode],
+      paidBy: escapeCsvCell(payerNames),
     }
 
     for (const participant of group.participants) {
-      const { totalShares, participantShare } = expense.paidFor.reduce(
-        (acc, { participantId, shares }) => {
-          acc.totalShares += shares
-          if (participantId === participant.id) {
-            acc.participantShare = shares
-          }
-          return acc
-        },
-        { totalShares: 0, participantShare: 0 },
-      )
-
-      const paidAmount = expense.paidBy.find(
-        (pb) => pb.participantId === participant.id,
-      )?.amount ?? 0
-      const owedAmount =
-        totalShares === 0
-          ? 0
-          : (expense.amount / totalShares) * participantShare
-
+      const shareMinor = shares.get(participant.id) ?? 0
+      const paidAmount =
+        expense.paidBy.find((pb) => pb.participantId === participant.id)
+          ?.amount ?? 0
       row[participant.name] = +formatAmountAsDecimal(
-        paidAmount - owedAmount,
+        paidAmount - shareMinor,
         currency,
       )
     }

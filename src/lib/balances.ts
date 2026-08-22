@@ -24,6 +24,7 @@ export function getBalances(expenses: ExpenseListItem[]): Balances {
     }
 
     const allocations = allocatePaidForAmounts({
+      id: expense.id,
       amount: expense.amount,
       paidFor: paidFors.map((paidFor) => ({
         participantId: paidFor.participant.id,
@@ -41,8 +42,9 @@ export function getBalances(expenses: ExpenseListItem[]): Balances {
   }
 
   for (const participantId in balances) {
-    balances[participantId].paidFor = balances[participantId].paidFor + 0
-    balances[participantId].paid = balances[participantId].paid + 0
+    balances[participantId].paidFor =
+      Math.round(balances[participantId].paidFor) + 0
+    balances[participantId].paid = Math.round(balances[participantId].paid) + 0
 
     balances[participantId].total =
       balances[participantId].paid - balances[participantId].paidFor

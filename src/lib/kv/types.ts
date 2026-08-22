@@ -158,6 +158,8 @@ export type Group = {
 
 export type ExpenseListItem = {
   amount: number
+  originalAmount: number | null
+  originalCurrency: string | null
   category: Category | null
   createdAt: Date
   expenseDate: Date

@@ -39,6 +39,10 @@ import { Locale } from '@/i18n/request'
 import { evaluateAmountExpression } from '@/lib/amount-expression'
 import { normalizeNumberInput } from '@/lib/number-input'
 import { defaultCurrencyList, getCurrency } from '@/lib/currency'
+import {
+  convertToGroupCurrency,
+  convertToOriginalCurrency,
+} from '@/lib/currency-conversion'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
 import { useActiveUser, useCurrencyRate } from '@/lib/hooks'
 import { RecurrenceRule } from '@/lib/kv/types'
@@ -391,6 +395,14 @@ export function ExpenseForm({
     originalCurrency.code.length &&
     originalCurrency.code !== group.currencyCode
 
+  /**
+   * For a regular expense the user enters what they spent in the original
+   * currency and the group-currency amount follows. For a repayment it is the
+   * other way around: the group-currency amount is the balance being settled,
+   * and the original amount is the amount to actually transfer.
+   */
+  const convertFromGroupCurrency = !!form.watch('isReimbursement')
+
   useEffect(() => {
     setManuallyEditedParticipants(new Set())
   }, [form.watch('splitMode'), form.watch('paidBy')])
@@ -468,17 +480,19 @@ export function ExpenseForm({
   }, [exchangeRate.data, usingCustomConversionRate])
 
   useEffect(() => {
+    if (convertFromGroupCurrency || !conversionRequired) return
     if (!form.getFieldState('originalAmount').isTouched) return
     const originalAmount = form.getValues('originalAmount') ?? 0
     const conversionRate = form.getValues('conversionRate')
 
     if (conversionRate && originalAmount) {
-      const rate = Number(conversionRate)
-      const convertedAmount = originalAmount * rate
-      if (!Number.isNaN(convertedAmount)) {
-        const v = normalizeNumberInput(
-          convertedAmount.toFixed(groupCurrency.decimal_digits),
-        )
+      const converted = convertToGroupCurrency(
+        Number(originalAmount),
+        Number(conversionRate),
+        groupCurrency,
+      )
+      if (converted !== null) {
+        const v = normalizeNumberInput(converted)
         const income = Number(v) < 0
         setIsIncome(income)
         if (income) form.setValue('isReimbursement', false)
@@ -490,7 +504,6 @@ export function ExpenseForm({
             shouldValidate: true,
           })
         } else if (paidBy.length > 1) {
-          // Keep relative payer ratios when conversion updates the total
           const currentSum = calcTotalAmountMajor(paidBy)
           if (currentSum !== 0) {
             const scale = Number(v) / currentSum
@@ -514,6 +527,40 @@ export function ExpenseForm({
     form.watch('originalAmount'),
     form.watch('conversionRate'),
     form.getFieldState('originalAmount').isTouched,
+    convertFromGroupCurrency,
+    conversionRequired,
+  ])
+
+  useEffect(() => {
+    if (!convertFromGroupCurrency || !conversionRequired) return
+    if (
+      !isCreate &&
+      !form.getFieldState('paidBy').isDirty &&
+      !form.getFieldState('originalCurrency').isDirty &&
+      !form.getFieldState('conversionRate').isDirty
+    )
+      return
+
+    const converted = convertToOriginalCurrency(
+      calcTotalAmountMajor(form.getValues('paidBy') as any),
+      Number(form.getValues('conversionRate')),
+      originalCurrency,
+    )
+    if (converted !== null) {
+      form.setValue(
+        'originalAmount',
+        (Number(converted) === 0
+          ? ''
+          : normalizeNumberInput(converted)) as any,
+      )
+    }
+  }, [
+    form.watch('paidBy'),
+    form.watch('conversionRate'),
+    convertFromGroupCurrency,
+    conversionRequired,
+    originalCurrency.code,
+    isCreate,
   ])
 
   let conversionRateMessage = ''
@@ -670,15 +717,26 @@ export function ExpenseForm({
                 name="originalAmount"
                 render={({ field: { onChange, ...field } }) => (
                   <FormItem>
-                    <FormLabel>{t('originalAmountField.label')}</FormLabel>
+                    <FormLabel>
+                      {t(
+                        convertFromGroupCurrency
+                          ? 'originalAmountField.repaymentLabel'
+                          : 'originalAmountField.label',
+                      )}
+                    </FormLabel>
                     <div className="flex items-baseline gap-2">
                       <span>{originalCurrency.symbol}</span>
                       <FormControl>
                         <Input
-                          className="text-base max-w-[120px]"
+                          className={cn(
+                            'text-base max-w-[120px]',
+                            convertFromGroupCurrency &&
+                              'bg-muted text-muted-foreground',
+                          )}
                           type="text"
                           inputMode="decimal"
                           placeholder="0.00"
+                          readOnly={convertFromGroupCurrency}
                           onChange={(event) => {
                             const v = normalizeNumberInput(event.target.value)
                             onChange(v)
@@ -691,6 +749,11 @@ export function ExpenseForm({
                         />
                       </FormControl>
                     </div>
+                    {convertFromGroupCurrency && (
+                      <FormDescription>
+                        {t('originalAmountField.repaymentDescription')}
+                      </FormDescription>
+                    )}
                     <FormDescription>
                       {isNaN(form.getValues('expenseDate').getTime()) ? (
                         t('conversionRateState.noDate')
@@ -701,6 +764,7 @@ export function ExpenseForm({
                           {!exchangeRate.isLoading && (
                             <Button
                               className="h-auto py-0"
+                              type="button"
                               variant="link"
                               onClick={() => exchangeRate.refresh()}
                             >
@@ -721,7 +785,7 @@ export function ExpenseForm({
                 onOpenChange={setUsingCustomConversionRate}
               >
                 <CollapsibleTrigger asChild>
-                  <Button variant="link" className="-mx-4">
+                  <Button type="button" variant="link" className="-mx-4">
                     {usingCustomConversionRate
                       ? t('conversionRateField.useApi')
                       : t('conversionRateField.useCustom')}
@@ -1105,6 +1169,7 @@ export function ExpenseForm({
                                       {formatCurrency(
                                         groupCurrency,
                                         calculateShare(id, {
+                                          id: expense?.id,
                                           amount: amountAsMinorUnits(
                                             calcTotalAmountMajor(
                                               form.watch('paidBy') as any,
@@ -1202,12 +1267,12 @@ export function ExpenseForm({
                                                     ) &&
                                                     exchangeRate.data
                                                   ) {
-                                                    convertedAmount = (
-                                                      originalAmount *
-                                                      exchangeRate.data
-                                                    ).toFixed(
-                                                      groupCurrency.decimal_digits,
-                                                    )
+                                                    convertedAmount =
+                                                      convertToGroupCurrency(
+                                                        originalAmount,
+                                                        exchangeRate.data,
+                                                        groupCurrency,
+                                                      ) ?? ''
                                                   }
                                                   field.onChange(
                                                     field.value.map((p) =>

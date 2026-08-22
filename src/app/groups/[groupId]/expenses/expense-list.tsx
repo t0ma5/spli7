@@ -8,6 +8,7 @@ import {
   groupExpensesByCalendarMonth,
   groupExpensesByRelativeDate,
 } from '@/lib/expense-date-groups'
+import { getWeekStartsOn } from '@/lib/date-groups'
 import { getCurrencyFromGroup } from '@/lib/utils'
 import { trpc } from '@/trpc/client'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -112,7 +113,11 @@ const ExpenseListForSearch = ({
         locale,
       })
     }
-    return groupExpensesByRelativeDate(withDates)
+    return groupExpensesByRelativeDate(
+      withDates,
+      dayjs(),
+      getWeekStartsOn(locale),
+    )
   }, [expenses, group, locale, t])
 
   if (isLoading) return <ExpensesLoading />

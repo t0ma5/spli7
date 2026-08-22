@@ -1,5 +1,6 @@
 'use client'
 import { AddGroupByUrlButton } from '@/app/groups/add-group-by-url-button'
+import { GlobalBalanceCard } from '@/app/groups/global-balance-card'
 import { ImportGroupJsonButton } from '@/app/groups/import-group-json-button'
 import {
   RecentGroups,
@@ -143,6 +144,7 @@ function RecentGroupList_({
 
   return (
     <GroupsPage reload={refreshGroupsFromStorage}>
+      <GlobalBalanceCard groups={groups} />
       {starredGroupInfo.length > 0 && (
         <>
           <h2 className="mb-2">{t('starred')}</h2>

@@ -1,6 +1,7 @@
 import { ApplePwaSplash } from '@/app/apple-pwa-splash'
 import { LocaleSwitcher } from '@/components/locale-switcher'
 import { ProgressBar } from '@/components/progress-bar'
+import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -18,15 +19,15 @@ import './globals.css'
 export const metadata: Metadata = {
   metadataBase: new URL(env.NEXT_PUBLIC_BASE_URL),
   title: {
-    default: 'spl1t · Share Expenses with Friends & Family',
-    template: '%s · spl1t',
+    default: 'Spl1t · Share Expenses with Friends & Family',
+    template: '%s · Spl1t',
   },
   description:
-    'spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
+    'Spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
   openGraph: {
-    title: 'spl1t · Share Expenses with Friends & Family',
+    title: 'Spl1t · Share Expenses with Friends & Family',
     description:
-      'spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
+      'Spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
     images: `/banner.png`,
     type: 'website',
     url: '/',
@@ -36,15 +37,15 @@ export const metadata: Metadata = {
     creator: '@scastiel',
     site: '@scastiel',
     images: `/banner.png`,
-    title: 'spl1t · Share Expenses with Friends & Family',
+    title: 'Spl1t · Share Expenses with Friends & Family',
     description:
-      'spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
+      'Spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
   },
   appleWebApp: {
     capable: true,
-    title: 'spl1t',
+    title: 'Spl1t',
   },
-  applicationName: 'spl1t',
+  applicationName: 'Spl1t',
   icons: [
     {
       url: '/android-chrome-192x192.png',
@@ -78,7 +79,7 @@ function Content({ children }: { children: React.ReactNode }) {
               className="h-8 w-auto max-h-8 object-contain"
               width={413}
               height={180}
-              alt="spl1t"
+              alt="Spl1t"
               priority
             />
           </h1>
@@ -124,6 +125,7 @@ export default async function RootLayout({
       <ApplePwaSplash icon="/logo-with-text.png" color="#027756" />
       <body className="min-h-[100dvh] flex flex-col items-stretch bg-slate-50 bg-opacity-30 dark:bg-background">
         <NextIntlClientProvider messages={messages}>
+          <ServiceWorkerRegistration />
           <ThemeProvider
             attribute="class"
             defaultTheme="system"

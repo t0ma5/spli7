@@ -14,7 +14,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🟢 Create expenses with description
 - [x] 🟢 Display group balances
 - [x] 🟢 Create reimbursement expenses
-- [x] 🟢 Progressive Web App
+- [x] 🟢 Progressive Web App (**Spl1t** home-screen name; service worker + offline page + update prompt)
 - [x] 🟢 Select all/no participant for expenses
 - [x] 🟢 Split expenses unevenly
 - [x] 🟢 Mark a group as favorite
@@ -23,7 +23,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🟢 Search for expenses in a group
 - [x] 🟢 Export a group to JSON or CSV
 - [x] 🔴 Import a group from a Spliit JSON export (creates a **new** group with remapped IDs)
-- [x] 🔴 Import a group from a **Tricount** GDPR CSV export (participants + expenses)
+- [x] 🔴 Import a group from a **Tricount** GDPR CSV or **Splitwise** CSV export (participants + expenses)
 - [x] 🔴 Notes + activity history + **document links** in JSON export/import (`exportVersion: 3`)
 - [x] 🔴 Copy an existing expense into a new draft
 - [x] 🔴 Math expressions in the amount field
@@ -37,7 +37,13 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Paste-friendly amount parsing (US/EU grouped currency)
 - [x] 🔴 Keyboard navigation restored in category/currency selectors
 - [x] 🔴 Mobile group tab icons
-- [x] 🔴 **Stats:** monthly spending (stacked category chart + breakdown) and **balance timeline**
+- [x] 🔴 **Stats:** period selector, summary, spending over time / by participant / by category, recurring estimate, drill-downs, monthly stacked chart, and **balance timeline**
+- [x] 🔴 Global balance across groups on My groups
+- [x] 🔴 Settle reimbursements in a currency other than the group’s
+- [x] 🔴 Unified share math (balances, stats, CSV, and the expense form agree)
+- [x] 🔴 Locale-aware week grouping on expenses and activity
+- [x] 🔴 Translated page titles
+- [x] 🔴 CSV export as per-expense saldo (reimbursements as Cost=0)
 - [x] 🔴 Optional calendar-month expense grouping
 - [x] 🔴 Drag-reorder / Sort A–Z participants
 - [x] 🔴 Multiple payers per expense (legacy single paidById migrated on read)
@@ -79,6 +85,15 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Selector keyboard nav** | Category/currency pickers use cmdk CommandList. | Upstream [#491](https://github.com/spliit-app/spliit/pull/491) |
 | **Mobile tab icons** | Icon-only tabs on small screens; labels from sm. | Upstream [#539](https://github.com/spliit-app/spliit/pull/539) |
 | **Monthly spending + balance timeline** | CSS stacked category charts, category breakdown, and balance timeline on Stats. | Upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555) |
+| **Stats cards + drill-downs** | Period selector, summary, spending over time / participant / category, recurring estimate, click-a-bar expense lists. | Upstream [#584](https://github.com/spliit-app/spliit/pull/584) / [#586](https://github.com/spliit-app/spliit/pull/586) |
+| **Global balance** | Net across visited groups on My groups, bucketed by currency. | Upstream [#583](https://github.com/spliit-app/spliit/pull/583) |
+| **Settle in another currency** | Reimbursements can show the transfer amount in a non-group currency; group amount stays authoritative. | Upstream [#588](https://github.com/spliit-app/spliit/pull/588) |
+| **Unified share math** | One apportionment for balances, stats, CSV, and the form (Hamilton remainder). | Upstream [#562](https://github.com/spliit-app/spliit/pull/562) |
+| **Locale week start** | Expense/activity “this week” follows the UI locale, not Sunday. | Upstream [#559](https://github.com/spliit-app/spliit/pull/559) |
+| **PWA service worker** | Offline shell + update Reload toast; never caches API or mutations. Home-screen name **Spl1t**. | Upstream [#587](https://github.com/spliit-app/spliit/pull/587) |
+| **Splitwise import** | CSV reconstruction (EN/DE headers) via the same Import control. | Upstream [#483](https://github.com/spliit-app/spliit/pull/483) |
+| **CSV saldo export** | Participant columns are per-expense saldo; reimbursements Cost=0. | Upstream [#473](https://github.com/spliit-app/spliit/pull/473) |
+| **Translated page titles** | `generateMetadata` + next-intl on group pages. | Upstream [#537](https://github.com/spliit-app/spliit/pull/537) |
 | **Calendar month grouping** | Optional group setting for roommate-style monthly lists. | Upstream [#530](https://github.com/spliit-app/spliit/pull/530) |
 | **Multiple payers** | Split who paid an expense across several participants; balances/export/import aware. Legacy paidById migrates on read. | Upstream [#396](https://github.com/spliit-app/spliit/pull/396) |
 | **Reorder participants** | Drag-and-drop + Sort A–Z; order persisted in KV. | Upstream [#416](https://github.com/spliit-app/spliit/pull/416) |
@@ -89,17 +104,22 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 
 On each group’s **Stats** tab:
 
+- **Period** — all time, this month, last 30 days, this year, or a custom from/to range.
+- **Summary / spending over time / by participant / by category / recurring** — same cards as upstream [#584](https://github.com/spliit-app/spliit/pull/584); bars drill into the expenses behind them ([#586](https://github.com/spliit-app/spliit/pull/586)).
 - **Monthly spending** — stacked category chart for calendar months, with a category breakdown and legend controls.
 - **Balance timeline** — cumulative balances over time for participants (engineering fixes on this fork for share math / timeline consistency).
 
-Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555); reimplemented for denormalized KV documents.
+Spending stats exclude reimbursements. Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555) / [#584](https://github.com/spliit-app/spliit/pull/584); reimplemented for denormalized KV documents.
 
-## Group import JSON / Tricount (this fork)
+## Group import JSON / Tricount / Splitwise (this fork)
 
 On the **Groups** page, use **Import JSON** to upload:
 
 1. A **Spliit JSON** export (this fork or upstream Spliit), or
-2. A **Tricount** personal-data / GDPR **CSV** export (detected automatically).
+2. A **Tricount** personal-data / GDPR **CSV** export, or
+3. A **Splitwise** **CSV** export (English or German headers).
+
+The format is detected automatically.
 
 Shared behavior:
 
@@ -120,6 +140,12 @@ Shared behavior:
 - Uses the CSV default currency (Frankfurter `.dev` for missing cross-rates).
 - Notes and activity history are Spliit-only; Tricount imports leave them empty.
 - Prior art: upstream [#526](https://github.com/spliit-app/spliit/pull/526).
+
+### Splitwise CSV
+
+- Reconstructs expenses from Splitwise’s balance-delta CSV so resulting **balances match** the export (original split mode may be approximated).
+- English and German headers/categories; other Splitwise UI languages: switch Splitwise to English before export.
+- Prior art: upstream [#483](https://github.com/spliit-app/spliit/pull/483).
 
 ## Removed / disabled upstream features (S3 & OpenAI)
 

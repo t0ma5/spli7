@@ -33,6 +33,7 @@ import {
   GroupImportValues,
 } from '@/lib/schemas'
 import { parseTricountCsv } from '@/lib/tricount-import'
+import { parseSplitwiseCsv } from '@/lib/splitwise-import'
 
 function toDate(value: string | Date): Date {
   return value instanceof Date ? value : new Date(value)
@@ -364,6 +365,39 @@ export async function createGroupFromTricountCsv(
   return mapGroup(group)
 }
 
+/** Create a new group from a Splitwise CSV export (new IDs). */
+export async function createGroupFromSplitwiseCsv(csvText: string) {
+  const parsed = parseSplitwiseCsv(csvText)
+  const now = new Date().toISOString()
+  const group: GroupDocument = {
+    id: parsed.participants[0]?.groupId ?? randomId(),
+    name: parsed.name,
+    information: null,
+    currency: parsed.currency,
+    currencyCode: parsed.currencyCode,
+    pinHash: null,
+    defaultSplitMode: SplitMode.EVENLY,
+    fixedExpenseDateGroups: false,
+    createdAt: now,
+    lastActivityAt: now,
+    deletedAt: null,
+    participants: parsed.participants,
+    expenses: parsed.expenses,
+    activities: [],
+  }
+
+  const groupId = group.id
+  for (const participant of group.participants) {
+    participant.groupId = groupId
+  }
+  for (const expense of group.expenses) {
+    expense.groupId = groupId
+  }
+
+  await persistGroup(group)
+  return mapGroup(group)
+}
+
 export async function createExpense(
   expenseFormValues: ExpenseFormValues,
   groupId: string,
@@ -669,6 +703,8 @@ export async function getGroupExpenses(
     })
     return {
       amount: expense.amount,
+      originalAmount: expense.originalAmount ?? null,
+      originalCurrency: expense.originalCurrency ?? null,
       category: getCategoryById(expense.categoryId) ?? null,
       createdAt: toDate(expense.createdAt),
       expenseDate: toDate(expense.expenseDate),
@@ -695,6 +731,29 @@ export async function getGroupExpenses(
 export async function getGroupExpenseCount(groupId: string) {
   const group = await getGroupDocument(groupId)
   return group?.expenses.length ?? 0
+}
+
+/**
+ * Current frames of active recurring expenses (the ones still generating
+ * future copies). Used by stats so the subscription estimate is not multiplied
+ * by every already-materialized occurrence.
+ */
+export async function getActiveRecurringExpenses(groupId: string) {
+  const group = await getGroupDocument(groupId)
+  if (!group || group.deletedAt) return []
+
+  const mutated = createRecurringExpensesForGroup(group)
+  if (mutated) {
+    await persistGroup(group)
+  }
+
+  return group.expenses.filter(
+    (expense) =>
+      !expense.isReimbursement &&
+      expense.recurrenceRule &&
+      expense.recurrenceRule !== RecurrenceRule.NONE &&
+      expense.recurringExpenseLink?.nextExpenseCreatedAt === null,
+  )
 }
 
 export async function getExpense(groupId: string, expenseId: string) {

@@ -1,3 +1,4 @@
+import { getWeekStartsOn, isSameWeek } from '@/lib/date-groups'
 import dayjs, { type Dayjs } from 'dayjs'
 
 export const RELATIVE_EXPENSE_DATE_GROUPS = {
@@ -24,10 +25,14 @@ const RELATIVE_EXPENSE_DATE_GROUP_ORDER = Object.values(
   RELATIVE_EXPENSE_DATE_GROUPS,
 )
 
-function getRelativeExpenseDateGroup(date: Dayjs, today: Dayjs) {
+function getRelativeExpenseDateGroup(
+  date: Dayjs,
+  today: Dayjs,
+  weekStartsOn: number,
+) {
   if (today.isBefore(date)) {
     return RELATIVE_EXPENSE_DATE_GROUPS.UPCOMING
-  } else if (today.isSame(date, 'week')) {
+  } else if (isSameWeek(today, date, weekStartsOn)) {
     return RELATIVE_EXPENSE_DATE_GROUPS.THIS_WEEK
   } else if (today.isSame(date, 'month')) {
     return RELATIVE_EXPENSE_DATE_GROUPS.EARLIER_THIS_MONTH
@@ -45,12 +50,14 @@ function getRelativeExpenseDateGroup(date: Dayjs, today: Dayjs) {
 export function groupExpensesByRelativeDate<TExpense extends ExpenseWithDate>(
   expenses: TExpense[],
   today: Dayjs = dayjs(),
+  weekStartsOn: number = getWeekStartsOn('en-US'),
 ): ExpenseDateGroup<TExpense>[] {
   const groupedExpenses = expenses.reduce(
     (result, expense) => {
       const expenseGroup = getRelativeExpenseDateGroup(
         dayjs(expense.expenseDate),
         today,
+        weekStartsOn,
       )
       result[expenseGroup] = result[expenseGroup] ?? []
       result[expenseGroup].push(expense)

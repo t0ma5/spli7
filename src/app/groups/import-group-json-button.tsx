@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/popover'
 import { useMediaQuery } from '@/lib/hooks'
 import { groupImportSchema } from '@/lib/schemas'
+import { looksLikeSplitwiseCsv } from '@/lib/splitwise-import'
 import { looksLikeTricountCsv } from '@/lib/tricount-detect'
 import { trpc } from '@/trpc/client'
 import { Loader2, Upload } from 'lucide-react'
@@ -32,6 +33,8 @@ export function ImportGroupJsonButton({ reload }: Props) {
   const { mutateAsync: importJson } = trpc.groups.import.useMutation()
   const { mutateAsync: importTricount } =
     trpc.groups.importTricount.useMutation()
+  const { mutateAsync: importSplitwise } =
+    trpc.groups.importSplitwise.useMutation()
 
   async function handleFile(file: File) {
     setError(null)
@@ -41,6 +44,16 @@ export function ImportGroupJsonButton({ reload }: Props) {
 
       if (looksLikeTricountCsv(text)) {
         const { groupId, groupName } = await importTricount({ csvText: text })
+        saveRecentGroup({ id: groupId, name: groupName })
+        await utils.groups.invalidate()
+        reload()
+        setOpen(false)
+        router.push(`/groups/${groupId}`)
+        return
+      }
+
+      if (looksLikeSplitwiseCsv(text)) {
+        const { groupId, groupName } = await importSplitwise({ csvText: text })
         saveRecentGroup({ id: groupId, name: groupName })
         await utils.groups.invalidate()
         reload()
@@ -93,8 +106,8 @@ export function ImportGroupJsonButton({ reload }: Props) {
         align={isDesktop ? 'end' : 'start'}
         className="[&_p]:text-sm flex flex-col gap-3"
       >
-        <h3 className="font-bold">{t('title')}</h3>
-        <p>{t('description')}</p>
+          <h3 className="font-bold">{t('title')}</h3>
+          <p>{t('description')}</p>
         <input
           ref={fileInputRef}
           type="file"

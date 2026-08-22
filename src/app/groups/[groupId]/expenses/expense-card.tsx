@@ -3,7 +3,8 @@ import { ActiveUserBalance } from '@/app/groups/[groupId]/expenses/active-user-b
 import { CategoryIcon } from '@/app/groups/[groupId]/expenses/category-icon'
 import { DocumentsCount } from '@/app/groups/[groupId]/expenses/documents-count'
 import { Button } from '@/components/ui/button'
-import { Currency } from '@/lib/currency'
+import { Locale } from '@/i18n/request'
+import { Currency, getCurrency } from '@/lib/currency'
 import type { ExpenseListItem } from '@/lib/kv/types'
 import { cn, formatCurrency, formatDateOnly } from '@/lib/utils'
 import { ChevronRight, Copy } from 'lucide-react'
@@ -58,8 +59,19 @@ export function ExpenseCard({
   participantCount,
 }: Props) {
   const router = useRouter()
-  const locale = useLocale()
+  const locale = useLocale() as Locale
   const t = useTranslations('ExpenseCard')
+
+  const originalAmount =
+    expense.originalAmount != null &&
+    expense.originalCurrency &&
+    expense.originalCurrency !== currency.code
+      ? formatCurrency(
+          getCurrency(expense.originalCurrency, locale),
+          expense.originalAmount,
+          locale,
+        )
+      : null
 
   return (
     <div
@@ -96,6 +108,11 @@ export function ExpenseCard({
         >
           {formatCurrency(currency, expense.amount, locale)}
         </div>
+        {originalAmount && (
+          <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+            {originalAmount}
+          </div>
+        )}
         <div className="text-xs text-muted-foreground">
           <DocumentsCount count={expense._count.documents} />
         </div>
