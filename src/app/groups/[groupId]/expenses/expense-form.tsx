@@ -37,7 +37,6 @@ import {
 } from '@/components/ui/select'
 import { Locale } from '@/i18n/request'
 import { evaluateAmountExpression } from '@/lib/amount-expression'
-import { normalizeNumberInput } from '@/lib/number-input'
 import { defaultCurrencyList, getCurrency } from '@/lib/currency'
 import {
   convertToGroupCurrency,
@@ -46,6 +45,7 @@ import {
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
 import { useActiveUser, useCurrencyRate } from '@/lib/hooks'
 import { RecurrenceRule } from '@/lib/kv/types'
+import { normalizeNumberInput } from '@/lib/number-input'
 import { randomId } from '@/lib/randomId'
 import {
   ExpenseFormValues,
@@ -60,7 +60,6 @@ import {
   formatCurrency,
   getCurrencyFromGroup,
 } from '@/lib/utils'
-import { trpc } from '@/trpc/client'
 import { AppRouterOutput } from '@/trpc/routers/_app'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChevronRight, Copy, Save, UserMinus, UserPlus } from 'lucide-react'
@@ -149,17 +148,60 @@ async function persistDefaultSplittingOptions(
   }
 }
 
+type LoadedExpense = NonNullable<
+  AppRouterOutput['groups']['expenses']['get']['expense']
+>
+
+function expenseToFormValues(
+  expense: LoadedExpense,
+  groupCurrency: ReturnType<typeof getCurrencyFromGroup>,
+  groupCurrencyCode: string | null,
+  mode: 'edit' | 'duplicate',
+): ExpenseFormValues {
+  return {
+    title: expense.title,
+    expenseDate:
+      mode === 'duplicate' ? new Date() : (expense.expenseDate ?? new Date()),
+    amount: amountAsDecimal(expense.amount, groupCurrency),
+    originalCurrency: expense.originalCurrency ?? groupCurrencyCode,
+    originalAmount: expense.originalAmount ?? undefined,
+    conversionRate: expense.conversionRate ?? undefined,
+    category: expense.categoryId,
+    paidBy: expense.paidBy.map(({ participantId, amount }) => ({
+      participant: participantId,
+      amount: amountAsDecimal(amount, groupCurrency) as any,
+    })),
+    paidFor: expense.paidFor.map(({ participantId, shares }) => ({
+      participant: participantId,
+      shares: (expense.splitMode === 'BY_AMOUNT'
+        ? amountAsDecimal(shares, groupCurrency)
+        : (shares / 100).toString()) as any,
+    })),
+    splitMode: expense.splitMode,
+    saveDefaultSplittingOptions: false,
+    isReimbursement: expense.isReimbursement,
+    documents: mode === 'duplicate' ? [] : expense.documents,
+    notes: expense.notes ?? '',
+    recurrenceRule:
+      mode === 'duplicate'
+        ? RecurrenceRule.NONE
+        : (expense.recurrenceRule ?? RecurrenceRule.NONE),
+  }
+}
+
 export function ExpenseForm({
   group,
   categories,
   expense,
+  duplicateFrom,
   onSubmit,
   onDelete,
   runtimeFeatureFlags,
 }: {
   group: NonNullable<AppRouterOutput['groups']['get']['group']>
   categories: AppRouterOutput['categories']['list']['categories']
-  expense?: AppRouterOutput['groups']['expenses']['get']['expense']
+  expense?: LoadedExpense
+  duplicateFrom?: LoadedExpense
   onSubmit: (value: ExpenseFormValues, participantId?: string) => Promise<void>
   onDelete?: (participantId?: string) => Promise<void>
   runtimeFeatureFlags: RuntimeFeatureFlags
@@ -187,141 +229,89 @@ export function ExpenseForm({
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: expense
-      ? {
-          title: expense.title,
-          expenseDate: expense.expenseDate ?? new Date(),
-          amount: amountAsDecimal(expense.amount, groupCurrency),
-          originalCurrency: expense.originalCurrency ?? group.currencyCode,
-          originalAmount: expense.originalAmount ?? undefined,
-          conversionRate: expense.conversionRate ?? undefined,
-          category: expense.categoryId,
-          paidBy: expense.paidBy.map(({ participantId, amount }) => ({
-            participant: participantId,
-            amount: amountAsDecimal(amount, groupCurrency) as any,
-          })),
-          paidFor: expense.paidFor.map(({ participantId, shares }) => ({
-            participant: participantId,
-            shares: (expense.splitMode === 'BY_AMOUNT'
-              ? amountAsDecimal(shares, groupCurrency)
-              : (shares / 100).toString()) as any, // Convert to string to ensure consistent handling
-          })),
-          splitMode: expense.splitMode,
-          saveDefaultSplittingOptions: false,
-          isReimbursement: expense.isReimbursement,
-          documents: expense.documents,
-          notes: expense.notes ?? '',
-          recurrenceRule: expense.recurrenceRule ?? undefined,
-        }
-      : searchParams.get('reimbursement')
-        ? {
-            title: t('reimbursement'),
-            expenseDate: new Date(),
-            amount: amountAsDecimal(
-              Number(searchParams.get('amount')) || 0,
-              groupCurrency,
-            ),
-            originalCurrency: group.currencyCode,
-            originalAmount: undefined,
-            conversionRate: undefined,
-            category: 1, // category with Id 1 is Payment
-            paidBy: [
-              {
-                participant: searchParams.get('from') ?? (undefined as any),
-                amount: amountAsDecimal(
-                  Number(searchParams.get('amount')) || 0,
-                  groupCurrency,
-                ) as any,
-              },
-            ],
-            paidFor: [
-              searchParams.get('to')
-                ? {
-                    participant: searchParams.get('to')!,
-                    shares: '1' as any, // String for consistent form handling
-                  }
-                : undefined,
-            ],
-            isReimbursement: true,
-            splitMode: defaultSplittingOptions.splitMode,
-            saveDefaultSplittingOptions: false,
-            documents: [],
-            notes: '',
-            recurrenceRule: RecurrenceRule.NONE,
-          }
-        : {
-            title: searchParams.get('title') ?? '',
-            expenseDate: searchParams.get('date')
-              ? new Date(searchParams.get('date') as string)
-              : new Date(),
-            amount: Number(searchParams.get('amount')) || 0,
-            originalCurrency: group.currencyCode ?? undefined,
-            originalAmount: undefined,
-            conversionRate: undefined,
-            category: searchParams.get('categoryId')
-              ? Number(searchParams.get('categoryId'))
-              : 0, // category with Id 0 is General
-            // paid for all, split evenly
-            paidFor: defaultSplittingOptions.paidFor,
-            paidBy: [
-              {
-                participant: getSelectedPayer() as any,
-                amount: (Number(searchParams.get('amount')) || '') as any,
-              },
-            ],
-            isReimbursement: false,
-            splitMode: defaultSplittingOptions.splitMode,
-            saveDefaultSplittingOptions: false,
-            documents: searchParams.get('imageUrl')
-              ? [
-                  {
-                    id: randomId(),
-                    url: searchParams.get('imageUrl') as string,
-                    width: Number(searchParams.get('imageWidth')),
-                    height: Number(searchParams.get('imageHeight')),
-                  },
-                ]
-              : [],
-            notes: '',
-            recurrenceRule: RecurrenceRule.NONE,
-          },
+      ? expenseToFormValues(expense, groupCurrency, group.currencyCode, 'edit')
+      : duplicateFrom
+        ? expenseToFormValues(
+            duplicateFrom,
+            groupCurrency,
+            group.currencyCode,
+            'duplicate',
+          )
+        : searchParams.get('reimbursement')
+          ? {
+              title: t('reimbursement'),
+              expenseDate: new Date(),
+              amount: amountAsDecimal(
+                Number(searchParams.get('amount')) || 0,
+                groupCurrency,
+              ),
+              originalCurrency: group.currencyCode,
+              originalAmount: undefined,
+              conversionRate: undefined,
+              category: 1, // category with Id 1 is Payment
+              paidBy: [
+                {
+                  participant: searchParams.get('from') ?? (undefined as any),
+                  amount: amountAsDecimal(
+                    Number(searchParams.get('amount')) || 0,
+                    groupCurrency,
+                  ) as any,
+                },
+              ],
+              paidFor: [
+                searchParams.get('to')
+                  ? {
+                      participant: searchParams.get('to')!,
+                      shares: '1' as any, // String for consistent form handling
+                    }
+                  : undefined,
+              ],
+              isReimbursement: true,
+              splitMode: defaultSplittingOptions.splitMode,
+              saveDefaultSplittingOptions: false,
+              documents: [],
+              notes: '',
+              recurrenceRule: RecurrenceRule.NONE,
+            }
+          : {
+              title: searchParams.get('title') ?? '',
+              expenseDate: searchParams.get('date')
+                ? new Date(searchParams.get('date') as string)
+                : new Date(),
+              amount: Number(searchParams.get('amount')) || 0,
+              originalCurrency: group.currencyCode ?? undefined,
+              originalAmount: undefined,
+              conversionRate: undefined,
+              category: searchParams.get('categoryId')
+                ? Number(searchParams.get('categoryId'))
+                : 0, // category with Id 0 is General
+              // paid for all, split evenly
+              paidFor: defaultSplittingOptions.paidFor,
+              paidBy: [
+                {
+                  participant: getSelectedPayer() as any,
+                  amount: (Number(searchParams.get('amount')) || '') as any,
+                },
+              ],
+              isReimbursement: false,
+              splitMode: defaultSplittingOptions.splitMode,
+              saveDefaultSplittingOptions: false,
+              documents: searchParams.get('imageUrl')
+                ? [
+                    {
+                      id: randomId(),
+                      url: searchParams.get('imageUrl') as string,
+                      width: Number(searchParams.get('imageWidth')),
+                      height: Number(searchParams.get('imageHeight')),
+                    },
+                  ]
+                : [],
+              notes: '',
+              recurrenceRule: RecurrenceRule.NONE,
+            },
   })
   const [isCategoryLoading, setCategoryLoading] = useState(false)
   const activeUserId = useActiveUser(group.id)
-  const fromExpenseId = isCreate ? searchParams.get('fromExpense') : null
-  const { data: fromExpenseData } = trpc.groups.expenses.get.useQuery(
-    { groupId: group.id, expenseId: fromExpenseId ?? '' },
-    { enabled: Boolean(fromExpenseId) },
-  )
-
-  useEffect(() => {
-    const source = fromExpenseData?.expense
-    if (!isCreate || !source) return
-    form.reset({
-      title: source.title,
-      expenseDate: new Date(),
-      amount: amountAsDecimal(source.amount, groupCurrency),
-      originalCurrency: source.originalCurrency ?? group.currencyCode,
-      originalAmount: source.originalAmount ?? undefined,
-      conversionRate: source.conversionRate ?? undefined,
-      category: source.categoryId,
-      paidBy: source.paidBy.map(({ participantId, amount }) => ({
-        participant: participantId,
-        amount: amountAsDecimal(amount, groupCurrency) as any,
-      })),
-      paidFor: source.paidFor.map(({ participantId, shares }) => ({
-        participant: participantId,
-        shares: (source.splitMode === 'BY_AMOUNT'
-          ? amountAsDecimal(shares, groupCurrency)
-          : (shares / 100).toString()) as any,
-      })),
-      splitMode: source.splitMode,
-      saveDefaultSplittingOptions: false,
-      isReimbursement: source.isReimbursement,
-      documents: [],
-      notes: source.notes ?? '',
-      recurrenceRule: RecurrenceRule.NONE,
-    })
-  }, [fromExpenseData?.expense, isCreate])
 
   const calcTotalAmountMajor = (
     paidBys: { amount: number | string }[] | undefined,
@@ -549,9 +539,7 @@ export function ExpenseForm({
     if (converted !== null) {
       form.setValue(
         'originalAmount',
-        (Number(converted) === 0
-          ? ''
-          : normalizeNumberInput(converted)) as any,
+        (Number(converted) === 0 ? '' : normalizeNumberInput(converted)) as any,
       )
     }
   }, [
