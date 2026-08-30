@@ -11,6 +11,7 @@ import {
   type ExpenseDocument,
   type ExpensePaidBy,
   type ExpensePaidFor,
+  getExpensePaidBy,
   type GroupDocument,
   RecurrenceRule,
   type RecurringExpenseLink,
@@ -296,7 +297,7 @@ function childInserts(
           expense.recurrenceRule,
         ),
     )
-    for (const paidBy of expense.paidBy) {
+    for (const paidBy of getExpensePaidBy(expense)) {
       stmts.push(
         db
           .prepare(
@@ -305,7 +306,7 @@ function childInserts(
           .bind(expense.id, paidBy.participantId, paidBy.amount),
       )
     }
-    for (const paidFor of expense.paidFor) {
+    for (const paidFor of expense.paidFor ?? []) {
       stmts.push(
         db
           .prepare(
