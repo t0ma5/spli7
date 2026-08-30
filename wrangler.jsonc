@@ -18,7 +18,7 @@
     {
       "binding": "DATABASE",
       "database_name": "spl1t",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "41a44c89-54ce-4761-887a-9a1e6408403c",
       "migrations_dir": "migrations",
     },
   ],
