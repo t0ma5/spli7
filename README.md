@@ -201,8 +201,8 @@ This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
 
 - `DATABASE` D1 binding in `wrangler.jsonc` points at your database.
 - `vars.NEXT_PUBLIC_BASE_URL` matches the URL users open (`https://spl1t.pages.dev`).
-- `limits.cpu_ms` is set (this fork uses 30s). OpenNext SSR of a group page often needs more than Cloudflare’s default 10–30ms; without the limit, consistent traffic returns **Error 1102** (Worker exceeded resource limits).
 - `observability.enabled` is on so Workers Logs persist.
+- This account is on **Workers Free** (hard **10 ms** CPU per request). Do **not** set `limits.cpu_ms` — Wrangler rejects it with error 100328. OpenNext SSR of a large group can exceed 10 ms; Cloudflare may allow infrequent overage, then return **Error 1102** once traffic is consistent. The D1 keyset/surgical-write work is what keeps hot paths small. **Workers Paid** ($5/mo) raises the default to 30 s without any `cpu_ms` field.
 
 From this repo, production deploys are usually GitHub Actions **Deploy** (`workflow_dispatch` on `ubuntu-latest`, because Wrangler/`workerd` does not run on Windows ARM64). That still does **not** apply D1 migrations — run `npm run db:migrate:remote` (or equivalent) when `migrations/` changes.
 
