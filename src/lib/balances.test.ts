@@ -65,7 +65,9 @@ describe('balances', () => {
     ]
     const balances = getBalances(expenses)
     const reimbursements = getSuggestedReimbursements(balances)
-    const copy: typeof balances = JSON.parse(JSON.stringify(balances))
+    const copy = Object.fromEntries(
+      Object.entries(balances).map(([id, row]) => [id, { ...row }]),
+    ) as typeof balances
     for (const reimbursement of reimbursements) {
       copy[reimbursement.from].total += reimbursement.amount
       copy[reimbursement.to].total -= reimbursement.amount
