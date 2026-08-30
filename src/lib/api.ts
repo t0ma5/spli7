@@ -513,21 +513,18 @@ export async function getGroupExpensesParticipants(groupId: string) {
 }
 
 export async function getGroups(groupIds: string[]) {
-  const groups = (
-    await Promise.all(groupIds.map((id) => getGroupDocument(id)))
-  ).filter(
-    (group): group is GroupDocument => group !== null && !group.deletedAt,
-  )
-
-  return groups.map((group) => ({
-    id: group.id,
-    name: group.name,
-    information: group.information,
-    currency: group.currency,
-    currencyCode: group.currencyCode,
-    createdAt: toDate(group.createdAt).toISOString(),
-    _count: { participants: group.participants.length },
-  }))
+  const summaries = await getRepository().listSummaries(groupIds)
+  return summaries
+    .filter((group) => !group.deletedAt)
+    .map((group) => ({
+      id: group.id,
+      name: group.name,
+      information: group.information,
+      currency: group.currency,
+      currencyCode: group.currencyCode,
+      createdAt: toDate(group.createdAt).toISOString(),
+      _count: { participants: group.participantCount },
+    }))
 }
 
 export async function updateExpense(

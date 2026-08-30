@@ -4,7 +4,7 @@ import { baseProcedure } from '@/trpc/init'
 import { z } from 'zod'
 
 export const getGroupProcedure = baseProcedure
-  .input(z.object({ groupId: z.string().min(1).max(30) }))
+  .input(z.object({ groupId: z.string().min(1).max(64) }))
   .query(async ({ input: { groupId } }) => {
     const group = await getGroupIncludingDeleted(groupId)
     if (!group) return { group: null, locked: false as const }

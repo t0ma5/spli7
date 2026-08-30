@@ -14,8 +14,9 @@ export function GroupLayoutClient({
   groupId,
   children,
 }: PropsWithChildren<{ groupId: string }>) {
-  const { data, isLoading } = trpc.groups.get.useQuery({ groupId })
+  const { data, isLoading, isError } = trpc.groups.get.useQuery({ groupId })
   const t = useTranslations('Groups.NotFound')
+  const tGroups = useTranslations('Groups')
   const { toast } = useToast()
 
   useEffect(() => {
@@ -36,6 +37,14 @@ export function GroupLayoutClient({
     return (
       <CurrentGroupProvider {...props}>
         <GroupHeader />
+      </CurrentGroupProvider>
+    )
+  }
+
+  if (isError) {
+    return (
+      <CurrentGroupProvider {...props}>
+        <p className="text-sm text-muted-foreground">{tGroups('loadError')}</p>
       </CurrentGroupProvider>
     )
   }

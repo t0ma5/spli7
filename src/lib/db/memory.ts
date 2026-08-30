@@ -24,6 +24,24 @@ export function createMemoryRepository(
       const group = groups.get(id)
       return group ? clone(group) : null
     },
+    async listSummaries(ids) {
+      return ids.flatMap((id) => {
+        const group = groups.get(id)
+        if (!group) return []
+        return [
+          {
+            id: group.id,
+            name: group.name,
+            information: group.information,
+            currency: group.currency,
+            currencyCode: group.currencyCode,
+            createdAt: group.createdAt,
+            deletedAt: group.deletedAt ?? null,
+            participantCount: group.participants.length,
+          },
+        ]
+      })
+    },
     async create(group) {
       if (groups.has(group.id)) throw new Error(`Group exists: ${group.id}`)
       groups.set(group.id, clone({ ...group, version: group.version ?? 0 }))

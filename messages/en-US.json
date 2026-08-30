@@ -61,6 +61,8 @@
     "create": "Create",
     "createGroup": "Create group",
     "loadingRecent": "Loading recent groups…",
+    "loadError": "Could not load your groups. Try again.",
+    "retry": "Retry",
     "NoRecent": {
       "description": "You have not visited any group recently.",
       "create": "Create one",

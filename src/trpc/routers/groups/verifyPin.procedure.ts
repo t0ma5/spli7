@@ -12,7 +12,7 @@ import { z } from 'zod'
 export const verifyGroupPinProcedure = baseProcedure
   .input(
     z.object({
-      groupId: z.string().min(1).max(30),
+      groupId: z.string().min(1).max(64),
       pin: z
         .string()
         .min(4)

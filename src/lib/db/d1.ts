@@ -1,6 +1,7 @@
 import { getD1 } from '@/lib/db/client'
 import type {
   GroupRepository,
+  GroupSummary,
   PinAttemptState,
   WriteResult,
 } from '@/lib/db/repository'
@@ -84,19 +85,20 @@ async function loadGroup(
     .bind(id)
     .all<ExpenseRow>()
 
-  const expenseIds = expenseRows.map((row) => row.id)
   const paidByByExpense = new Map<string, ExpensePaidBy[]>()
   const paidForByExpense = new Map<string, ExpensePaidFor[]>()
   const documentsByExpense = new Map<string, ExpenseDocument[]>()
   const recurringByExpense = new Map<string, RecurringExpenseLink>()
 
-  if (expenseIds.length > 0) {
-    const placeholders = expenseIds.map(() => '?').join(',')
+  // Subqueries (one bind) instead of `IN (?,?,…)` — D1 allows only 100 bound
+  // parameters, and migrated groups can have 100+ expenses.
+  if (expenseRows.length > 0) {
     const { results: paidByRows } = await db
       .prepare(
-        `SELECT expense_id, participant_id, amount FROM expense_paid_by WHERE expense_id IN (${placeholders})`,
+        `SELECT expense_id, participant_id, amount FROM expense_paid_by
+         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
       )
-      .bind(...expenseIds)
+      .bind(id)
       .all<{ expense_id: string; participant_id: string; amount: number }>()
     for (const row of paidByRows) {
       const list = paidByByExpense.get(row.expense_id) ?? []
@@ -110,9 +112,10 @@ async function loadGroup(
 
     const { results: paidForRows } = await db
       .prepare(
-        `SELECT expense_id, participant_id, shares FROM expense_paid_for WHERE expense_id IN (${placeholders})`,
+        `SELECT expense_id, participant_id, shares FROM expense_paid_for
+         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
       )
-      .bind(...expenseIds)
+      .bind(id)
       .all<{ expense_id: string; participant_id: string; shares: number }>()
     for (const row of paidForRows) {
       const list = paidForByExpense.get(row.expense_id) ?? []
@@ -126,9 +129,10 @@ async function loadGroup(
 
     const { results: documentRows } = await db
       .prepare(
-        `SELECT id, expense_id, url, width, height FROM expense_documents WHERE expense_id IN (${placeholders})`,
+        `SELECT id, expense_id, url, width, height FROM expense_documents
+         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
       )
-      .bind(...expenseIds)
+      .bind(id)
       .all<{
         id: string
         expense_id: string
@@ -404,9 +408,63 @@ async function runChunks(db: D1Database, stmts: D1PreparedStatement[]) {
   }
 }
 
+/** D1 allows at most 100 bound parameters per statement. */
+const D1_MAX_BOUND_PARAMETERS = 100
+
+async function selectWhereIdIn<T>(
+  db: D1Database,
+  sqlBeforeIn: string,
+  ids: string[],
+): Promise<T[]> {
+  if (ids.length === 0) return []
+  const out: T[] = []
+  for (let i = 0; i < ids.length; i += D1_MAX_BOUND_PARAMETERS) {
+    const chunk = ids.slice(i, i + D1_MAX_BOUND_PARAMETERS)
+    const placeholders = chunk.map(() => '?').join(',')
+    const { results } = await db
+      .prepare(`${sqlBeforeIn} (${placeholders})`)
+      .bind(...chunk)
+      .all<T>()
+    out.push(...results)
+  }
+  return out
+}
+
 export const d1Repository: GroupRepository = {
   async get(id) {
     return loadGroup(await getD1(), id)
+  },
+
+  async listSummaries(ids) {
+    const unique = Array.from(new Set(ids))
+    const rows = await selectWhereIdIn<
+      GroupRow & { participant_count: number }
+    >(
+      await getD1(),
+      `SELECT g.*,
+        (SELECT COUNT(*) FROM participants p WHERE p.group_id = g.id) AS participant_count
+       FROM groups g WHERE g.id IN`,
+      unique,
+    )
+    const byId = new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          name: row.name,
+          information: row.information,
+          currency: row.currency,
+          currencyCode: row.currency_code,
+          createdAt: row.created_at,
+          deletedAt: row.deleted_at,
+          participantCount: row.participant_count,
+        } satisfies GroupSummary,
+      ]),
+    )
+    return ids.flatMap((id) => {
+      const row = byId.get(id)
+      return row ? [row] : []
+    })
   },
 
   async create(group) {

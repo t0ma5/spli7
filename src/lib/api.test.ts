@@ -3,8 +3,8 @@ jest.mock('nanoid', () => {
   return { nanoid: () => `id${++n}` }
 })
 
-import { createExpense, createGroup, updateGroup } from '@/lib/api'
-import { setRepositoryForTests } from '@/lib/db'
+import { createExpense, createGroup, getGroups, updateGroup } from '@/lib/api'
+import { getRepository, setRepositoryForTests } from '@/lib/db'
 import { createMemoryRepository } from '@/lib/db/memory'
 
 describe('api + memory repository', () => {
@@ -179,5 +179,80 @@ describe('api + memory repository', () => {
         participants: [{ id: group.participants[0].id, name: 'Ada' }],
       }),
     ).rejects.toThrow(/Cannot remove/)
+  })
+
+  it('lists group summaries without requiring a full expense graph', async () => {
+    const repo = createMemoryRepository()
+    setRepositoryForTests(repo)
+    const group = await createGroup({
+      name: 'Big',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }, { name: 'Bob' }],
+    })
+    const stored = await repo.get(group.id)
+    expect(stored).toBeTruthy()
+    if (!stored) return
+    stored.expenses = Array.from({ length: 160 }, (_, index) => ({
+      id: `exp${index}`,
+      groupId: group.id,
+      expenseDate: '2026-01-01',
+      title: `E${index}`,
+      categoryId: 0,
+      amount: 1,
+      originalAmount: null,
+      originalCurrency: null,
+      conversionRate: null,
+      paidBy: [
+        {
+          expenseId: `exp${index}`,
+          participantId: group.participants[0].id,
+          amount: 1,
+        },
+      ],
+      isReimbursement: false,
+      splitMode: 'EVENLY' as const,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      notes: null,
+      recurrenceRule: 'NONE' as const,
+      paidFor: [
+        {
+          expenseId: `exp${index}`,
+          participantId: group.participants[0].id,
+          shares: 1,
+        },
+      ],
+      documents: [],
+      recurringExpenseLink: null,
+    }))
+    await repo.save(stored, stored.version ?? 0)
+
+    const listed = await getGroups([group.id, 'missing'])
+    expect(listed).toEqual([
+      expect.objectContaining({
+        id: group.id,
+        name: 'Big',
+        _count: { participants: 2 },
+      }),
+    ])
+  })
+
+  it('omits soft-deleted groups from the recent list', async () => {
+    const group = await createGroup({
+      name: 'Gone',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }],
+    })
+    const existing = await getRepository().get(group.id)
+    expect(existing).toBeTruthy()
+    if (!existing) return
+    existing.deletedAt = '2026-08-11T00:00:00.000Z'
+    await getRepository().save(existing, existing.version ?? 0)
+    await expect(getGroups([group.id])).resolves.toEqual([])
   })
 })

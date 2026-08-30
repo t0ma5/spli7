@@ -105,9 +105,22 @@ function RecentGroupList_({
   refreshGroupsFromStorage: () => void
 }) {
   const t = useTranslations('Groups')
-  const { data, isLoading } = trpc.groups.list.useQuery({
+  const { data, isLoading, isError, refetch } = trpc.groups.list.useQuery({
     groupIds: groups.map((group) => group.id),
   })
+
+  if (isError) {
+    return (
+      <GroupsPage reload={refreshGroupsFromStorage}>
+        <div className="text-sm space-y-2">
+          <p>{t('loadError')}</p>
+          <Button variant="secondary" onClick={() => refetch()}>
+            {t('retry')}
+          </Button>
+        </div>
+      </GroupsPage>
+    )
+  }
 
   if (isLoading || !data) {
     return (

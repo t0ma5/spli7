@@ -8,8 +8,21 @@ export type PinAttemptState = {
   lockedUntil: number | null
 }
 
+export type GroupSummary = {
+  id: string
+  name: string
+  information: string | null
+  currency: string
+  currencyCode: string | null
+  createdAt: string
+  deletedAt: string | null
+  participantCount: number
+}
+
 export interface GroupRepository {
   get(id: string): Promise<GroupDocument | null>
+  /** Metadata only — used by /groups so large expense graphs are not loaded. */
+  listSummaries(ids: string[]): Promise<GroupSummary[]>
   create(group: GroupDocument): Promise<void>
   /**
    * Replace the stored group if `expectedVersion` still matches.
