@@ -3,7 +3,17 @@ jest.mock('nanoid', () => {
   return { nanoid: () => `id${++n}` }
 })
 
-import { createExpense, createGroup, getGroups, updateGroup } from '@/lib/api'
+import {
+  createExpense,
+  createGroup,
+  getActivities,
+  getExpense,
+  getGroup,
+  getGroupExpenseCount,
+  getGroupExpenses,
+  getGroups,
+  updateGroup,
+} from '@/lib/api'
 import { getRepository, setRepositoryForTests } from '@/lib/db'
 import { createMemoryRepository } from '@/lib/db/memory'
 
@@ -254,5 +264,64 @@ describe('api + memory repository', () => {
     existing.deletedAt = '2026-08-11T00:00:00.000Z'
     await getRepository().save(existing, existing.version ?? 0)
     await expect(getGroups([group.id])).resolves.toEqual([])
+  })
+
+  it('pages and filters expenses in the repository instead of slicing a full document', async () => {
+    const group = await createGroup({
+      name: 'Paged',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }, { name: 'Bob' }],
+    })
+    const ada = group.participants[0].id
+    const bob = group.participants[1].id
+    const titles = ['Coffee', 'Dinner', 'Taxi', 'Museum']
+    for (let index = 0; index < titles.length; index++) {
+      await createExpense(
+        {
+          expenseDate: new Date(`2026-01-0${index + 1}`),
+          title: titles[index],
+          category: 0,
+          amount: 100 + index,
+          paidBy: [{ participant: ada, amount: 100 + index }],
+          paidFor: [
+            { participant: ada, shares: 1 },
+            { participant: bob, shares: 1 },
+          ],
+          splitMode: 'EVENLY',
+          saveDefaultSplittingOptions: false,
+          isReimbursement: false,
+          documents: [],
+          recurrenceRule: 'NONE',
+        },
+        group.id,
+      )
+    }
+
+    expect(await getGroupExpenseCount(group.id)).toBe(4)
+    const header = await getGroup(group.id)
+    expect(header?.name).toBe('Paged')
+    expect(header?.participants).toHaveLength(2)
+
+    const page = await getGroupExpenses(group.id, { offset: 0, length: 2 })
+    expect(page.map((expense) => expense.title)).toEqual(['Museum', 'Taxi'])
+    const next = await getGroupExpenses(group.id, { offset: 2, length: 2 })
+    expect(next.map((expense) => expense.title)).toEqual(['Dinner', 'Coffee'])
+
+    const filtered = await getGroupExpenses(group.id, {
+      filter: 'din',
+      offset: 0,
+      length: 10,
+    })
+    expect(filtered.map((expense) => expense.title)).toEqual(['Dinner'])
+
+    const one = await getExpense(group.id, page[0].id)
+    expect(one?.title).toBe('Museum')
+
+    const activities = await getActivities(group.id, { offset: 0, length: 2 })
+    expect(activities).toHaveLength(2)
+    expect(activities[0].expense?.title).toBe('Museum')
   })
 })

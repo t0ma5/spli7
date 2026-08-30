@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { getRepository } from '@/lib/db'
-import { WRITE_RETRIES } from '@/lib/db/repository'
+import { WRITE_RETRIES, type GroupMeta } from '@/lib/db/repository'
 import {
   INACTIVITY_MONTHS,
   isInactive,
@@ -45,13 +45,13 @@ function toIsoDateOnly(date: Date): string {
 }
 
 function participantById(
-  group: GroupDocument,
+  participants: Participant[],
   participantId: string,
 ): Participant | undefined {
-  return group.participants.find((p) => p.id === participantId)
+  return participants.find((p) => p.id === participantId)
 }
 
-function mapGroup(group: GroupDocument): Group {
+function mapGroup(group: GroupMeta): Group {
   return {
     id: group.id,
     name: group.name,
@@ -76,12 +76,16 @@ async function getGroupDocument(
   return getRepository().get(groupId)
 }
 
-async function persistGroup(group: GroupDocument, touchActivity = true) {
+async function persistGroup(
+  group: GroupDocument,
+  previous: GroupDocument,
+  touchActivity = true,
+) {
   if (touchActivity) {
     group.lastActivityAt = new Date().toISOString()
   }
   const expected = group.version ?? 0
-  const result = await getRepository().save(group, expected)
+  const result = await getRepository().save(group, expected, previous)
   if (result === 'conflict') {
     throw new ConflictError()
   }
@@ -109,8 +113,9 @@ async function withGroupWrite<T>(
       throw new Error(`Invalid group ID: ${groupId}`)
     }
     try {
+      const previous = structuredClone(group)
       const value = await fn(group)
-      await persistGroup(group, touchActivity)
+      await persistGroup(group, previous, touchActivity)
       return value
     } catch (error) {
       lastError = error
@@ -652,7 +657,7 @@ export async function updateGroup(
 }
 
 export async function verifyGroupPin(groupId: string, pin: string) {
-  const group = await getGroupDocument(groupId)
+  const group = await getRepository().getMeta(groupId)
   if (!group) return false
   if (!group.pinHash) return true
   const matches = await pinMatchesHash(pin, groupId, group.pinHash)
@@ -672,7 +677,7 @@ export async function verifyGroupPin(groupId: string, pin: string) {
 }
 
 export async function getGroup(groupId: string) {
-  const group = await getGroupDocument(groupId)
+  const group = await getRepository().getMeta(groupId)
   if (!group || group.deletedAt) return null
   void getRepository().bumpLastSeen(groupId, new Date().toISOString())
   return mapGroup(group)
@@ -680,7 +685,7 @@ export async function getGroup(groupId: string) {
 
 /** Includes soft-deleted groups (for restore UI). */
 export async function getGroupIncludingDeleted(groupId: string) {
-  const group = await getGroupDocument(groupId)
+  const group = await getRepository().getMeta(groupId)
   if (!group) return null
   return mapGroup(group)
 }
@@ -758,7 +763,8 @@ export async function getCategories() {
   return SEEDED_CATEGORIES
 }
 
-function hasDueRecurring(group: GroupDocument, now = new Date()): boolean {
+export async function materializeDueRecurringExpenses(groupId: string) {
+  const now = new Date()
   const utcNow = new Date(
     Date.UTC(
       now.getUTCFullYear(),
@@ -768,18 +774,9 @@ function hasDueRecurring(group: GroupDocument, now = new Date()): boolean {
       now.getUTCMinutes(),
     ),
   )
-  return group.expenses.some(
-    (expense) =>
-      expense.recurringExpenseLink &&
-      expense.recurringExpenseLink.nextExpenseCreatedAt === null &&
-      toDate(expense.recurringExpenseLink.nextExpenseDate) <= utcNow,
-  )
-}
-
-export async function materializeDueRecurringExpenses(groupId: string) {
-  const group = await getGroupDocument(groupId)
-  if (!group || group.deletedAt) return false
-  if (!hasDueRecurring(group)) return false
+  if (!(await getRepository().hasDueRecurring(groupId, utcNow.toISOString()))) {
+    return false
+  }
   await withGroupWrite(groupId, (fresh) => {
     createRecurringExpensesForGroup(fresh)
   })
@@ -806,37 +803,15 @@ export async function getGroupExpenses(
   if (await materializeDueRecurringExpenses(groupId)) {
     // reloaded below
   }
-  const group = await getGroupDocument(groupId)
+  const group = await getRepository().getMeta(groupId)
   if (!group || group.deletedAt) return []
   void getRepository().bumpLastSeen(groupId, new Date().toISOString())
 
-  let expenses = [...group.expenses]
-  if (options?.filter) {
-    const filter = options.filter.toLowerCase()
-    expenses = expenses.filter((expense) =>
-      expense.title.toLowerCase().includes(filter),
-    )
-  }
-
-  expenses.sort((a, b) => {
-    const dateDiff =
-      toDate(b.expenseDate).getTime() - toDate(a.expenseDate).getTime()
-    if (dateDiff !== 0) return dateDiff
-    return toDate(b.createdAt).getTime() - toDate(a.createdAt).getTime()
-  })
-
-  if (options?.offset !== undefined || options?.length !== undefined) {
-    const offset = options.offset ?? 0
-    const length = options.length
-    expenses =
-      length === undefined
-        ? expenses.slice(offset)
-        : expenses.slice(offset, offset + length)
-  }
+  const expenses = await getRepository().listExpenses(groupId, options)
 
   return expenses.map((expense) => {
     const paidBy = getExpensePaidBy(expense).map((pb) => {
-      const participant = participantById(group, pb.participantId)
+      const participant = participantById(group.participants, pb.participantId)
       return {
         id: participant?.id ?? pb.participantId,
         name: participant?.name ?? 'Unknown',
@@ -854,7 +829,10 @@ export async function getGroupExpenses(
       isReimbursement: expense.isReimbursement,
       paidBy,
       paidFor: expense.paidFor.map((paidFor) => {
-        const participant = participantById(group, paidFor.participantId)
+        const participant = participantById(
+          group.participants,
+          paidFor.participantId,
+        )
         return {
           shares: paidFor.shares,
           participant: participant
@@ -871,8 +849,7 @@ export async function getGroupExpenses(
 }
 
 export async function getGroupExpenseCount(groupId: string) {
-  const group = await getGroupDocument(groupId)
-  return group?.expenses.length ?? 0
+  return getRepository().countExpenses(groupId)
 }
 
 /**
@@ -895,9 +872,7 @@ export async function getActiveRecurringExpenses(groupId: string) {
 }
 
 export async function getExpense(groupId: string, expenseId: string) {
-  const group = await getGroupDocument(groupId)
-  if (!group) return null
-  const expense = group.expenses.find((e) => e.id === expenseId)
+  const expense = await getRepository().getExpense(groupId, expenseId)
   if (!expense) return null
 
   const paidBy = getExpensePaidBy(expense)
@@ -927,28 +902,23 @@ export async function getActivities(
   groupId: string,
   options?: { offset?: number; length?: number },
 ) {
-  const group = await getGroupDocument(groupId)
-  if (!group) return []
-
-  let activities = [...group.activities].sort(
-    (a, b) => toDate(b.time).getTime() - toDate(a.time).getTime(),
-  )
-
-  if (options?.offset !== undefined || options?.length !== undefined) {
-    const offset = options.offset ?? 0
-    const length = options.length
-    activities =
-      length === undefined
-        ? activities.slice(offset)
-        : activities.slice(offset, offset + length)
+  const activities = await getRepository().listActivities(groupId, options)
+  const expenseIds = activities
+    .map((activity) => activity.expenseId)
+    .filter((id): id is string => Boolean(id))
+  const uniqueIds: string[] = []
+  for (const id of expenseIds) {
+    if (!uniqueIds.includes(id)) uniqueIds.push(id)
   }
+  const expenses = await getRepository().listExpensesByIds(groupId, uniqueIds)
+  const expenseById = new Map(expenses.map((expense) => [expense.id, expense]))
 
   return activities.map((activity) => ({
     ...activity,
     time: toDate(activity.time),
     expense:
       activity.expenseId !== null
-        ? group.expenses.find((expense) => expense.id === activity.expenseId)
+        ? expenseById.get(activity.expenseId)
         : undefined,
   }))
 }

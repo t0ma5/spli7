@@ -1,5 +1,9 @@
 import { getD1 } from '@/lib/db/client'
+import { diffGroupChildren } from '@/lib/db/group-patch'
 import type {
+  ActivityListOptions,
+  ExpenseListOptions,
+  GroupMeta,
   GroupRepository,
   GroupSummary,
   PinAttemptState,
@@ -81,142 +85,15 @@ async function loadGroup(
     .all<ParticipantRow>()
 
   const { results: expenseRows } = await db
-    .prepare('SELECT * FROM expenses WHERE group_id = ?')
+    .prepare(
+      'SELECT * FROM expenses WHERE group_id = ? ORDER BY expense_date DESC, created_at DESC',
+    )
     .bind(id)
     .all<ExpenseRow>()
 
-  const paidByByExpense = new Map<string, ExpensePaidBy[]>()
-  const paidForByExpense = new Map<string, ExpensePaidFor[]>()
-  const documentsByExpense = new Map<string, ExpenseDocument[]>()
-  const recurringByExpense = new Map<string, RecurringExpenseLink>()
+  const expenses = await hydrateExpenses(db, expenseRows)
 
-  // Subqueries (one bind) instead of `IN (?,?,…)` — D1 allows only 100 bound
-  // parameters, and migrated groups can have 100+ expenses.
-  if (expenseRows.length > 0) {
-    const { results: paidByRows } = await db
-      .prepare(
-        `SELECT expense_id, participant_id, amount FROM expense_paid_by
-         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
-      )
-      .bind(id)
-      .all<{ expense_id: string; participant_id: string; amount: number }>()
-    for (const row of paidByRows) {
-      const list = paidByByExpense.get(row.expense_id) ?? []
-      list.push({
-        expenseId: row.expense_id,
-        participantId: row.participant_id,
-        amount: row.amount,
-      })
-      paidByByExpense.set(row.expense_id, list)
-    }
-
-    const { results: paidForRows } = await db
-      .prepare(
-        `SELECT expense_id, participant_id, shares FROM expense_paid_for
-         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
-      )
-      .bind(id)
-      .all<{ expense_id: string; participant_id: string; shares: number }>()
-    for (const row of paidForRows) {
-      const list = paidForByExpense.get(row.expense_id) ?? []
-      list.push({
-        expenseId: row.expense_id,
-        participantId: row.participant_id,
-        shares: row.shares,
-      })
-      paidForByExpense.set(row.expense_id, list)
-    }
-
-    const { results: documentRows } = await db
-      .prepare(
-        `SELECT id, expense_id, url, width, height FROM expense_documents
-         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
-      )
-      .bind(id)
-      .all<{
-        id: string
-        expense_id: string
-        url: string
-        width: number
-        height: number
-      }>()
-    for (const row of documentRows) {
-      const list = documentsByExpense.get(row.expense_id) ?? []
-      list.push({
-        id: row.id,
-        expenseId: row.expense_id,
-        url: row.url,
-        width: row.width,
-        height: row.height,
-      })
-      documentsByExpense.set(row.expense_id, list)
-    }
-
-    const { results: recurringRows } = await db
-      .prepare('SELECT * FROM recurring_expense_links WHERE group_id = ?')
-      .bind(id)
-      .all<{
-        id: string
-        group_id: string
-        current_frame_expense_id: string
-        next_expense_created_at: string | null
-        next_expense_date: string
-      }>()
-    for (const row of recurringRows) {
-      recurringByExpense.set(row.current_frame_expense_id, {
-        id: row.id,
-        groupId: row.group_id,
-        currentFrameExpenseId: row.current_frame_expense_id,
-        nextExpenseCreatedAt: row.next_expense_created_at,
-        nextExpenseDate: row.next_expense_date,
-      })
-    }
-  }
-
-  const expenses: Expense[] = expenseRows.map((row) => ({
-    id: row.id,
-    groupId: row.group_id,
-    expenseDate: row.expense_date,
-    title: row.title,
-    categoryId: row.category_id,
-    amount: row.amount,
-    originalAmount: row.original_amount,
-    originalCurrency: row.original_currency,
-    conversionRate: row.conversion_rate,
-    paidBy: paidByByExpense.get(row.id) ?? [],
-    isReimbursement: row.is_reimbursement === 1,
-    splitMode: (row.split_mode as SplitMode) ?? SplitMode.EVENLY,
-    createdAt: row.created_at,
-    notes: row.notes,
-    recurrenceRule:
-      (row.recurrence_rule as RecurrenceRule | null) ?? RecurrenceRule.NONE,
-    paidFor: paidForByExpense.get(row.id) ?? [],
-    documents: documentsByExpense.get(row.id) ?? [],
-    recurringExpenseLink: recurringByExpense.get(row.id) ?? null,
-  }))
-
-  const { results: activityRows } = await db
-    .prepare('SELECT * FROM activities WHERE group_id = ? ORDER BY time DESC')
-    .bind(id)
-    .all<{
-      id: string
-      group_id: string
-      time: string
-      activity_type: string
-      participant_id: string | null
-      expense_id: string | null
-      data: string | null
-    }>()
-
-  const activities: Activity[] = activityRows.map((row) => ({
-    id: row.id,
-    groupId: row.group_id,
-    time: row.time,
-    activityType: row.activity_type as ActivityType,
-    participantId: row.participant_id,
-    expenseId: row.expense_id,
-    data: row.data,
-  }))
+  const activities = await listActivityRows(db, id)
 
   return {
     id: group.id,
@@ -260,118 +137,274 @@ function groupMetaBinds(group: GroupDocument) {
   ]
 }
 
+function participantUpsert(
+  db: D1Database,
+  groupId: string,
+  participant: GroupDocument['participants'][number],
+  index: number,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO participants (id, group_id, name, sort_order) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         sort_order = excluded.sort_order,
+         group_id = excluded.group_id`,
+    )
+    .bind(participant.id, groupId, participant.name, index)
+}
+
+function expenseInserts(
+  db: D1Database,
+  groupId: string,
+  expense: GroupDocument['expenses'][number],
+): D1PreparedStatement[] {
+  const stmts: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO expenses (
+          id, group_id, expense_date, title, category_id, amount,
+          original_amount, original_currency, conversion_rate, is_reimbursement,
+          split_mode, created_at, notes, recurrence_rule
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+          group_id = excluded.group_id,
+          expense_date = excluded.expense_date,
+          title = excluded.title,
+          category_id = excluded.category_id,
+          amount = excluded.amount,
+          original_amount = excluded.original_amount,
+          original_currency = excluded.original_currency,
+          conversion_rate = excluded.conversion_rate,
+          is_reimbursement = excluded.is_reimbursement,
+          split_mode = excluded.split_mode,
+          created_at = excluded.created_at,
+          notes = excluded.notes,
+          recurrence_rule = excluded.recurrence_rule`,
+      )
+      .bind(
+        expense.id,
+        groupId,
+        expense.expenseDate,
+        expense.title,
+        expense.categoryId,
+        expense.amount,
+        expense.originalAmount,
+        expense.originalCurrency,
+        expense.conversionRate,
+        bool01(expense.isReimbursement),
+        expense.splitMode,
+        expense.createdAt,
+        expense.notes,
+        expense.recurrenceRule,
+      ),
+  ]
+  for (const paidBy of getExpensePaidBy(expense)) {
+    stmts.push(
+      db
+        .prepare(
+          'INSERT INTO expense_paid_by (expense_id, participant_id, amount) VALUES (?, ?, ?)',
+        )
+        .bind(expense.id, paidBy.participantId, paidBy.amount),
+    )
+  }
+  for (const paidFor of expense.paidFor ?? []) {
+    stmts.push(
+      db
+        .prepare(
+          'INSERT INTO expense_paid_for (expense_id, participant_id, shares) VALUES (?, ?, ?)',
+        )
+        .bind(expense.id, paidFor.participantId, paidFor.shares),
+    )
+  }
+  for (const document of expense.documents) {
+    stmts.push(
+      db
+        .prepare(
+          'INSERT INTO expense_documents (id, expense_id, url, width, height) VALUES (?, ?, ?, ?, ?)',
+        )
+        .bind(
+          document.id,
+          expense.id,
+          document.url,
+          document.width,
+          document.height,
+        ),
+    )
+  }
+  if (expense.recurringExpenseLink) {
+    const link = expense.recurringExpenseLink
+    stmts.push(
+      db
+        .prepare(
+          `INSERT INTO recurring_expense_links (
+            id, group_id, current_frame_expense_id, next_expense_created_at, next_expense_date
+          ) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+            group_id = excluded.group_id,
+            current_frame_expense_id = excluded.current_frame_expense_id,
+            next_expense_created_at = excluded.next_expense_created_at,
+            next_expense_date = excluded.next_expense_date`,
+        )
+        .bind(
+          link.id,
+          groupId,
+          expense.id,
+          link.nextExpenseCreatedAt,
+          link.nextExpenseDate,
+        ),
+    )
+  }
+  return stmts
+}
+
+function activityInsert(
+  db: D1Database,
+  activity: GroupDocument['activities'][number],
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO activities (
+        id, group_id, time, activity_type, participant_id, expense_id, data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      activity.id,
+      activity.groupId,
+      activity.time,
+      activity.activityType,
+      activity.participantId,
+      activity.expenseId,
+      activity.data,
+    )
+}
+
+function expenseChildDeletes(
+  db: D1Database,
+  expenseId: string,
+): D1PreparedStatement[] {
+  return [
+    db
+      .prepare('DELETE FROM expense_documents WHERE expense_id = ?')
+      .bind(expenseId),
+    db
+      .prepare(
+        'DELETE FROM recurring_expense_links WHERE current_frame_expense_id = ?',
+      )
+      .bind(expenseId),
+    db
+      .prepare('DELETE FROM expense_paid_by WHERE expense_id = ?')
+      .bind(expenseId),
+    db
+      .prepare('DELETE FROM expense_paid_for WHERE expense_id = ?')
+      .bind(expenseId),
+  ]
+}
+
+function inDeletes(
+  db: D1Database,
+  sqlBeforeIn: string,
+  ids: string[],
+): D1PreparedStatement[] {
+  const stmts: D1PreparedStatement[] = []
+  const size = 80
+  for (let i = 0; i < ids.length; i += size) {
+    const chunk = ids.slice(i, i + size)
+    const placeholders = chunk.map(() => '?').join(',')
+    stmts.push(db.prepare(`${sqlBeforeIn} (${placeholders})`).bind(...chunk))
+  }
+  return stmts
+}
+
 function childInserts(
   db: D1Database,
   group: GroupDocument,
 ): D1PreparedStatement[] {
   const stmts: D1PreparedStatement[] = []
   group.participants.forEach((participant, index) => {
-    stmts.push(
-      db
-        .prepare(
-          'INSERT INTO participants (id, group_id, name, sort_order) VALUES (?, ?, ?, ?)',
-        )
-        .bind(participant.id, group.id, participant.name, index),
-    )
+    stmts.push(participantUpsert(db, group.id, participant, index))
   })
   for (const expense of group.expenses) {
-    stmts.push(
-      db
-        .prepare(
-          `INSERT INTO expenses (
-            id, group_id, expense_date, title, category_id, amount,
-            original_amount, original_currency, conversion_rate, is_reimbursement,
-            split_mode, created_at, notes, recurrence_rule
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          expense.id,
-          group.id,
-          expense.expenseDate,
-          expense.title,
-          expense.categoryId,
-          expense.amount,
-          expense.originalAmount,
-          expense.originalCurrency,
-          expense.conversionRate,
-          bool01(expense.isReimbursement),
-          expense.splitMode,
-          expense.createdAt,
-          expense.notes,
-          expense.recurrenceRule,
-        ),
-    )
-    for (const paidBy of getExpensePaidBy(expense)) {
-      stmts.push(
-        db
-          .prepare(
-            'INSERT INTO expense_paid_by (expense_id, participant_id, amount) VALUES (?, ?, ?)',
-          )
-          .bind(expense.id, paidBy.participantId, paidBy.amount),
-      )
-    }
-    for (const paidFor of expense.paidFor ?? []) {
-      stmts.push(
-        db
-          .prepare(
-            'INSERT INTO expense_paid_for (expense_id, participant_id, shares) VALUES (?, ?, ?)',
-          )
-          .bind(expense.id, paidFor.participantId, paidFor.shares),
-      )
-    }
-    for (const document of expense.documents) {
-      stmts.push(
-        db
-          .prepare(
-            'INSERT INTO expense_documents (id, expense_id, url, width, height) VALUES (?, ?, ?, ?, ?)',
-          )
-          .bind(
-            document.id,
-            expense.id,
-            document.url,
-            document.width,
-            document.height,
-          ),
-      )
-    }
-    if (expense.recurringExpenseLink) {
-      const link = expense.recurringExpenseLink
-      stmts.push(
-        db
-          .prepare(
-            `INSERT INTO recurring_expense_links (
-              id, group_id, current_frame_expense_id, next_expense_created_at, next_expense_date
-            ) VALUES (?, ?, ?, ?, ?)`,
-          )
-          .bind(
-            link.id,
-            group.id,
-            expense.id,
-            link.nextExpenseCreatedAt,
-            link.nextExpenseDate,
-          ),
-      )
-    }
+    stmts.push(...expenseInserts(db, group.id, expense))
   }
   for (const activity of group.activities) {
+    stmts.push(activityInsert(db, activity))
+  }
+  return stmts
+}
+
+function childPatchStatements(
+  db: D1Database,
+  group: GroupDocument,
+  previous: GroupDocument,
+): D1PreparedStatement[] {
+  const patch = diffGroupChildren(previous, group)
+  const stmts: D1PreparedStatement[] = []
+
+  if (patch.deleteExpenseIds.length > 0) {
     stmts.push(
-      db
-        .prepare(
-          `INSERT INTO activities (
-            id, group_id, time, activity_type, participant_id, expense_id, data
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          activity.id,
-          group.id,
-          activity.time,
-          activity.activityType,
-          activity.participantId,
-          activity.expenseId,
-          activity.data,
-        ),
+      ...inDeletes(
+        db,
+        'DELETE FROM expense_documents WHERE expense_id IN',
+        patch.deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM recurring_expense_links WHERE current_frame_expense_id IN',
+        patch.deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM expense_paid_by WHERE expense_id IN',
+        patch.deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM expense_paid_for WHERE expense_id IN',
+        patch.deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM expenses WHERE id IN',
+        patch.deleteExpenseIds,
+      ),
     )
   }
+
+  if (patch.replaceParticipants) {
+    patch.participants.forEach((participant, index) => {
+      stmts.push(participantUpsert(db, group.id, participant, index))
+    })
+  }
+
+  for (const expense of patch.upsertExpenses) {
+    stmts.push(...expenseChildDeletes(db, expense.id))
+    stmts.push(...expenseInserts(db, group.id, expense))
+  }
+
+  if (patch.deleteParticipantIds.length > 0) {
+    stmts.push(
+      ...inDeletes(
+        db,
+        'DELETE FROM participants WHERE id IN',
+        patch.deleteParticipantIds,
+      ),
+    )
+  }
+
+  if (patch.deleteActivityIds.length > 0) {
+    stmts.push(
+      ...inDeletes(
+        db,
+        'DELETE FROM activities WHERE id IN',
+        patch.deleteActivityIds,
+      ),
+    )
+  }
+  for (const activity of patch.insertActivities) {
+    stmts.push(activityInsert(db, activity))
+  }
+
   return stmts
 }
 
@@ -411,28 +444,287 @@ async function runChunks(db: D1Database, stmts: D1PreparedStatement[]) {
 /** D1 allows at most 100 bound parameters per statement. */
 const D1_MAX_BOUND_PARAMETERS = 100
 
+type ActivityRow = {
+  id: string
+  group_id: string
+  time: string
+  activity_type: string
+  participant_id: string | null
+  expense_id: string | null
+  data: string | null
+}
+
 async function selectWhereIdIn<T>(
   db: D1Database,
   sqlBeforeIn: string,
   ids: string[],
+  extraBinds: unknown[] = [],
 ): Promise<T[]> {
   if (ids.length === 0) return []
+  const chunkSize = Math.max(1, D1_MAX_BOUND_PARAMETERS - extraBinds.length)
   const out: T[] = []
-  for (let i = 0; i < ids.length; i += D1_MAX_BOUND_PARAMETERS) {
-    const chunk = ids.slice(i, i + D1_MAX_BOUND_PARAMETERS)
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
     const placeholders = chunk.map(() => '?').join(',')
     const { results } = await db
       .prepare(`${sqlBeforeIn} (${placeholders})`)
-      .bind(...chunk)
+      .bind(...extraBinds, ...chunk)
       .all<T>()
     out.push(...results)
   }
   return out
 }
 
+function rowToExpense(
+  row: ExpenseRow,
+  paidByByExpense: Map<string, ExpensePaidBy[]>,
+  paidForByExpense: Map<string, ExpensePaidFor[]>,
+  documentsByExpense: Map<string, ExpenseDocument[]>,
+  recurringByExpense: Map<string, RecurringExpenseLink>,
+): Expense {
+  return {
+    id: row.id,
+    groupId: row.group_id,
+    expenseDate: row.expense_date,
+    title: row.title,
+    categoryId: row.category_id,
+    amount: row.amount,
+    originalAmount: row.original_amount,
+    originalCurrency: row.original_currency,
+    conversionRate: row.conversion_rate,
+    paidBy: paidByByExpense.get(row.id) ?? [],
+    isReimbursement: row.is_reimbursement === 1,
+    splitMode: (row.split_mode as SplitMode) ?? SplitMode.EVENLY,
+    createdAt: row.created_at,
+    notes: row.notes,
+    recurrenceRule:
+      (row.recurrence_rule as RecurrenceRule | null) ?? RecurrenceRule.NONE,
+    paidFor: paidForByExpense.get(row.id) ?? [],
+    documents: documentsByExpense.get(row.id) ?? [],
+    recurringExpenseLink: recurringByExpense.get(row.id) ?? null,
+  }
+}
+
+async function hydrateExpenses(
+  db: D1Database,
+  expenseRows: ExpenseRow[],
+): Promise<Expense[]> {
+  const paidByByExpense = new Map<string, ExpensePaidBy[]>()
+  const paidForByExpense = new Map<string, ExpensePaidFor[]>()
+  const documentsByExpense = new Map<string, ExpenseDocument[]>()
+  const recurringByExpense = new Map<string, RecurringExpenseLink>()
+  const expenseIds = expenseRows.map((row) => row.id)
+  if (expenseIds.length === 0) return []
+
+  const paidByRows = await selectWhereIdIn<{
+    expense_id: string
+    participant_id: string
+    amount: number
+  }>(
+    db,
+    'SELECT expense_id, participant_id, amount FROM expense_paid_by WHERE expense_id IN',
+    expenseIds,
+  )
+  for (const row of paidByRows) {
+    const list = paidByByExpense.get(row.expense_id) ?? []
+    list.push({
+      expenseId: row.expense_id,
+      participantId: row.participant_id,
+      amount: row.amount,
+    })
+    paidByByExpense.set(row.expense_id, list)
+  }
+
+  const paidForRows = await selectWhereIdIn<{
+    expense_id: string
+    participant_id: string
+    shares: number
+  }>(
+    db,
+    'SELECT expense_id, participant_id, shares FROM expense_paid_for WHERE expense_id IN',
+    expenseIds,
+  )
+  for (const row of paidForRows) {
+    const list = paidForByExpense.get(row.expense_id) ?? []
+    list.push({
+      expenseId: row.expense_id,
+      participantId: row.participant_id,
+      shares: row.shares,
+    })
+    paidForByExpense.set(row.expense_id, list)
+  }
+
+  const documentRows = await selectWhereIdIn<{
+    id: string
+    expense_id: string
+    url: string
+    width: number
+    height: number
+  }>(
+    db,
+    'SELECT id, expense_id, url, width, height FROM expense_documents WHERE expense_id IN',
+    expenseIds,
+  )
+  for (const row of documentRows) {
+    const list = documentsByExpense.get(row.expense_id) ?? []
+    list.push({
+      id: row.id,
+      expenseId: row.expense_id,
+      url: row.url,
+      width: row.width,
+      height: row.height,
+    })
+    documentsByExpense.set(row.expense_id, list)
+  }
+
+  const groupIds: string[] = []
+  for (const row of expenseRows) {
+    if (!groupIds.includes(row.group_id)) groupIds.push(row.group_id)
+  }
+  for (const groupId of groupIds) {
+    const { results: recurringRows } = await db
+      .prepare('SELECT * FROM recurring_expense_links WHERE group_id = ?')
+      .bind(groupId)
+      .all<{
+        id: string
+        group_id: string
+        current_frame_expense_id: string
+        next_expense_created_at: string | null
+        next_expense_date: string
+      }>()
+    for (const row of recurringRows) {
+      recurringByExpense.set(row.current_frame_expense_id, {
+        id: row.id,
+        groupId: row.group_id,
+        currentFrameExpenseId: row.current_frame_expense_id,
+        nextExpenseCreatedAt: row.next_expense_created_at,
+        nextExpenseDate: row.next_expense_date,
+      })
+    }
+  }
+
+  return expenseRows.map((row) =>
+    rowToExpense(
+      row,
+      paidByByExpense,
+      paidForByExpense,
+      documentsByExpense,
+      recurringByExpense,
+    ),
+  )
+}
+
+async function listActivityRows(
+  db: D1Database,
+  groupId: string,
+  options?: ActivityListOptions,
+): Promise<Activity[]> {
+  const binds: unknown[] = [groupId]
+  let sql = 'SELECT * FROM activities WHERE group_id = ? ORDER BY time DESC'
+  if (options?.length !== undefined) {
+    sql += ' LIMIT ? OFFSET ?'
+    binds.push(options.length, options.offset ?? 0)
+  } else if (options?.offset) {
+    sql += ' LIMIT -1 OFFSET ?'
+    binds.push(options.offset)
+  }
+  const { results } = await db
+    .prepare(sql)
+    .bind(...binds)
+    .all<ActivityRow>()
+  return results.map((row) => ({
+    id: row.id,
+    groupId: row.group_id,
+    time: row.time,
+    activityType: row.activity_type as ActivityType,
+    participantId: row.participant_id,
+    expenseId: row.expense_id,
+    data: row.data,
+  }))
+}
+
+async function loadMeta(db: D1Database, id: string): Promise<GroupMeta | null> {
+  const group = await db
+    .prepare('SELECT * FROM groups WHERE id = ?')
+    .bind(id)
+    .first<GroupRow>()
+  if (!group) return null
+  const { results: participantRows } = await db
+    .prepare(
+      'SELECT * FROM participants WHERE group_id = ? ORDER BY sort_order ASC, name ASC',
+    )
+    .bind(id)
+    .all<ParticipantRow>()
+  return {
+    id: group.id,
+    name: group.name,
+    information: group.information,
+    currency: group.currency,
+    currencyCode: group.currency_code,
+    pinHash: group.pin_hash,
+    defaultSplitMode:
+      (group.default_split_mode as SplitMode) ?? SplitMode.EVENLY,
+    fixedExpenseDateGroups: group.fixed_expense_date_groups === 1,
+    version: group.version,
+    createdAt: group.created_at,
+    lastActivityAt: group.last_activity_at,
+    lastSeenAt: group.last_seen_at,
+    deletedAt: group.deleted_at,
+    participants: participantRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      groupId: row.group_id,
+    })),
+  }
+}
+
+async function selectExpenseRows(
+  db: D1Database,
+  groupId: string,
+  options?: ExpenseListOptions,
+): Promise<ExpenseRow[]> {
+  const filter = options?.filter?.trim()
+  const clauses = ['group_id = ?']
+  const binds: unknown[] = [groupId]
+  if (filter) {
+    clauses.push(`LOWER(title) LIKE ? ESCAPE '\\'`)
+    binds.push(
+      `%${filter.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`,
+    )
+  }
+  let sql = `SELECT * FROM expenses WHERE ${clauses.join(' AND ')} ORDER BY expense_date DESC, created_at DESC`
+  if (options?.length !== undefined) {
+    sql += ' LIMIT ? OFFSET ?'
+    binds.push(options.length, options.offset ?? 0)
+  } else if (options?.offset) {
+    sql += ' LIMIT -1 OFFSET ?'
+    binds.push(options.offset)
+  }
+  const { results } = await db
+    .prepare(sql)
+    .bind(...binds)
+    .all<ExpenseRow>()
+  return results
+}
+
+async function activeGroupId(
+  db: D1Database,
+  groupId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT id FROM groups WHERE id = ? AND deleted_at IS NULL')
+    .bind(groupId)
+    .first<{ id: string }>()
+  return Boolean(row)
+}
+
 export const d1Repository: GroupRepository = {
   async get(id) {
     return loadGroup(await getD1(), id)
+  },
+
+  async getMeta(id) {
+    return loadMeta(await getD1(), id)
   },
 
   async listSummaries(ids) {
@@ -465,6 +757,86 @@ export const d1Repository: GroupRepository = {
       const row = byId.get(id)
       return row ? [row] : []
     })
+  },
+
+  async listExpenses(groupId, options) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId))) return []
+    const rows = await selectExpenseRows(db, groupId, options)
+    return hydrateExpenses(db, rows)
+  },
+
+  async listExpensesByIds(groupId, ids) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId)) || ids.length === 0) return []
+    const rows = await selectWhereIdIn<ExpenseRow>(
+      db,
+      'SELECT * FROM expenses WHERE group_id = ? AND id IN',
+      ids,
+      [groupId],
+    )
+    return hydrateExpenses(db, rows)
+  },
+
+  async countExpenses(groupId, filter) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId))) return 0
+    const trimmed = filter?.trim()
+    if (trimmed) {
+      const row = await db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM expenses
+           WHERE group_id = ? AND LOWER(title) LIKE ? ESCAPE '\\'`,
+        )
+        .bind(
+          groupId,
+          `%${trimmed.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`,
+        )
+        .first<{ n: number }>()
+      return row?.n ?? 0
+    }
+    const row = await db
+      .prepare('SELECT COUNT(*) AS n FROM expenses WHERE group_id = ?')
+      .bind(groupId)
+      .first<{ n: number }>()
+    return row?.n ?? 0
+  },
+
+  async listActivities(groupId, options) {
+    const db = await getD1()
+    const meta = await db
+      .prepare('SELECT id FROM groups WHERE id = ?')
+      .bind(groupId)
+      .first<{ id: string }>()
+    if (!meta) return []
+    return listActivityRows(db, groupId, options)
+  },
+
+  async getExpense(groupId, expenseId) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId))) return null
+    const row = await db
+      .prepare('SELECT * FROM expenses WHERE group_id = ? AND id = ?')
+      .bind(groupId, expenseId)
+      .first<ExpenseRow>()
+    if (!row) return null
+    const [expense] = await hydrateExpenses(db, [row])
+    return expense ?? null
+  },
+
+  async hasDueRecurring(groupId, nowIso) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId))) return false
+    const row = await db
+      .prepare(
+        `SELECT 1 AS ok FROM recurring_expense_links
+         WHERE group_id = ? AND next_expense_created_at IS NULL
+           AND next_expense_date <= ?
+         LIMIT 1`,
+      )
+      .bind(groupId, nowIso)
+      .first<{ ok: number }>()
+    return Boolean(row)
   },
 
   async create(group) {
@@ -501,7 +873,7 @@ export const d1Repository: GroupRepository = {
     }
   },
 
-  async save(group, expectedVersion): Promise<WriteResult> {
+  async save(group, expectedVersion, previous): Promise<WriteResult> {
     const db = await getD1()
     const claimed = await db
       .prepare(
@@ -516,9 +888,13 @@ export const d1Repository: GroupRepository = {
       .run()
     if ((claimed.meta.changes ?? 0) !== 1) return 'conflict'
 
-    const deletes = childDeletes(db, group.id)
-    await db.batch(deletes)
-    await runChunks(db, childInserts(db, group))
+    if (previous) {
+      await runChunks(db, childPatchStatements(db, group, previous))
+    } else {
+      const deletes = childDeletes(db, group.id)
+      await db.batch(deletes)
+      await runChunks(db, childInserts(db, group))
+    }
     group.version = expectedVersion + 1
     return 'ok'
   },
