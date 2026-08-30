@@ -121,3 +121,38 @@ export function diffGroupChildren(
     insertActivities,
   }
 }
+
+/** Apply a child-row diff to a snapshot. Used by the memory repo to match D1. */
+export function applyGroupChildPatch(
+  previous: GroupDocument,
+  patch: GroupChildPatch,
+): GroupDocument {
+  const participants = patch.replaceParticipants
+    ? patch.participants
+    : previous.participants.filter(
+        (participant) => !patch.deleteParticipantIds.includes(participant.id),
+      )
+
+  const deletedExpenses = new Set(patch.deleteExpenseIds)
+  const expensesById = new Map(
+    previous.expenses
+      .filter((expense) => !deletedExpenses.has(expense.id))
+      .map((expense) => [expense.id, expense]),
+  )
+  for (const expense of patch.upsertExpenses) {
+    expensesById.set(expense.id, expense)
+  }
+
+  const deletedActivities = new Set(patch.deleteActivityIds)
+  const remainingActivities = previous.activities.filter(
+    (activity) => !deletedActivities.has(activity.id),
+  )
+  const activities = [...patch.insertActivities, ...remainingActivities]
+
+  return {
+    ...previous,
+    participants,
+    expenses: Array.from(expensesById.values()),
+    activities,
+  }
+}

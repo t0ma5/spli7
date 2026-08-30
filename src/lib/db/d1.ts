@@ -3,6 +3,7 @@ import { diffGroupChildren } from '@/lib/db/group-patch'
 import type {
   ActivityListOptions,
   ExpenseListOptions,
+  GroupExpenseMutation,
   GroupMeta,
   GroupRepository,
   GroupSummary,
@@ -408,6 +409,48 @@ function childPatchStatements(
   return stmts
 }
 
+function expenseMutationStatements(
+  db: D1Database,
+  groupId: string,
+  mutation: GroupExpenseMutation,
+): D1PreparedStatement[] {
+  const stmts: D1PreparedStatement[] = []
+  const deleteExpenseIds = mutation.deleteExpenseIds ?? []
+  if (deleteExpenseIds.length > 0) {
+    stmts.push(
+      ...inDeletes(
+        db,
+        'DELETE FROM expense_documents WHERE expense_id IN',
+        deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM recurring_expense_links WHERE current_frame_expense_id IN',
+        deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM expense_paid_by WHERE expense_id IN',
+        deleteExpenseIds,
+      ),
+      ...inDeletes(
+        db,
+        'DELETE FROM expense_paid_for WHERE expense_id IN',
+        deleteExpenseIds,
+      ),
+      ...inDeletes(db, 'DELETE FROM expenses WHERE id IN', deleteExpenseIds),
+    )
+  }
+  for (const expense of mutation.upsertExpenses ?? []) {
+    stmts.push(...expenseChildDeletes(db, expense.id))
+    stmts.push(...expenseInserts(db, groupId, expense))
+  }
+  for (const activity of mutation.insertActivities ?? []) {
+    stmts.push(activityInsert(db, activity))
+  }
+  return stmts
+}
+
 function childDeletes(db: D1Database, groupId: string): D1PreparedStatement[] {
   return [
     db.prepare('DELETE FROM activities WHERE group_id = ?').bind(groupId),
@@ -505,10 +548,18 @@ function rowToExpense(
   }
 }
 
+type ExpenseHydrate = {
+  documents?: boolean
+  recurring?: boolean
+}
+
 async function hydrateExpenses(
   db: D1Database,
   expenseRows: ExpenseRow[],
+  hydrate: ExpenseHydrate = {},
 ): Promise<Expense[]> {
+  const includeDocuments = hydrate.documents !== false
+  const includeRecurring = hydrate.recurring !== false
   const paidByByExpense = new Map<string, ExpensePaidBy[]>()
   const paidForByExpense = new Map<string, ExpensePaidFor[]>()
   const documentsByExpense = new Map<string, ExpenseDocument[]>()
@@ -554,52 +605,56 @@ async function hydrateExpenses(
     paidForByExpense.set(row.expense_id, list)
   }
 
-  const documentRows = await selectWhereIdIn<{
-    id: string
-    expense_id: string
-    url: string
-    width: number
-    height: number
-  }>(
-    db,
-    'SELECT id, expense_id, url, width, height FROM expense_documents WHERE expense_id IN',
-    expenseIds,
-  )
-  for (const row of documentRows) {
-    const list = documentsByExpense.get(row.expense_id) ?? []
-    list.push({
-      id: row.id,
-      expenseId: row.expense_id,
-      url: row.url,
-      width: row.width,
-      height: row.height,
-    })
-    documentsByExpense.set(row.expense_id, list)
+  if (includeDocuments) {
+    const documentRows = await selectWhereIdIn<{
+      id: string
+      expense_id: string
+      url: string
+      width: number
+      height: number
+    }>(
+      db,
+      'SELECT id, expense_id, url, width, height FROM expense_documents WHERE expense_id IN',
+      expenseIds,
+    )
+    for (const row of documentRows) {
+      const list = documentsByExpense.get(row.expense_id) ?? []
+      list.push({
+        id: row.id,
+        expenseId: row.expense_id,
+        url: row.url,
+        width: row.width,
+        height: row.height,
+      })
+      documentsByExpense.set(row.expense_id, list)
+    }
   }
 
-  const groupIds: string[] = []
-  for (const row of expenseRows) {
-    if (!groupIds.includes(row.group_id)) groupIds.push(row.group_id)
-  }
-  for (const groupId of groupIds) {
-    const { results: recurringRows } = await db
-      .prepare('SELECT * FROM recurring_expense_links WHERE group_id = ?')
-      .bind(groupId)
-      .all<{
-        id: string
-        group_id: string
-        current_frame_expense_id: string
-        next_expense_created_at: string | null
-        next_expense_date: string
-      }>()
-    for (const row of recurringRows) {
-      recurringByExpense.set(row.current_frame_expense_id, {
-        id: row.id,
-        groupId: row.group_id,
-        currentFrameExpenseId: row.current_frame_expense_id,
-        nextExpenseCreatedAt: row.next_expense_created_at,
-        nextExpenseDate: row.next_expense_date,
-      })
+  if (includeRecurring) {
+    const groupIds: string[] = []
+    for (const row of expenseRows) {
+      if (!groupIds.includes(row.group_id)) groupIds.push(row.group_id)
+    }
+    for (const groupId of groupIds) {
+      const { results: recurringRows } = await db
+        .prepare('SELECT * FROM recurring_expense_links WHERE group_id = ?')
+        .bind(groupId)
+        .all<{
+          id: string
+          group_id: string
+          current_frame_expense_id: string
+          next_expense_created_at: string | null
+          next_expense_date: string
+        }>()
+      for (const row of recurringRows) {
+        recurringByExpense.set(row.current_frame_expense_id, {
+          id: row.id,
+          groupId: row.group_id,
+          currentFrameExpenseId: row.current_frame_expense_id,
+          nextExpenseCreatedAt: row.next_expense_created_at,
+          nextExpenseDate: row.next_expense_date,
+        })
+      }
     }
   }
 
@@ -620,13 +675,15 @@ async function listActivityRows(
   options?: ActivityListOptions,
 ): Promise<Activity[]> {
   const binds: unknown[] = [groupId]
-  let sql = 'SELECT * FROM activities WHERE group_id = ? ORDER BY time DESC'
+  let sql = 'SELECT * FROM activities WHERE group_id = ?'
+  if (options?.after) {
+    sql += ' AND (time < ? OR (time = ? AND id < ?))'
+    binds.push(options.after.time, options.after.time, options.after.id)
+  }
+  sql += ' ORDER BY time DESC, id DESC'
   if (options?.length !== undefined) {
-    sql += ' LIMIT ? OFFSET ?'
-    binds.push(options.length, options.offset ?? 0)
-  } else if (options?.offset) {
-    sql += ' LIMIT -1 OFFSET ?'
-    binds.push(options.offset)
+    sql += ' LIMIT ?'
+    binds.push(options.length)
   }
   const { results } = await db
     .prepare(sql)
@@ -692,13 +749,17 @@ async function selectExpenseRows(
       `%${filter.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`,
     )
   }
-  let sql = `SELECT * FROM expenses WHERE ${clauses.join(' AND ')} ORDER BY expense_date DESC, created_at DESC`
+  if (options?.after) {
+    clauses.push(
+      `(expense_date < ? OR (expense_date = ? AND created_at < ?) OR (expense_date = ? AND created_at = ? AND id < ?))`,
+    )
+    const { expenseDate, createdAt, id } = options.after
+    binds.push(expenseDate, expenseDate, createdAt, expenseDate, createdAt, id)
+  }
+  let sql = `SELECT * FROM expenses WHERE ${clauses.join(' AND ')} ORDER BY expense_date DESC, created_at DESC, id DESC`
   if (options?.length !== undefined) {
-    sql += ' LIMIT ? OFFSET ?'
-    binds.push(options.length, options.offset ?? 0)
-  } else if (options?.offset) {
-    sql += ' LIMIT -1 OFFSET ?'
-    binds.push(options.offset)
+    sql += ' LIMIT ?'
+    binds.push(options.length)
   }
   const { results } = await db
     .prepare(sql)
@@ -763,7 +824,10 @@ export const d1Repository: GroupRepository = {
     const db = await getD1()
     if (!(await activeGroupId(db, groupId))) return []
     const rows = await selectExpenseRows(db, groupId, options)
-    return hydrateExpenses(db, rows)
+    return hydrateExpenses(db, rows, {
+      documents: options?.documents,
+      recurring: options?.recurring,
+    })
   },
 
   async listExpensesByIds(groupId, ids) {
@@ -822,6 +886,51 @@ export const d1Repository: GroupRepository = {
     if (!row) return null
     const [expense] = await hydrateExpenses(db, [row])
     return expense ?? null
+  },
+
+  async listExpenseParticipantIds(groupId) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId))) return []
+    const { results } = await db
+      .prepare(
+        `SELECT participant_id FROM expense_paid_by
+         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)
+         UNION
+         SELECT participant_id FROM expense_paid_for
+         WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)`,
+      )
+      .bind(groupId, groupId)
+      .all<{ participant_id: string }>()
+    return results.map((row) => row.participant_id)
+  },
+
+  async listActiveRecurring(groupId) {
+    const db = await getD1()
+    if (!(await activeGroupId(db, groupId))) return []
+    const { results } = await db
+      .prepare(
+        `SELECT e.amount, e.recurrence_rule, e.is_reimbursement
+         FROM expenses e
+         INNER JOIN recurring_expense_links r
+           ON r.current_frame_expense_id = e.id
+         WHERE e.group_id = ?
+           AND e.is_reimbursement = 0
+           AND r.next_expense_created_at IS NULL
+           AND e.recurrence_rule IS NOT NULL
+           AND e.recurrence_rule != ?`,
+      )
+      .bind(groupId, RecurrenceRule.NONE)
+      .all<{
+        amount: number
+        recurrence_rule: string | null
+        is_reimbursement: number
+      }>()
+    return results.map((row) => ({
+      amount: row.amount,
+      recurrenceRule:
+        (row.recurrence_rule as RecurrenceRule | null) ?? RecurrenceRule.NONE,
+      isReimbursement: row.is_reimbursement === 1,
+    }))
   },
 
   async hasDueRecurring(groupId, nowIso) {
@@ -896,6 +1005,23 @@ export const d1Repository: GroupRepository = {
       await runChunks(db, childInserts(db, group))
     }
     group.version = expectedVersion + 1
+    return 'ok'
+  },
+
+  async mutateExpenses(groupId, expectedVersion, mutation) {
+    const db = await getD1()
+    const lastActivityAt = mutation.lastActivityAt ?? new Date().toISOString()
+    const claimed = await db
+      .prepare(
+        `UPDATE groups SET
+          last_activity_at = ?,
+          version = version + 1
+         WHERE id = ? AND version = ? AND deleted_at IS NULL`,
+      )
+      .bind(lastActivityAt, groupId, expectedVersion)
+      .run()
+    if ((claimed.meta.changes ?? 0) !== 1) return 'conflict'
+    await runChunks(db, expenseMutationStatements(db, groupId, mutation))
     return 'ok'
   },
 

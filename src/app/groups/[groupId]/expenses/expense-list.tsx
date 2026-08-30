@@ -90,7 +90,7 @@ const ExpenseListForSearch = ({
     fetchNextPage,
   } = trpc.groups.expenses.list.useInfiniteQuery(
     { groupId, limit: PAGE_SIZE, filter: searchText },
-    { getNextPageParam: ({ nextCursor }) => nextCursor },
+    { getNextPageParam: (lastPage) => lastPage.nextCursor },
   )
   const expenses = data?.pages.flatMap((page) => page.expenses)
   const hasMore = data?.pages.at(-1)?.hasMore ?? false

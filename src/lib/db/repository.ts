@@ -1,4 +1,10 @@
+import type {
+  ActivityListCursor,
+  ExpenseListCursor,
+} from '@/lib/db/list-cursor'
 import type { Activity, Expense, GroupDocument } from '@/lib/kv/types'
+
+export type { ActivityListCursor, ExpenseListCursor }
 
 export type WriteResult = 'ok' | 'conflict'
 
@@ -23,14 +29,24 @@ export type GroupSummary = {
 export type GroupMeta = Omit<GroupDocument, 'expenses' | 'activities'>
 
 export type ExpenseListOptions = {
-  offset?: number
+  after?: ExpenseListCursor
   length?: number
   filter?: string
+  /** Default true. Balances/stats skip documents and recurring links. */
+  documents?: boolean
+  recurring?: boolean
 }
 
 export type ActivityListOptions = {
-  offset?: number
+  after?: ActivityListCursor
   length?: number
+}
+
+export type GroupExpenseMutation = {
+  upsertExpenses?: Expense[]
+  deleteExpenseIds?: string[]
+  insertActivities?: Activity[]
+  lastActivityAt?: string | null
 }
 
 export interface GroupRepository {
@@ -50,6 +66,12 @@ export interface GroupRepository {
     options?: ActivityListOptions,
   ): Promise<Activity[]>
   getExpense(groupId: string, expenseId: string): Promise<Expense | null>
+  /** Distinct payer/share participant ids — no expense rows. */
+  listExpenseParticipantIds(groupId: string): Promise<string[]>
+  /** Active recurring frames (next copy not yet created). */
+  listActiveRecurring(
+    groupId: string,
+  ): Promise<Pick<Expense, 'amount' | 'recurrenceRule' | 'isReimbursement'>[]>
   /** Cheap check so list pages do not hydrate the group when nothing is due. */
   hasDueRecurring(groupId: string, nowIso: string): Promise<boolean>
   create(group: GroupDocument): Promise<void>
@@ -62,6 +84,15 @@ export interface GroupRepository {
     group: GroupDocument,
     expectedVersion: number,
     previous?: GroupDocument,
+  ): Promise<WriteResult>
+  /**
+   * Write expense/activity rows without loading the group document.
+   * Bumps `version` when `expectedVersion` still matches.
+   */
+  mutateExpenses(
+    groupId: string,
+    expectedVersion: number,
+    mutation: GroupExpenseMutation,
   ): Promise<WriteResult>
   delete(id: string): Promise<void>
   listIds(): Promise<string[]>

@@ -32,4 +32,11 @@
   "vars": {
     "NEXT_PUBLIC_BASE_URL": "https://spl1t.pages.dev",
   },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "limits": {
+    "cpu_ms": 30000,
+  },
 }

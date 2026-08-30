@@ -103,7 +103,7 @@ export function ActivityList() {
     fetchNextPage,
   } = trpc.groups.activities.list.useInfiniteQuery(
     { groupId, limit: PAGE_SIZE },
-    { getNextPageParam: ({ nextCursor }) => nextCursor },
+    { getNextPageParam: (lastPage) => lastPage.nextCursor },
   )
   const { ref: loadingRef, inView } = useInView()
 

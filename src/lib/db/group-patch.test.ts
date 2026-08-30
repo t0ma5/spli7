@@ -1,4 +1,4 @@
-import { diffGroupChildren } from '@/lib/db/group-patch'
+import { applyGroupChildPatch, diffGroupChildren } from '@/lib/db/group-patch'
 import type { Expense, GroupDocument } from '@/lib/kv/types'
 
 function expense(partial: Partial<Expense> & { id: string }): Expense {
@@ -131,5 +131,50 @@ describe('diffGroupChildren', () => {
     const patch = diffGroupChildren(previous, next)
     expect(patch.replaceParticipants).toBe(true)
     expect(patch.participants).toEqual(next.participants)
+  })
+
+  it('rebuilds children from a patch so a full rewrite is not required', () => {
+    const keep = expense({ id: 'keep', title: 'Hotel' })
+    const added = expense({ id: 'new', title: 'Taxi', amount: 20 })
+    const previous = group({
+      expenses: [keep],
+      activities: [
+        {
+          id: 'a1',
+          groupId: 'g',
+          time: '2026-01-01T00:00:00.000Z',
+          activityType: 'CREATE_EXPENSE',
+          participantId: null,
+          expenseId: 'keep',
+          data: 'Hotel',
+        },
+      ],
+    })
+    const next = group({
+      name: 'Trip 2',
+      expenses: [keep, added],
+      activities: [
+        {
+          id: 'a2',
+          groupId: 'g',
+          time: '2026-01-02T00:00:00.000Z',
+          activityType: 'CREATE_EXPENSE',
+          participantId: null,
+          expenseId: 'new',
+          data: 'Taxi',
+        },
+        previous.activities[0],
+      ],
+    })
+    const patched = applyGroupChildPatch(
+      previous,
+      diffGroupChildren(previous, next),
+    )
+    expect(patched.expenses.map((item) => item.id).sort()).toEqual([
+      'keep',
+      'new',
+    ])
+    expect(patched.activities.map((item) => item.id)).toEqual(['a2', 'a1'])
+    expect(patched.participants).toEqual(previous.participants)
   })
 })

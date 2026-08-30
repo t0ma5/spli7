@@ -6,16 +6,43 @@ jest.mock('nanoid', () => {
 import {
   createExpense,
   createGroup,
+  deleteExpense,
+  getActiveRecurringExpenses,
   getActivities,
   getExpense,
   getGroup,
   getGroupExpenseCount,
   getGroupExpenses,
+  getGroupExpensesParticipants,
+  getGroupForExport,
   getGroups,
+  updateExpense,
   updateGroup,
 } from '@/lib/api'
 import { getRepository, setRepositoryForTests } from '@/lib/db'
+import { decodeActivityCursor, decodeExpenseCursor } from '@/lib/db/list-cursor'
 import { createMemoryRepository } from '@/lib/db/memory'
+import type { GroupRepository } from '@/lib/db/repository'
+
+function countingGetRepository() {
+  const inner = createMemoryRepository()
+  let getCount = 0
+  const repo = new Proxy(inner, {
+    get(target, prop, receiver) {
+      if (prop === 'get') {
+        return (id: string) => {
+          getCount += 1
+          return target.get(id)
+        }
+      }
+      const value = Reflect.get(target, prop, receiver)
+      return typeof value === 'function'
+        ? (value as (...args: never[]) => unknown).bind(target)
+        : value
+    },
+  }) as GroupRepository
+  return { repo, getCount: () => getCount }
+}
 
 describe('api + memory repository', () => {
   beforeEach(() => {
@@ -57,6 +84,62 @@ describe('api + memory repository', () => {
       group.id,
     )
     expect(expense.amount).toBe(1000)
+  })
+
+  it('creates, updates, and deletes an expense without loading the group document', async () => {
+    const { repo, getCount } = countingGetRepository()
+    setRepositoryForTests(repo)
+    const group = await createGroup({
+      name: 'Trip',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }, { name: 'Bob' }],
+    })
+    const ada = group.participants[0].id
+    const bob = group.participants[1].id
+    const form = {
+      expenseDate: new Date('2026-01-01'),
+      title: 'Dinner',
+      category: 0,
+      amount: 1000,
+      paidBy: [{ participant: ada, amount: 1000 }],
+      paidFor: [
+        { participant: ada, shares: 1 },
+        { participant: bob, shares: 1 },
+      ],
+      splitMode: 'EVENLY' as const,
+      saveDefaultSplittingOptions: false,
+      isReimbursement: false,
+      documents: [] as [],
+      recurrenceRule: 'NONE' as const,
+    }
+
+    const created = await createExpense(form, group.id)
+    expect(getCount()).toBe(0)
+    expect(await getGroupExpenseCount(group.id)).toBe(1)
+
+    await updateExpense(group.id, created.id, { ...form, title: 'Lunch' })
+    expect(getCount()).toBe(0)
+    expect((await getExpense(group.id, created.id))?.title).toBe('Lunch')
+
+    await deleteExpense(group.id, created.id)
+    expect(getCount()).toBe(0)
+    expect(await getGroupExpenseCount(group.id)).toBe(0)
+
+    await updateGroup(group.id, {
+      name: 'Renamed',
+      currency: group.currency,
+      currencyCode: group.currencyCode ?? 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: group.participants.map((participant) => ({
+        id: participant.id,
+        name: participant.name,
+      })),
+    })
+    expect(getCount()).toBeGreaterThan(0)
   })
 
   it('last-write-wins is replaced by conflict retries that keep both expenses', async () => {
@@ -305,14 +388,16 @@ describe('api + memory repository', () => {
     expect(header?.name).toBe('Paged')
     expect(header?.participants).toHaveLength(2)
 
-    const page = await getGroupExpenses(group.id, { offset: 0, length: 2 })
+    const page = await getGroupExpenses(group.id, { length: 2 })
     expect(page.map((expense) => expense.title)).toEqual(['Museum', 'Taxi'])
-    const next = await getGroupExpenses(group.id, { offset: 2, length: 2 })
+    const next = await getGroupExpenses(group.id, {
+      after: decodeExpenseCursor(page[1].listCursor)!,
+      length: 2,
+    })
     expect(next.map((expense) => expense.title)).toEqual(['Dinner', 'Coffee'])
 
     const filtered = await getGroupExpenses(group.id, {
       filter: 'din',
-      offset: 0,
       length: 10,
     })
     expect(filtered.map((expense) => expense.title)).toEqual(['Dinner'])
@@ -320,8 +405,49 @@ describe('api + memory repository', () => {
     const one = await getExpense(group.id, page[0].id)
     expect(one?.title).toBe('Museum')
 
-    const activities = await getActivities(group.id, { offset: 0, length: 2 })
+    const activities = await getActivities(group.id, { length: 2 })
     expect(activities).toHaveLength(2)
     expect(activities[0].expense?.title).toBe('Museum')
+    const moreActivities = await getActivities(group.id, {
+      after: decodeActivityCursor(activities[1].listCursor)!,
+      length: 2,
+    })
+    expect(moreActivities.length).toBeGreaterThan(0)
+    expect(moreActivities[0].id).not.toBe(activities[0].id)
+
+    const participantIds = await getGroupExpensesParticipants(group.id)
+    expect(participantIds.sort()).toEqual([ada, bob].sort())
+
+    const exported = await getGroupForExport(group.id)
+    expect(exported?.expenses).toHaveLength(4)
+    expect(exported?.participants).toHaveLength(2)
+
+    await createExpense(
+      {
+        expenseDate: new Date('2027-01-01'),
+        title: 'Rent',
+        category: 0,
+        amount: 500,
+        paidBy: [{ participant: ada, amount: 500 }],
+        paidFor: [
+          { participant: ada, shares: 1 },
+          { participant: bob, shares: 1 },
+        ],
+        splitMode: 'EVENLY',
+        saveDefaultSplittingOptions: false,
+        isReimbursement: false,
+        documents: [],
+        recurrenceRule: 'MONTHLY',
+      },
+      group.id,
+    )
+    const recurring = await getActiveRecurringExpenses(group.id)
+    expect(recurring).toEqual([
+      expect.objectContaining({
+        amount: 500,
+        recurrenceRule: 'MONTHLY',
+        isReimbursement: false,
+      }),
+    ])
   })
 })

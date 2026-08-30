@@ -48,6 +48,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Drag-reorder / Sort A–Z participants
 - [x] 🔴 Multiple payers per expense (legacy single paidById migrated on read)
 - [x] 🔴 Extra currencies: **ARS**, **TRY**, **COP**, **JOD**, **MKD**, **MOP**, **MYR**, **VND**
+- [x] 🔴 Large groups: keyset-paginated expense/activity lists, compact stats/balance reads, and create/update/delete that do not load the whole group
 - [ ] ❌ Upload and attach images to expenses (removed — see below)
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
@@ -61,8 +62,9 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 
 ## Data model notes
 
-- Groups, participants, expenses, payers, shares, and activity live in **D1** tables (see `migrations/0001_init.sql`).
+- Groups, participants, expenses, payers, shares, and activity live in **D1** tables (see `migrations/0001_init.sql`, `0002_keyset_indexes.sql`).
 - Concurrent edits use an integer `version` column and retry on conflict (not last-write-wins KV).
+- Expense lists and activity history page with **keyset cursors** (`expense_date`/`created_at`/`id`, not `OFFSET`). Adding or editing one expense writes only that row (plus an activity), not the whole group. Balances and stats still need every expense but skip documents and recurring links.
 - Optional group PIN is hashed with PBKDF2, never returned to clients, and enforced on tRPC + export routes via an HTTP-only cookie (`PIN_SECRET`).
 - Groups track `lastActivityAt` on mutations and `lastSeenAt` on reads. After **24 months** without either, cleanup soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted.
 - Cron (Bearer `CRON_SECRET`): `GET/POST /api/cron/cleanup-groups`, `/api/cron/recurring`, `/api/cron/backup`. One-shot KV import: `POST /api/cron/migrate-kv`.
@@ -184,7 +186,7 @@ If you still have groups in the legacy KV namespace, set `CRON_SECRET` and `POST
 
 ## Deploy to Cloudflare
 
-Deploy **directly** to Cloudflare (no automatic deploy from GitHub; CI only runs types/lint/format/tests).
+Deploy to Cloudflare Workers. GitHub **CI** (push) only runs types/lint/format/tests. Live updates are **manual**: `npm run deploy` on a host where Wrangler works, or GitHub Actions **Deploy** (`workflow_dispatch`).
 
 Requires **Node.js 22+** and a host where Wrangler/workerd runs (Linux / macOS / Windows x64 — not Windows ARM64).
 
@@ -199,10 +201,14 @@ This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
 
 - `DATABASE` D1 binding in `wrangler.jsonc` points at your database.
 - `vars.NEXT_PUBLIC_BASE_URL` matches the URL users open (`https://spl1t.pages.dev`).
+- `limits.cpu_ms` is set (this fork uses 30s). OpenNext SSR of a group page often needs more than Cloudflare’s default 10–30ms; without the limit, consistent traffic returns **Error 1102** (Worker exceeded resource limits).
+- `observability.enabled` is on so Workers Logs persist.
+
+From this repo, production deploys are usually GitHub Actions **Deploy** (`workflow_dispatch` on `ubuntu-latest`, because Wrangler/`workerd` does not run on Windows ARM64). That still does **not** apply D1 migrations — run `npm run db:migrate:remote` (or equivalent) when `migrations/` changes.
 
 ### Ops notes
 
-- Pushing code to GitHub does **not** update the live Worker until you run `npm run deploy` (or equivalent OpenNext/Wrangler upload) against Cloudflare.
+- Pushing code to GitHub does **not** update the live Worker until you run `npm run deploy` or the **Deploy** workflow.
 - Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories.
 - Set Worker secrets `PIN_SECRET` and `CRON_SECRET`. Call `/api/cron/cleanup-groups` and `/api/cron/recurring` daily.
 

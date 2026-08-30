@@ -1,7 +1,14 @@
 import 'server-only'
 
 import { getRepository } from '@/lib/db'
-import { WRITE_RETRIES, type GroupMeta } from '@/lib/db/repository'
+import { encodeActivityCursor, encodeExpenseCursor } from '@/lib/db/list-cursor'
+import {
+  WRITE_RETRIES,
+  type ActivityListCursor,
+  type ExpenseListCursor,
+  type GroupExpenseMutation,
+  type GroupMeta,
+} from '@/lib/db/repository'
 import {
   INACTIVITY_MONTHS,
   isInactive,
@@ -24,6 +31,7 @@ import {
   RecurrenceRule,
   RecurringExpenseLink,
   SplitMode,
+  type Activity,
 } from '@/lib/kv/types'
 import { randomId } from '@/lib/randomId'
 import {
@@ -123,6 +131,70 @@ async function withGroupWrite<T>(
     }
   }
   throw lastError instanceof Error ? lastError : new ConflictError()
+}
+
+async function withExpenseWrite<T>(
+  groupId: string,
+  fn: (
+    meta: GroupMeta,
+  ) =>
+    | { value: T; mutation: GroupExpenseMutation }
+    | Promise<{ value: T; mutation: GroupExpenseMutation }>,
+): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < WRITE_RETRIES; attempt++) {
+    const meta = await getRepository().getMeta(groupId)
+    if (!meta || meta.deletedAt) {
+      throw new Error(`Invalid group ID: ${groupId}`)
+    }
+    try {
+      const { value, mutation } = await fn(meta)
+      const result = await getRepository().mutateExpenses(
+        groupId,
+        meta.version ?? 0,
+        {
+          ...mutation,
+          lastActivityAt: mutation.lastActivityAt ?? new Date().toISOString(),
+        },
+      )
+      if (result === 'conflict') throw new ConflictError()
+      return value
+    } catch (error) {
+      lastError = error
+      if (!(error instanceof ConflictError)) throw error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new ConflictError()
+}
+
+function makeActivity(
+  groupId: string,
+  activityType: ActivityType,
+  extra?: { participantId?: string; expenseId?: string; data?: string },
+): Activity {
+  return {
+    id: randomId(),
+    groupId,
+    time: new Date().toISOString(),
+    activityType,
+    participantId: extra?.participantId ?? null,
+    expenseId: extra?.expenseId ?? null,
+    data: extra?.data ?? null,
+  }
+}
+
+function assertParticipantsInGroup(
+  participants: Participant[],
+  expenseFormValues: ExpenseFormValues,
+) {
+  for (const participant of [
+    ...expenseFormValues.paidBy.map((p) => p.participant),
+    ...expenseFormValues.paidFor.map((p) => p.participant),
+  ]) {
+    if (!participants.some((item) => item.id === participant)) {
+      throw new Error(`Invalid participant ID: ${participant}`)
+    }
+  }
 }
 
 function assertIntegerMinorUnits(amount: number, label: string) {
@@ -466,25 +538,23 @@ export async function createExpense(
   groupId: string,
   participantId?: string,
 ): Promise<Expense> {
-  return withGroupWrite(groupId, (group) => {
-    for (const participant of [
-      ...expenseFormValues.paidBy.map((p) => p.participant),
-      ...expenseFormValues.paidFor.map((p) => p.participant),
-    ]) {
-      if (!group.participants.some((p) => p.id === participant))
-        throw new Error(`Invalid participant ID: ${participant}`)
-    }
-
+  return withExpenseWrite(groupId, (meta) => {
+    assertParticipantsInGroup(meta.participants, expenseFormValues)
     const expenseId = randomId()
-    appendActivity(group, ActivityType.CREATE_EXPENSE, {
-      participantId,
-      expenseId,
-      data: expenseFormValues.title,
-    })
-
     const expense = buildExpenseFromForm(expenseFormValues, groupId, expenseId)
-    group.expenses.push(expense)
-    return expense
+    return {
+      value: expense,
+      mutation: {
+        upsertExpenses: [expense],
+        insertActivities: [
+          makeActivity(groupId, ActivityType.CREATE_EXPENSE, {
+            participantId,
+            expenseId,
+            data: expenseFormValues.title,
+          }),
+        ],
+      },
+    }
   })
 }
 
@@ -493,28 +563,26 @@ export async function deleteExpense(
   expenseId: string,
   participantId?: string,
 ) {
-  await withGroupWrite(groupId, (group) => {
-    const existingExpense = group.expenses.find((e) => e.id === expenseId)
-    appendActivity(group, ActivityType.DELETE_EXPENSE, {
-      participantId,
-      expenseId,
-      data: existingExpense?.title,
-    })
-
-    group.expenses = group.expenses.filter((e) => e.id !== expenseId)
+  await withExpenseWrite(groupId, async () => {
+    const existingExpense = await getRepository().getExpense(groupId, expenseId)
+    return {
+      value: undefined,
+      mutation: {
+        deleteExpenseIds: existingExpense ? [expenseId] : [],
+        insertActivities: [
+          makeActivity(groupId, ActivityType.DELETE_EXPENSE, {
+            participantId,
+            expenseId,
+            data: existingExpense?.title,
+          }),
+        ],
+      },
+    }
   })
 }
 
 export async function getGroupExpensesParticipants(groupId: string) {
-  const expenses = await getGroupExpenses(groupId)
-  return Array.from(
-    new Set(
-      expenses.flatMap((e) => [
-        ...e.paidBy.map((pb) => pb.id),
-        ...e.paidFor.map((pf) => pf.participant.id),
-      ]),
-    ),
-  )
+  return getRepository().listExpenseParticipantIds(groupId)
 }
 
 export async function getGroups(groupIds: string[]) {
@@ -538,34 +606,29 @@ export async function updateExpense(
   expenseFormValues: ExpenseFormValues,
   participantId?: string,
 ) {
-  return withGroupWrite(groupId, (group) => {
-    const existingIndex = group.expenses.findIndex((e) => e.id === expenseId)
-    if (existingIndex === -1)
-      throw new Error(`Invalid expense ID: ${expenseId}`)
-    const existingExpense = group.expenses[existingIndex]
-
-    for (const participant of [
-      ...expenseFormValues.paidBy.map((p) => p.participant),
-      ...expenseFormValues.paidFor.map((p) => p.participant),
-    ]) {
-      if (!group.participants.some((p) => p.id === participant))
-        throw new Error(`Invalid participant ID: ${participant}`)
-    }
-
-    appendActivity(group, ActivityType.UPDATE_EXPENSE, {
-      participantId,
-      expenseId,
-      data: expenseFormValues.title,
-    })
-
+  return withExpenseWrite(groupId, async (meta) => {
+    const existingExpense = await getRepository().getExpense(groupId, expenseId)
+    if (!existingExpense) throw new Error(`Invalid expense ID: ${expenseId}`)
+    assertParticipantsInGroup(meta.participants, expenseFormValues)
     const updated = buildExpenseFromForm(
       expenseFormValues,
       groupId,
       expenseId,
       existingExpense,
     )
-    group.expenses[existingIndex] = updated
-    return updated
+    return {
+      value: updated,
+      mutation: {
+        upsertExpenses: [updated],
+        insertActivities: [
+          makeActivity(groupId, ActivityType.UPDATE_EXPENSE, {
+            participantId,
+            expenseId,
+            data: expenseFormValues.title,
+          }),
+        ],
+      },
+    }
   })
 }
 
@@ -798,7 +861,11 @@ export async function materializeAllDueRecurringExpenses() {
 
 export async function getGroupExpenses(
   groupId: string,
-  options?: { offset?: number; length?: number; filter?: string },
+  options?: {
+    after?: ExpenseListCursor
+    length?: number
+    filter?: string
+  },
 ) {
   if (await materializeDueRecurringExpenses(groupId)) {
     // reloaded below
@@ -807,7 +874,14 @@ export async function getGroupExpenses(
   if (!group || group.deletedAt) return []
   void getRepository().bumpLastSeen(groupId, new Date().toISOString())
 
-  const expenses = await getRepository().listExpenses(groupId, options)
+  const compact = options?.length === undefined
+  const expenses = await getRepository().listExpenses(groupId, {
+    after: options?.after,
+    length: options?.length,
+    filter: options?.filter,
+    documents: !compact,
+    recurring: !compact,
+  })
 
   return expenses.map((expense) => {
     const paidBy = getExpensePaidBy(expense).map((pb) => {
@@ -844,6 +918,11 @@ export async function getGroupExpenses(
       recurrenceRule: expense.recurrenceRule,
       title: expense.title,
       _count: { documents: expense.documents.length },
+      listCursor: encodeExpenseCursor({
+        expenseDate: expense.expenseDate,
+        createdAt: expense.createdAt,
+        id: expense.id,
+      }),
     }
   })
 }
@@ -859,16 +938,7 @@ export async function getGroupExpenseCount(groupId: string) {
  */
 export async function getActiveRecurringExpenses(groupId: string) {
   await materializeDueRecurringExpenses(groupId)
-  const group = await getGroupDocument(groupId)
-  if (!group || group.deletedAt) return []
-
-  return group.expenses.filter(
-    (expense) =>
-      !expense.isReimbursement &&
-      expense.recurrenceRule &&
-      expense.recurrenceRule !== RecurrenceRule.NONE &&
-      expense.recurringExpenseLink?.nextExpenseCreatedAt === null,
-  )
+  return getRepository().listActiveRecurring(groupId)
 }
 
 export async function getExpense(groupId: string, expenseId: string) {
@@ -900,7 +970,7 @@ export async function getExpense(groupId: string, expenseId: string) {
 
 export async function getActivities(
   groupId: string,
-  options?: { offset?: number; length?: number },
+  options?: { after?: ActivityListCursor; length?: number },
 ) {
   const activities = await getRepository().listActivities(groupId, options)
   const expenseIds = activities
@@ -916,6 +986,7 @@ export async function getActivities(
   return activities.map((activity) => ({
     ...activity,
     time: toDate(activity.time),
+    listCursor: encodeActivityCursor({ time: activity.time, id: activity.id }),
     expense:
       activity.expenseId !== null
         ? expenseById.get(activity.expenseId)
@@ -928,9 +999,12 @@ export async function logActivity(
   activityType: ActivityType,
   extra?: { participantId?: string; expenseId?: string; data?: string },
 ) {
-  await withGroupWrite(groupId, (group) => {
-    appendActivity(group, activityType, extra)
-  })
+  await withExpenseWrite(groupId, () => ({
+    value: undefined,
+    mutation: {
+      insertActivities: [makeActivity(groupId, activityType, extra)],
+    },
+  }))
 }
 
 function createRecurringExpensesForGroup(group: GroupDocument): boolean {
@@ -1082,8 +1156,14 @@ function isDateInNextMonth(
 }
 
 export async function getGroupForExport(groupId: string) {
-  const group = await getGroupDocument(groupId)
+  const group = await getRepository().getMeta(groupId)
   if (!group) return null
+  void getRepository().bumpLastSeen(groupId, new Date().toISOString())
+
+  const [expenses, activities] = await Promise.all([
+    getRepository().listExpenses(groupId),
+    getRepository().listActivities(groupId),
+  ])
 
   return {
     exportVersion: 3 as const,
@@ -1095,7 +1175,7 @@ export async function getGroupForExport(groupId: string) {
     defaultSplitMode: group.defaultSplitMode ?? SplitMode.EVENLY,
     fixedExpenseDateGroups: group.fixedExpenseDateGroups ?? false,
     participants: group.participants.map((p) => ({ id: p.id, name: p.name })),
-    expenses: group.expenses
+    expenses: expenses
       .slice()
       .sort((a, b) => {
         const dateDiff =
@@ -1132,7 +1212,7 @@ export async function getGroupForExport(groupId: string) {
           height: document.height,
         })),
       })),
-    activities: group.activities
+    activities: activities
       .slice()
       .sort((a, b) => toDate(a.time).getTime() - toDate(b.time).getTime())
       .map((activity) => ({
