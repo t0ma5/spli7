@@ -1,4 +1,9 @@
-import { getActiveRecurringExpenses, getGroup, getGroupExpenses } from '@/lib/api'
+import {
+  getActiveRecurringExpenses,
+  getGroup,
+  getGroupExpenses,
+} from '@/lib/api'
+import { assertGroupUnlocked } from '@/lib/group-access'
 import {
   filterExpensesByDateRange,
   getRecurringSpending,
@@ -28,6 +33,7 @@ export const getStatsOverviewProcedure = baseProcedure
     }),
   )
   .query(async ({ input: { groupId, participantId, from, to } }) => {
+    await assertGroupUnlocked(groupId)
     const [group, allExpenses] = await Promise.all([
       getGroup(groupId),
       getGroupExpenses(groupId),

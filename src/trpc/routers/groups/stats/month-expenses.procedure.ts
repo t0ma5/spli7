@@ -1,4 +1,5 @@
 import { getGroupExpenses } from '@/lib/api'
+import { assertGroupUnlocked } from '@/lib/group-access'
 import { filterExpensesByDateRange, getExpensesByMonth } from '@/lib/totals'
 import { baseProcedure } from '@/trpc/init'
 import { z } from 'zod'
@@ -13,6 +14,7 @@ export const getStatsMonthExpensesProcedure = baseProcedure
     }),
   )
   .query(async ({ input: { groupId, month, from, to } }) => {
+    await assertGroupUnlocked(groupId)
     const allExpenses = await getGroupExpenses(groupId)
     const expenses = filterExpensesByDateRange(allExpenses, from, to)
 

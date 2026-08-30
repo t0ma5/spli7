@@ -1,5 +1,6 @@
 import { getGroupExpenses } from '@/lib/api'
 import { getBalanceTimeline } from '@/lib/balance-timeline'
+import { assertGroupUnlocked } from '@/lib/group-access'
 import {
   getMonthlyCategorySpending,
   monthlySpendingGroupingOptions,
@@ -16,7 +17,7 @@ import { z } from 'zod'
 export const getGroupStatsProcedure = baseProcedure
   .input(
     z.object({
-      groupId: z.string().min(1),
+      groupId: z.string().min(1).max(64),
       participantId: z.string().optional(),
       // Optional on purpose: Totals does not pass these, so we skip monthly /
       // timeline aggregation and avoid a second heavy payload on stats load.
@@ -35,6 +36,7 @@ export const getGroupStatsProcedure = baseProcedure
         monthlySpendingRange,
       },
     }) => {
+      await assertGroupUnlocked(groupId)
       const expenses = await getGroupExpenses(groupId)
       const totalGroupSpendings = getTotalGroupSpending(expenses)
 

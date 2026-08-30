@@ -4,14 +4,14 @@ import { getGroupExpensesAction } from '@/app/groups/[groupId]/expenses/expense-
 import { Button } from '@/components/ui/button'
 import { SearchBar } from '@/components/ui/search-bar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getWeekStartsOn } from '@/lib/date-groups'
 import {
   groupExpensesByCalendarMonth,
   groupExpensesByRelativeDate,
 } from '@/lib/expense-date-groups'
-import { getWeekStartsOn } from '@/lib/date-groups'
 import { getCurrencyFromGroup } from '@/lib/utils'
 import { trpc } from '@/trpc/client'
-import dayjs, { type Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { forwardRef, useEffect, useMemo, useState } from 'react'

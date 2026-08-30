@@ -1,4 +1,4 @@
-import { getKv, HEALTH_KEY } from '@/lib/kv/client'
+import { getD1 } from '@/lib/db/client'
 
 export interface HealthCheckStatus {
   status: 'healthy' | 'unhealthy'
@@ -15,24 +15,14 @@ async function checkDatabase(): Promise<{
   error?: string
 }> {
   try {
-    const kv = await getKv()
-    await kv.put(HEALTH_KEY, String(Date.now()))
-    const value = await kv.get(HEALTH_KEY)
-    if (!value) {
-      return {
-        status: 'unhealthy',
-        error: 'KV health key was not readable after write',
-      }
+    const db = await getD1()
+    const row = await db.prepare('SELECT 1 AS ok').first<{ ok: number }>()
+    if (!row || row.ok !== 1) {
+      return { status: 'unhealthy', error: 'Database probe failed' }
     }
-    return {
-      status: 'healthy',
-    }
-  } catch (error) {
-    return {
-      status: 'unhealthy',
-      error:
-        error instanceof Error ? error.message : 'Database connection failed',
-    }
+    return { status: 'healthy' }
+  } catch {
+    return { status: 'unhealthy', error: 'Database connection failed' }
   }
 }
 
@@ -52,47 +42,25 @@ function createHealthResponse(
 export async function checkReadiness(): Promise<Response> {
   try {
     const databaseStatus = await checkDatabase()
-
-    const services: HealthCheckStatus['services'] = {
-      database: databaseStatus,
-    }
-
     const isHealthy = databaseStatus.status === 'healthy'
-
-    const healthStatus: HealthCheckStatus = {
-      status: isHealthy ? 'healthy' : 'unhealthy',
-      services,
-    }
-
-    return createHealthResponse(healthStatus, isHealthy)
-  } catch (error) {
-    const errorStatus: HealthCheckStatus = {
-      status: 'unhealthy',
-      services: {
-        database: {
-          status: 'unhealthy',
-          error:
-            error instanceof Error ? error.message : 'Readiness check failed',
-        },
+    return createHealthResponse(
+      {
+        status: isHealthy ? 'healthy' : 'unhealthy',
+        services: { database: { status: databaseStatus.status } },
       },
-    }
-
-    return createHealthResponse(errorStatus, false)
+      isHealthy,
+    )
+  } catch {
+    return createHealthResponse(
+      {
+        status: 'unhealthy',
+        services: { database: { status: 'unhealthy' } },
+      },
+      false,
+    )
   }
 }
 
 export async function checkLiveness(): Promise<Response> {
-  try {
-    const healthStatus: HealthCheckStatus = {
-      status: 'healthy',
-    }
-
-    return createHealthResponse(healthStatus, true)
-  } catch {
-    const errorStatus: HealthCheckStatus = {
-      status: 'unhealthy',
-    }
-
-    return createHealthResponse(errorStatus, false)
-  }
+  return createHealthResponse({ status: 'healthy' }, true)
 }

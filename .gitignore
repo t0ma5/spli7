@@ -44,6 +44,7 @@ next-env.d.ts
 
 # db
 postgres-data
+.swc/
 
 desktop.ini
 
@@ -51,8 +52,11 @@ desktop.ini
 
 tmp396/
 
-
-# Cursor IDE / agent local rules
-.cursor/
+# Cursor IDE local state; keep shared rules/skills
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
 
 tmp-pages-bind/

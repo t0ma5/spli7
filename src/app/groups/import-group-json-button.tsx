@@ -106,8 +106,8 @@ export function ImportGroupJsonButton({ reload }: Props) {
         align={isDesktop ? 'end' : 'start'}
         className="[&_p]:text-sm flex flex-col gap-3"
       >
-          <h3 className="font-bold">{t('title')}</h3>
-          <p>{t('description')}</p>
+        <h3 className="font-bold">{t('title')}</h3>
+        <p>{t('description')}</p>
         <input
           ref={fileInputRef}
           type="file"

@@ -10,6 +10,12 @@
   "Header": {
     "groups": "Groups"
   },
+  "Errors": {
+    "title": "Something went wrong",
+    "groupTitle": "Couldn’t load this group",
+    "generic": "Please try again. If this keeps happening, reload the page.",
+    "retry": "Try again"
+  },
   "Footer": {
     "madeIn": "Made in Montréal, Québec 🇨🇦",
     "builtBy": "Built by <author>Sebastien Castiel</author> and <source>contributors</source>"
@@ -518,7 +524,7 @@
   },
   "GroupPin": {
     "title": "Enter group PIN",
-    "description": "This group is protected with a PIN. Enter it to continue on this device.",
+    "description": "This group is protected with a PIN. Enter it to continue on this device. The unlock lasts 12 hours in this browser.",
     "placeholder": "PIN",
     "unlock": "Unlock",
     "incorrect": "Incorrect PIN. Try again."
@@ -543,7 +549,7 @@
     "noZeroShares": "All shares must be higher than 0.",
     "amountSum": "Sum of amounts must equal the expense amount.",
     "percentageSum": "Sum of percentages must equal 100.",
-    "pinFormat": "PIN must be 4 to 8 digits.",
+    "pinFormat": "PIN must be 6 to 8 digits.",
     "pinConflict": "Choose either a new PIN or remove PIN, not both."
   },
   "Categories": {

@@ -45,7 +45,8 @@ export function parseSplitwiseCsv(csvText: string): ParsedTricountGroup {
 
   const currencyCode = (parsed.group?.currencyCode || 'EUR').slice(0, 3)
   const currencyInfo = getCurrency(currencyCode)
-  const currency = currencyInfo.symbol_native || currencyInfo.symbol || currencyCode
+  const currency =
+    currencyInfo.symbol_native || currencyInfo.symbol || currencyCode
 
   const expenses: Expense[] = parsed.expenses.map((expense) => {
     const expenseId = randomId()

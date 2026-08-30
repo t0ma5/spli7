@@ -7,7 +7,7 @@ import * as z from 'zod'
 export const groupFormSchema = z
   .object({
     name: z.string().min(2, 'min2').max(50, 'max50'),
-    information: z.string().optional(),
+    information: z.string().max(2000).optional(),
     currency: z.string().min(1, 'min1').max(5, 'max5'),
     currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]), // ISO-4217 currency code
     defaultSplitMode: z
@@ -15,7 +15,7 @@ export const groupFormSchema = z
       .default('EVENLY'),
     currentPin: z.string().max(32).optional(),
     newPin: z
-      .union([z.string().regex(/^\d{4,8}$/, 'pinFormat'), z.literal('')])
+      .union([z.string().regex(/^\d{6,8}$/, 'pinFormat'), z.literal('')])
       .optional(),
     clearPin: z.boolean().optional(),
     fixedExpenseDateGroups: z.boolean().default(false),
@@ -297,7 +297,7 @@ export const groupImportSchema = z
     exportVersion: z.number().int().optional(),
     id: z.string().optional(),
     name: z.string().min(1).max(50),
-    information: z.string().nullish(),
+    information: z.string().max(2000).nullish(),
     currency: z.string().min(1).max(5),
     currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]),
     defaultSplitMode: z
@@ -310,14 +310,15 @@ export const groupImportSchema = z
           name: z.string().min(1).max(50),
         }),
       )
-      .min(1),
+      .min(1)
+      .max(100),
     expenses: z
       .array(
         z.object({
           id: z.string().optional(),
           createdAt: z.coerce.date(),
           expenseDate: z.coerce.date(),
-          title: z.string().min(1),
+          title: z.string().min(1).max(200),
           category: z
             .object({
               id: z.number().int().optional(),
@@ -364,6 +365,7 @@ export const groupImportSchema = z
             .default([]),
         }),
       )
+      .max(10_000)
       .default([]),
     activities: z
       .array(
@@ -377,9 +379,10 @@ export const groupImportSchema = z
           ]),
           participantId: z.string().nullish(),
           expenseId: z.string().nullish(),
-          data: z.string().nullish(),
+          data: z.string().max(2000).nullish(),
         }),
       )
+      .max(50_000)
       .default([]),
   })
   .superRefine((data, ctx) => {
@@ -405,7 +408,13 @@ export const groupImportSchema = z
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'unknownPaidBy',
-            path: ['expenses', expenseIndex, 'paidBy', paidByIndex, 'participantId'],
+            path: [
+              'expenses',
+              expenseIndex,
+              'paidBy',
+              paidByIndex,
+              'participantId',
+            ],
           })
         }
       })

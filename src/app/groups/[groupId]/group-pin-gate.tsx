@@ -9,39 +9,25 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { groupPinUnlockStorageKey } from '@/lib/group-pin'
 import { trpc } from '@/trpc/client'
 import { Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { PropsWithChildren, useEffect, useState } from 'react'
+import { PropsWithChildren, useState } from 'react'
 
 type Props = PropsWithChildren<{
   groupId: string
   hasPin: boolean
+  locked: boolean
 }>
 
-export function GroupPinGate({ groupId, hasPin, children }: Props) {
+export function GroupPinGate({ groupId, hasPin, locked, children }: Props) {
   const t = useTranslations('GroupPin')
-  const [unlocked, setUnlocked] = useState(!hasPin)
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const utils = trpc.useUtils()
   const { mutateAsync, isPending } = trpc.groups.verifyPin.useMutation()
 
-  useEffect(() => {
-    if (!hasPin) {
-      setUnlocked(true)
-      return
-    }
-    try {
-      setUnlocked(
-        sessionStorage.getItem(groupPinUnlockStorageKey(groupId)) === '1',
-      )
-    } catch {
-      setUnlocked(false)
-    }
-  }, [groupId, hasPin])
-
-  if (!hasPin || unlocked) return <>{children}</>
+  if (!hasPin || !locked) return <>{children}</>
 
   return (
     <Dialog open>
@@ -61,8 +47,7 @@ export function GroupPinGate({ groupId, hasPin, children }: Props) {
             setError(null)
             try {
               await mutateAsync({ groupId, pin })
-              sessionStorage.setItem(groupPinUnlockStorageKey(groupId), '1')
-              setUnlocked(true)
+              await utils.groups.get.invalidate({ groupId })
             } catch {
               setError(t('incorrect'))
             }

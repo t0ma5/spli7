@@ -1,4 +1,5 @@
 import { createExpense } from '@/lib/api'
+import { assertGroupUnlocked } from '@/lib/group-access'
 import { expenseFormSchema } from '@/lib/schemas'
 import { baseProcedure } from '@/trpc/init'
 import { z } from 'zod'
@@ -6,13 +7,14 @@ import { z } from 'zod'
 export const createGroupExpenseProcedure = baseProcedure
   .input(
     z.object({
-      groupId: z.string().min(1),
+      groupId: z.string().min(1).max(64),
       expenseFormValues: expenseFormSchema,
       participantId: z.string().optional(),
     }),
   )
   .mutation(
     async ({ input: { groupId, expenseFormValues, participantId } }) => {
+      await assertGroupUnlocked(groupId)
       const expense = await createExpense(
         expenseFormValues,
         groupId,

@@ -182,7 +182,9 @@ export async function parseTricountCsv(
     if (match) defaultCurrencyCode = match[1]
   }
 
-  const resolvedTarget = (targetCurrencyCode || defaultCurrencyCode).toUpperCase()
+  const resolvedTarget = (
+    targetCurrencyCode || defaultCurrencyCode
+  ).toUpperCase()
 
   if (participantNames.length === 0) {
     throw new Error('No participants found in the Tricount CSV')
@@ -211,6 +213,18 @@ export async function parseTricountCsv(
   )
 
   const expenses: Expense[] = []
+  const rateByCurrency = new Map<string, number>()
+  if (exchangeRateIdx !== -1 && currencyIdx !== -1) {
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i]
+      if (r.length < 8) continue
+      const code = r[currencyIdx]
+      const rate = parseFloat(r[exchangeRateIdx])
+      if (code && rate && !Number.isNaN(rate) && !rateByCurrency.has(code)) {
+        rateByCurrency.set(code, rate)
+      }
+    }
+  }
 
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
     const row = rows[rowIndex]
@@ -247,19 +261,10 @@ export async function parseTricountCsv(
 
     let targetToDefaultRate = 1
     if (resolvedTarget !== defaultCurrencyCode) {
-      let foundRate = false
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i]
-        if (r.length >= 8 && r[currencyIdx] === resolvedTarget) {
-          const rate = parseFloat(r[exchangeRateIdx])
-          if (rate && !Number.isNaN(rate)) {
-            targetToDefaultRate = rate
-            foundRate = true
-            break
-          }
-        }
-      }
-      if (!foundRate) {
+      const mapped = rateByCurrency.get(resolvedTarget)
+      if (mapped) {
+        targetToDefaultRate = mapped
+      } else {
         targetToDefaultRate = await getRate(
           expenseDate,
           resolvedTarget,

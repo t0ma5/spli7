@@ -1,5 +1,6 @@
 import { getGroup, getGroupExpenses } from '@/lib/api'
 import { getBalances } from '@/lib/balances'
+import { isGroupUnlocked } from '@/lib/group-access'
 import { baseProcedure } from '@/trpc/init'
 import { z } from 'zod'
 
@@ -29,6 +30,7 @@ export const forUserBalancesProcedure = baseProcedure
       groups.map(async ({ groupId, participantId }) => {
         const group = await getGroup(groupId)
         if (!group) return null
+        if (group.hasPin && !(await isGroupUnlocked(groupId))) return null
 
         const participant = group.participants.find(
           (p) => p.id === participantId,

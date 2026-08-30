@@ -132,8 +132,12 @@ export type GroupDocument = {
   /** When true, expense list groups by calendar month */
   fixedExpenseDateGroups?: boolean | null
   createdAt: string
+  /** Optimistic-concurrency counter; incremented on every successful save */
+  version?: number
   /** ISO timestamp of last mutating activity; falls back to createdAt when absent */
   lastActivityAt?: string | null
+  /** ISO timestamp of last authenticated read; used with lastActivityAt for expiry */
+  lastSeenAt?: string | null
   /** ISO timestamp when soft-deleted; null/absent = active */
   deletedAt?: string | null
   participants: Participant[]

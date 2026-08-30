@@ -45,13 +45,17 @@ export type SplitwiseParseResult = {
 export function detectSplitwiseCsv(content: string): number {
   const firstLine = content.split(/\r?\n/, 1)[0] ?? ''
   if (!firstLine) return 0
-  const headerCells = firstLine.split(',').map((c) => c.replace(/^"|"$/g, '').trim())
+  const headerCells = firstLine
+    .split(',')
+    .map((c) => c.replace(/^"|"$/g, '').trim())
   const detection = detectSplitwiseHeaders(headerCells)
   const recognizedFields = Object.keys(detection.fieldIndices).length
   return detectLanguageScore(detection.language, recognizedFields)
 }
 
-export function parseSplitwiseToInternal(content: string): SplitwiseParseResult {
+export function parseSplitwiseToInternal(
+  content: string,
+): SplitwiseParseResult {
   const parsed = parseSplitwiseExportCsv(content)
 
   const participants = parsed.participantNames.map((name, index) => {

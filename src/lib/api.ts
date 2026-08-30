@@ -1,20 +1,19 @@
 import 'server-only'
 
-import { hashGroupPin } from '@/lib/group-pin'
+import { getRepository } from '@/lib/db'
+import { WRITE_RETRIES } from '@/lib/db/repository'
 import {
   INACTIVITY_MONTHS,
-  MAX_RECURRING_GENERATIONS_PER_RUN,
   isInactive,
   isSoftDeleteExpired,
+  MAX_RECURRING_GENERATIONS_PER_RUN,
 } from '@/lib/group-lifecycle'
-import { getCategoryById, resolveCategoryId } from '@/lib/kv/categories'
+import { hashGroupPin, isLegacyPinHash, pinMatchesHash } from '@/lib/group-pin'
 import {
-  deleteGroupDocument,
-  ensureCategories,
-  getGroupDocument,
-  listGroupKeys,
-  putGroupDocument,
-} from '@/lib/kv/store'
+  getCategoryById,
+  resolveCategoryId,
+  SEEDED_CATEGORIES,
+} from '@/lib/kv/categories'
 import {
   ActivityType,
   Expense,
@@ -32,8 +31,8 @@ import {
   GroupFormValues,
   GroupImportValues,
 } from '@/lib/schemas'
-import { parseTricountCsv } from '@/lib/tricount-import'
 import { parseSplitwiseCsv } from '@/lib/splitwise-import'
+import { parseTricountCsv } from '@/lib/tricount-import'
 
 function toDate(value: string | Date): Date {
   return value instanceof Date ? value : new Date(value)
@@ -71,13 +70,61 @@ function mapGroup(group: GroupDocument): Group {
   }
 }
 
+async function getGroupDocument(
+  groupId: string,
+): Promise<GroupDocument | null> {
+  return getRepository().get(groupId)
+}
+
 async function persistGroup(group: GroupDocument, touchActivity = true) {
   if (touchActivity) {
     group.lastActivityAt = new Date().toISOString()
   }
-  await putGroupDocument(group)
+  const expected = group.version ?? 0
+  const result = await getRepository().save(group, expected)
+  if (result === 'conflict') {
+    throw new ConflictError()
+  }
 }
 
+class ConflictError extends Error {
+  constructor() {
+    super('This group was updated by someone else. Please retry.')
+    this.name = 'ConflictError'
+  }
+}
+
+async function withGroupWrite<T>(
+  groupId: string,
+  fn: (group: GroupDocument) => T | Promise<T>,
+  options?: { touchActivity?: boolean; allowDeleted?: boolean },
+): Promise<T> {
+  const touchActivity = options?.touchActivity ?? true
+  const allowDeleted = options?.allowDeleted ?? false
+  let lastError: unknown
+  for (let attempt = 0; attempt < WRITE_RETRIES; attempt++) {
+    const group = await getGroupDocument(groupId)
+    if (!group) throw new Error(`Invalid group ID: ${groupId}`)
+    if (group.deletedAt && !allowDeleted) {
+      throw new Error(`Invalid group ID: ${groupId}`)
+    }
+    try {
+      const value = await fn(group)
+      await persistGroup(group, touchActivity)
+      return value
+    } catch (error) {
+      lastError = error
+      if (!(error instanceof ConflictError)) throw error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new ConflictError()
+}
+
+function assertIntegerMinorUnits(amount: number, label: string) {
+  if (!Number.isInteger(amount)) {
+    throw new Error(`${label} must be an integer number of minor units`)
+  }
+}
 
 function appendActivity(
   group: GroupDocument,
@@ -150,11 +197,15 @@ function buildExpenseFromForm(
     originalAmount: expenseFormValues.originalAmount ?? null,
     originalCurrency: expenseFormValues.originalCurrency || null,
     conversionRate: expenseFormValues.conversionRate ?? null,
-    paidBy: expenseFormValues.paidBy.map((paidBy) => ({
-      expenseId,
-      participantId: paidBy.participant,
-      amount: Number(paidBy.amount),
-    })),
+    paidBy: expenseFormValues.paidBy.map((paidBy) => {
+      const amount = Number(paidBy.amount)
+      assertIntegerMinorUnits(amount, 'paidBy.amount')
+      return {
+        expenseId,
+        participantId: paidBy.participant,
+        amount,
+      }
+    }),
     isReimbursement: expenseFormValues.isReimbursement,
     splitMode: expenseFormValues.splitMode as SplitMode,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -186,10 +237,11 @@ export async function createGroup(groupFormValues: GroupFormValues) {
         ? await hashGroupPin(groupFormValues.newPin, id)
         : null,
     defaultSplitMode: groupFormValues.defaultSplitMode ?? SplitMode.EVENLY,
-    fixedExpenseDateGroups:
-      groupFormValues.fixedExpenseDateGroups ?? false,
+    fixedExpenseDateGroups: groupFormValues.fixedExpenseDateGroups ?? false,
+    version: 0,
     createdAt: new Date().toISOString(),
     lastActivityAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
     deletedAt: null,
     participants: groupFormValues.participants.map(({ name }) => ({
       id: randomId(),
@@ -199,7 +251,7 @@ export async function createGroup(groupFormValues: GroupFormValues) {
     expenses: [],
     activities: [],
   }
-  await persistGroup(group)
+  await getRepository().create(group)
   return mapGroup(group)
 }
 
@@ -316,15 +368,17 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
       (importValues.defaultSplitMode as SplitMode | null | undefined) ??
       SplitMode.EVENLY,
     fixedExpenseDateGroups: false,
+    version: 0,
     createdAt: new Date().toISOString(),
     lastActivityAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
     deletedAt: null,
     participants,
     expenses,
     activities,
   }
 
-  await persistGroup(group)
+  await getRepository().create(group)
   return mapGroup(group)
 }
 
@@ -344,8 +398,10 @@ export async function createGroupFromTricountCsv(
     pinHash: null,
     defaultSplitMode: SplitMode.EVENLY,
     fixedExpenseDateGroups: false,
+    version: 0,
     createdAt: now,
     lastActivityAt: now,
+    lastSeenAt: now,
     deletedAt: null,
     participants: parsed.participants,
     expenses: parsed.expenses,
@@ -361,7 +417,7 @@ export async function createGroupFromTricountCsv(
     expense.groupId = groupId
   }
 
-  await persistGroup(group)
+  await getRepository().create(group)
   return mapGroup(group)
 }
 
@@ -378,8 +434,10 @@ export async function createGroupFromSplitwiseCsv(csvText: string) {
     pinHash: null,
     defaultSplitMode: SplitMode.EVENLY,
     fixedExpenseDateGroups: false,
+    version: 0,
     createdAt: now,
     lastActivityAt: now,
+    lastSeenAt: now,
     deletedAt: null,
     participants: parsed.participants,
     expenses: parsed.expenses,
@@ -394,7 +452,7 @@ export async function createGroupFromSplitwiseCsv(csvText: string) {
     expense.groupId = groupId
   }
 
-  await persistGroup(group)
+  await getRepository().create(group)
   return mapGroup(group)
 }
 
@@ -403,28 +461,26 @@ export async function createExpense(
   groupId: string,
   participantId?: string,
 ): Promise<Expense> {
-  const group = await getGroupDocument(groupId)
-  if (!group || group.deletedAt) throw new Error(`Invalid group ID: ${groupId}`)
+  return withGroupWrite(groupId, (group) => {
+    for (const participant of [
+      ...expenseFormValues.paidBy.map((p) => p.participant),
+      ...expenseFormValues.paidFor.map((p) => p.participant),
+    ]) {
+      if (!group.participants.some((p) => p.id === participant))
+        throw new Error(`Invalid participant ID: ${participant}`)
+    }
 
-  for (const participant of [
-    ...expenseFormValues.paidBy.map((p) => p.participant),
-    ...expenseFormValues.paidFor.map((p) => p.participant),
-  ]) {
-    if (!group.participants.some((p) => p.id === participant))
-      throw new Error(`Invalid participant ID: ${participant}`)
-  }
+    const expenseId = randomId()
+    appendActivity(group, ActivityType.CREATE_EXPENSE, {
+      participantId,
+      expenseId,
+      data: expenseFormValues.title,
+    })
 
-  const expenseId = randomId()
-  appendActivity(group, ActivityType.CREATE_EXPENSE, {
-    participantId,
-    expenseId,
-    data: expenseFormValues.title,
+    const expense = buildExpenseFromForm(expenseFormValues, groupId, expenseId)
+    group.expenses.push(expense)
+    return expense
   })
-
-  const expense = buildExpenseFromForm(expenseFormValues, groupId, expenseId)
-  group.expenses.push(expense)
-  await persistGroup(group)
-  return expense
 }
 
 export async function deleteExpense(
@@ -432,18 +488,16 @@ export async function deleteExpense(
   expenseId: string,
   participantId?: string,
 ) {
-  const group = await getGroupDocument(groupId)
-  if (!group || group.deletedAt) throw new Error(`Invalid group ID: ${groupId}`)
+  await withGroupWrite(groupId, (group) => {
+    const existingExpense = group.expenses.find((e) => e.id === expenseId)
+    appendActivity(group, ActivityType.DELETE_EXPENSE, {
+      participantId,
+      expenseId,
+      data: existingExpense?.title,
+    })
 
-  const existingExpense = group.expenses.find((e) => e.id === expenseId)
-  appendActivity(group, ActivityType.DELETE_EXPENSE, {
-    participantId,
-    expenseId,
-    data: existingExpense?.title,
+    group.expenses = group.expenses.filter((e) => e.id !== expenseId)
   })
-
-  group.expenses = group.expenses.filter((e) => e.id !== expenseId)
-  await persistGroup(group)
 }
 
 export async function getGroupExpensesParticipants(groupId: string) {
@@ -482,36 +536,35 @@ export async function updateExpense(
   expenseFormValues: ExpenseFormValues,
   participantId?: string,
 ) {
-  const group = await getGroupDocument(groupId)
-  if (!group || group.deletedAt) throw new Error(`Invalid group ID: ${groupId}`)
+  return withGroupWrite(groupId, (group) => {
+    const existingIndex = group.expenses.findIndex((e) => e.id === expenseId)
+    if (existingIndex === -1)
+      throw new Error(`Invalid expense ID: ${expenseId}`)
+    const existingExpense = group.expenses[existingIndex]
 
-  const existingIndex = group.expenses.findIndex((e) => e.id === expenseId)
-  if (existingIndex === -1) throw new Error(`Invalid expense ID: ${expenseId}`)
-  const existingExpense = group.expenses[existingIndex]
+    for (const participant of [
+      ...expenseFormValues.paidBy.map((p) => p.participant),
+      ...expenseFormValues.paidFor.map((p) => p.participant),
+    ]) {
+      if (!group.participants.some((p) => p.id === participant))
+        throw new Error(`Invalid participant ID: ${participant}`)
+    }
 
-  for (const participant of [
-    ...expenseFormValues.paidBy.map((p) => p.participant),
-    ...expenseFormValues.paidFor.map((p) => p.participant),
-  ]) {
-    if (!group.participants.some((p) => p.id === participant))
-      throw new Error(`Invalid participant ID: ${participant}`)
-  }
+    appendActivity(group, ActivityType.UPDATE_EXPENSE, {
+      participantId,
+      expenseId,
+      data: expenseFormValues.title,
+    })
 
-  appendActivity(group, ActivityType.UPDATE_EXPENSE, {
-    participantId,
-    expenseId,
-    data: expenseFormValues.title,
+    const updated = buildExpenseFromForm(
+      expenseFormValues,
+      groupId,
+      expenseId,
+      existingExpense,
+    )
+    group.expenses[existingIndex] = updated
+    return updated
   })
-
-  const updated = buildExpenseFromForm(
-    expenseFormValues,
-    groupId,
-    expenseId,
-    existingExpense,
-  )
-  group.expenses[existingIndex] = updated
-  await persistGroup(group)
-  return updated
 }
 
 export async function updateGroup(
@@ -519,80 +572,112 @@ export async function updateGroup(
   groupFormValues: GroupFormValues,
   participantId?: string,
 ) {
-  const group = await getGroupDocument(groupId)
-  if (!group || group.deletedAt) throw new Error('Invalid group ID')
+  return withGroupWrite(groupId, async (group) => {
+    appendActivity(group, ActivityType.UPDATE_GROUP, { participantId })
 
-  appendActivity(group, ActivityType.UPDATE_GROUP, { participantId })
+    group.name = groupFormValues.name
+    group.information = groupFormValues.information ?? null
+    group.currency = groupFormValues.currency
+    group.currencyCode = groupFormValues.currencyCode || null
+    group.defaultSplitMode =
+      groupFormValues.defaultSplitMode ?? SplitMode.EVENLY
+    group.fixedExpenseDateGroups =
+      groupFormValues.fixedExpenseDateGroups ?? false
 
-  group.name = groupFormValues.name
-  group.information = groupFormValues.information ?? null
-  group.currency = groupFormValues.currency
-  group.currencyCode = groupFormValues.currencyCode || null
-  group.defaultSplitMode = groupFormValues.defaultSplitMode ?? SplitMode.EVENLY
-  group.fixedExpenseDateGroups =
-    groupFormValues.fixedExpenseDateGroups ?? false
-
-  if (groupFormValues.clearPin) {
-    if (group.pinHash) {
-      if (!groupFormValues.currentPin) {
-        throw new Error('Current PIN required to clear PIN')
+    if (groupFormValues.clearPin) {
+      if (group.pinHash) {
+        if (!groupFormValues.currentPin) {
+          throw new Error('Current PIN required to clear PIN')
+        }
+        const matches = await pinMatchesHash(
+          groupFormValues.currentPin,
+          groupId,
+          group.pinHash,
+        )
+        if (!matches) {
+          throw new Error('Incorrect PIN')
+        }
       }
-      const currentHash = await hashGroupPin(
-        groupFormValues.currentPin,
-        groupId,
+      group.pinHash = null
+    } else if (groupFormValues.newPin) {
+      if (group.pinHash) {
+        if (!groupFormValues.currentPin) {
+          throw new Error('Current PIN required to change PIN')
+        }
+        const matches = await pinMatchesHash(
+          groupFormValues.currentPin,
+          groupId,
+          group.pinHash,
+        )
+        if (!matches) {
+          throw new Error('Incorrect PIN')
+        }
+      }
+      group.pinHash = await hashGroupPin(groupFormValues.newPin, groupId)
+    }
+
+    const nextIds = new Set(
+      groupFormValues.participants
+        .map((participant) => participant.id)
+        .filter((id): id is string => Boolean(id)),
+    )
+    for (const existing of group.participants) {
+      if (nextIds.has(existing.id)) continue
+      const referenced = group.expenses.some(
+        (expense) =>
+          expense.paidBy.some((paid) => paid.participantId === existing.id) ||
+          expense.paidFor.some((paid) => paid.participantId === existing.id),
       )
-      if (currentHash !== group.pinHash) {
-        throw new Error('Incorrect PIN')
+      if (referenced) {
+        throw new Error(
+          `Cannot remove ${existing.name}: they are still on an expense. Reassign or delete those expenses first.`,
+        )
       }
     }
-    group.pinHash = null
-  } else if (groupFormValues.newPin) {
-    if (group.pinHash) {
-      if (!groupFormValues.currentPin) {
-        throw new Error('Current PIN required to change PIN')
-      }
-      const currentHash = await hashGroupPin(
-        groupFormValues.currentPin,
-        groupId,
-      )
-      if (currentHash !== group.pinHash) {
-        throw new Error('Incorrect PIN')
-      }
-    }
-    group.pinHash = await hashGroupPin(groupFormValues.newPin, groupId)
-  }
 
-  // Rebuild in form order so drag/sort order is persisted (stable IDs preserved).
-  const existingById = new Map(group.participants.map((p) => [p.id, p]))
-  group.participants = groupFormValues.participants.map((participant) => {
-    if (participant.id) {
-      const existing = existingById.get(participant.id)
-      if (existing) {
-        return { ...existing, name: participant.name }
+    const existingById = new Map(group.participants.map((p) => [p.id, p]))
+    group.participants = groupFormValues.participants.map((participant) => {
+      if (participant.id) {
+        const existing = existingById.get(participant.id)
+        if (existing) {
+          return { ...existing, name: participant.name }
+        }
       }
-    }
-    return {
-      id: randomId(),
-      name: participant.name,
-      groupId,
-    }
+      return {
+        id: randomId(),
+        name: participant.name,
+        groupId,
+      }
+    })
+
+    return mapGroup(group)
   })
-
-  await persistGroup(group)
-  return mapGroup(group)
 }
 
 export async function verifyGroupPin(groupId: string, pin: string) {
   const group = await getGroupDocument(groupId)
   if (!group) return false
   if (!group.pinHash) return true
-  const hash = await hashGroupPin(pin, groupId)
-  return hash === group.pinHash
+  const matches = await pinMatchesHash(pin, groupId, group.pinHash)
+  if (!matches) return false
+  if (isLegacyPinHash(group.pinHash)) {
+    try {
+      await withGroupWrite(groupId, async (fresh) => {
+        if (fresh.pinHash && isLegacyPinHash(fresh.pinHash)) {
+          fresh.pinHash = await hashGroupPin(pin, groupId)
+        }
+      })
+    } catch {
+      // Upgrade is best-effort; verification already succeeded.
+    }
+  }
+  return true
 }
 
 export async function getGroup(groupId: string) {
   const group = await getGroupDocument(groupId)
   if (!group || group.deletedAt) return null
+  void getRepository().bumpLastSeen(groupId, new Date().toISOString())
   return mapGroup(group)
 }
 
@@ -604,69 +689,129 @@ export async function getGroupIncludingDeleted(groupId: string) {
 }
 
 export async function softDeleteGroup(groupId: string) {
-  const group = await getGroupDocument(groupId)
-  if (!group) throw new Error(`Invalid group ID: ${groupId}`)
-  if (group.deletedAt) return mapGroup(group)
-  group.deletedAt = new Date().toISOString()
-  await persistGroup(group)
-  return mapGroup(group)
+  return withGroupWrite(
+    groupId,
+    (group) => {
+      if (!group.deletedAt) {
+        group.deletedAt = new Date().toISOString()
+      }
+      return mapGroup(group)
+    },
+    { allowDeleted: true, touchActivity: true },
+  )
 }
 
 export async function restoreGroup(groupId: string) {
-  const group = await getGroupDocument(groupId)
-  if (!group) throw new Error(`Invalid group ID: ${groupId}`)
-  group.deletedAt = null
-  await persistGroup(group)
-  return mapGroup(group)
+  return withGroupWrite(
+    groupId,
+    (group) => {
+      group.deletedAt = null
+      return mapGroup(group)
+    },
+    { allowDeleted: true },
+  )
 }
 
 /**
  * Hard-delete soft-deleted groups past grace, and soft-delete inactive groups
- * (24 months without mutating activity).
+ * (24 months without mutating or viewing activity).
  */
 export async function cleanupExpiredGroups(now = new Date()) {
-  const keys = await listGroupKeys()
+  const ids = await getRepository().listIds()
   let softDeleted = 0
   let hardDeleted = 0
 
-  for (const key of keys) {
-    const groupId = key.startsWith('group:') ? key.slice('group:'.length) : key
+  for (const groupId of ids) {
     const group = await getGroupDocument(groupId)
     if (!group) continue
 
     if (group.deletedAt) {
       if (isSoftDeleteExpired(group.deletedAt, now)) {
-        await deleteGroupDocument(groupId)
+        await getRepository().delete(groupId)
         hardDeleted += 1
       }
       continue
     }
 
     if (isInactive(group, now)) {
-      group.deletedAt = now.toISOString()
-      await persistGroup(group, false)
-      softDeleted += 1
+      try {
+        await withGroupWrite(
+          groupId,
+          (fresh) => {
+            fresh.deletedAt = now.toISOString()
+          },
+          { touchActivity: false },
+        )
+        softDeleted += 1
+      } catch {
+        // Skip groups that changed under us; next cron will retry.
+      }
     }
   }
 
-  return { scanned: keys.length, softDeleted, hardDeleted, inactivityMonths: INACTIVITY_MONTHS }
+  return {
+    scanned: ids.length,
+    softDeleted,
+    hardDeleted,
+    inactivityMonths: INACTIVITY_MONTHS,
+  }
 }
 
 export async function getCategories() {
-  return ensureCategories()
+  return SEEDED_CATEGORIES
+}
+
+function hasDueRecurring(group: GroupDocument, now = new Date()): boolean {
+  const utcNow = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+    ),
+  )
+  return group.expenses.some(
+    (expense) =>
+      expense.recurringExpenseLink &&
+      expense.recurringExpenseLink.nextExpenseCreatedAt === null &&
+      toDate(expense.recurringExpenseLink.nextExpenseDate) <= utcNow,
+  )
+}
+
+export async function materializeDueRecurringExpenses(groupId: string) {
+  const group = await getGroupDocument(groupId)
+  if (!group || group.deletedAt) return false
+  if (!hasDueRecurring(group)) return false
+  await withGroupWrite(groupId, (fresh) => {
+    createRecurringExpensesForGroup(fresh)
+  })
+  return true
+}
+
+export async function materializeAllDueRecurringExpenses() {
+  const ids = await getRepository().listIds()
+  let updated = 0
+  for (const id of ids) {
+    try {
+      if (await materializeDueRecurringExpenses(id)) updated += 1
+    } catch {
+      // next cron retries
+    }
+  }
+  return { scanned: ids.length, updated }
 }
 
 export async function getGroupExpenses(
   groupId: string,
   options?: { offset?: number; length?: number; filter?: string },
 ) {
+  if (await materializeDueRecurringExpenses(groupId)) {
+    // reloaded below
+  }
   const group = await getGroupDocument(groupId)
   if (!group || group.deletedAt) return []
-
-  const mutated = createRecurringExpensesForGroup(group)
-  if (mutated) {
-    await persistGroup(group)
-  }
+  void getRepository().bumpLastSeen(groupId, new Date().toISOString())
 
   let expenses = [...group.expenses]
   if (options?.filter) {
@@ -739,13 +884,9 @@ export async function getGroupExpenseCount(groupId: string) {
  * by every already-materialized occurrence.
  */
 export async function getActiveRecurringExpenses(groupId: string) {
+  await materializeDueRecurringExpenses(groupId)
   const group = await getGroupDocument(groupId)
   if (!group || group.deletedAt) return []
-
-  const mutated = createRecurringExpensesForGroup(group)
-  if (mutated) {
-    await persistGroup(group)
-  }
 
   return group.expenses.filter(
     (expense) =>
@@ -820,10 +961,9 @@ export async function logActivity(
   activityType: ActivityType,
   extra?: { participantId?: string; expenseId?: string; data?: string },
 ) {
-  const group = await getGroupDocument(groupId)
-  if (!group) throw new Error(`Invalid group ID: ${groupId}`)
-  appendActivity(group, activityType, extra)
-  await persistGroup(group)
+  await withGroupWrite(groupId, (group) => {
+    appendActivity(group, activityType, extra)
+  })
 }
 
 function createRecurringExpensesForGroup(group: GroupDocument): boolean {

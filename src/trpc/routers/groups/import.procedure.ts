@@ -1,4 +1,8 @@
-import { createGroupFromImport, createGroupFromSplitwiseCsv, createGroupFromTricountCsv } from '@/lib/api'
+import {
+  createGroupFromImport,
+  createGroupFromSplitwiseCsv,
+  createGroupFromTricountCsv,
+} from '@/lib/api'
 import { groupImportSchema } from '@/lib/schemas'
 import { looksLikeSplitwiseCsv } from '@/lib/splitwise-import'
 import { looksLikeTricountCsv } from '@/lib/tricount-detect'
@@ -28,7 +32,7 @@ export const importGroupProcedure = baseProcedure
 export const importTricountProcedure = baseProcedure
   .input(
     z.object({
-      csvText: z.string().min(1).max(5_000_000),
+      csvText: z.string().min(1).max(1_000_000),
       targetCurrencyCode: z.string().length(3).optional(),
     }),
   )
@@ -37,7 +41,10 @@ export const importTricountProcedure = baseProcedure
       if (!looksLikeTricountCsv(csvText)) {
         throw new Error('Invalid Tricount CSV format')
       }
-      const group = await createGroupFromTricountCsv(csvText, targetCurrencyCode)
+      const group = await createGroupFromTricountCsv(
+        csvText,
+        targetCurrencyCode,
+      )
       return { groupId: group.id, groupName: group.name }
     } catch (error) {
       throw new TRPCError({
@@ -53,7 +60,7 @@ export const importTricountProcedure = baseProcedure
 export const importSplitwiseProcedure = baseProcedure
   .input(
     z.object({
-      csvText: z.string().min(1).max(5_000_000),
+      csvText: z.string().min(1).max(1_000_000),
     }),
   )
   .mutation(async ({ input: { csvText } }) => {

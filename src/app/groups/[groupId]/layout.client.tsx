@@ -36,7 +36,6 @@ export function GroupLayoutClient({
     return (
       <CurrentGroupProvider {...props}>
         <GroupHeader />
-        {children}
       </CurrentGroupProvider>
     )
   }
@@ -44,19 +43,17 @@ export function GroupLayoutClient({
   if (data?.group?.deletedAt) {
     return (
       <CurrentGroupProvider {...props}>
-        <GroupDeletedScreen
-          groupId={groupId}
-          groupName={data.group.name}
-        />
+        <GroupDeletedScreen groupId={groupId} groupName={data.group.name} />
       </CurrentGroupProvider>
     )
   }
 
   const hasPin = Boolean(data?.group?.hasPin)
+  const locked = Boolean(data?.locked)
 
   return (
     <CurrentGroupProvider {...props}>
-      <GroupPinGate groupId={groupId} hasPin={hasPin}>
+      <GroupPinGate groupId={groupId} hasPin={hasPin} locked={locked}>
         <GroupHeader />
         {children}
         <SaveGroupLocally />

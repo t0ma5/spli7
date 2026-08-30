@@ -6,22 +6,30 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
     "directory": ".open-next/assets",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
   },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "spl1t"
-    }
+      "service": "spl1t",
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DATABASE",
+      "database_name": "spl1t",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
   ],
   "kv_namespaces": [
     {
       "binding": "DB",
       "id": "94eaadc98e2246d7989b734acf2cb461",
-      "preview_id": "94eaadc98e2246d7989b734acf2cb461"
-    }
+      "preview_id": "94eaadc98e2246d7989b734acf2cb461",
+    },
   ],
   "vars": {
-    "NEXT_PUBLIC_BASE_URL": "https://spl1t.pages.dev"
-  }
+    "NEXT_PUBLIC_BASE_URL": "https://spl1t.pages.dev",
+  },
 }

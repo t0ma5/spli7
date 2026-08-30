@@ -18,10 +18,7 @@ export function Totals({
   totalParticipantShare,
   currency,
 }: Props) {
-  if (
-    totalGroupSpendings === undefined ||
-    !currency
-  )
+  if (totalGroupSpendings === undefined || !currency)
     return (
       <div className="flex flex-col gap-7">
         {[0, 1, 2].map((index) => (

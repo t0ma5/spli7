@@ -1,7 +1,6 @@
 import { SortableParticipant } from '@/app/groups/[groupId]/edit/sortable-participants'
 import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Card,
   CardContent,
@@ -10,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Form,
   FormControl,
@@ -332,9 +332,7 @@ export function GroupForm({
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    {t('PinField.formatHelp')}
-                  </FormDescription>
+                  <FormDescription>{t('PinField.formatHelp')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -361,7 +359,7 @@ export function GroupForm({
           </CardContent>
         </Card>
 
-                <Card className="mb-4">
+        <Card className="mb-4">
           <CardHeader>
             <CardTitle>{t('GroupSettings.title')}</CardTitle>
             <CardDescription>{t('GroupSettings.description')}</CardDescription>
@@ -396,7 +394,7 @@ export function GroupForm({
           </CardContent>
         </Card>
 
-<Card className="mb-4">
+        <Card className="mb-4">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>{t('Participants.title')}</CardTitle>

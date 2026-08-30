@@ -18,13 +18,21 @@ export function daysAgo(days: number, from = new Date()): Date {
 
 export function getLastActivityAt(group: {
   lastActivityAt?: string | null
+  lastSeenAt?: string | null
   createdAt: string
 }): Date {
-  return new Date(group.lastActivityAt || group.createdAt)
+  const stamps = [group.lastActivityAt, group.lastSeenAt, group.createdAt]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+  return new Date(Math.max(...stamps))
 }
 
 export function isInactive(
-  group: { lastActivityAt?: string | null; createdAt: string },
+  group: {
+    lastActivityAt?: string | null
+    lastSeenAt?: string | null
+    createdAt: string
+  },
   now = new Date(),
 ): boolean {
   return getLastActivityAt(group) < monthsAgo(INACTIVITY_MONTHS, now)

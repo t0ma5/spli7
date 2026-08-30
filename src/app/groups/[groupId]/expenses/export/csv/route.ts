@@ -1,6 +1,7 @@
 import { getGroupForExport } from '@/lib/api'
 import { escapeCsvCell } from '@/lib/csv-escape'
 import { getCurrency } from '@/lib/currency'
+import { assertExportAccess } from '@/lib/group-access'
 import { getExpenseShares } from '@/lib/shares'
 import { formatAmountAsDecimal, getCurrencyFromGroup } from '@/lib/utils'
 import { Parser } from '@json2csv/plainjs'
@@ -23,10 +24,13 @@ function formatDate(isoDateString: Date): string {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ groupId: string }> },
 ) {
   const { groupId } = await params
+  if (!(await assertExportAccess(req, groupId))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const group = await getGroupForExport(groupId)
 
   if (!group) {

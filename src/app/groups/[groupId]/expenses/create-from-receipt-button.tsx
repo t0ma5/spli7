@@ -5,7 +5,7 @@ import { Receipt } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 /**
- * Receipt scanning is deferred on the Cloudflare KV deploy.
+ * Receipt scanning is disabled on the Cloudflare D1 deploy.
  * Kept as a no-op so expense pages compile when the feature flag is off.
  */
 export function CreateFromReceiptButton() {
