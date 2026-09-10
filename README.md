@@ -189,7 +189,7 @@ If you still have groups in the legacy KV namespace, set `CRON_SECRET` and `POST
 GitHub and Cloudflare are **not** linked. Treat them as two separate actions:
 
 1. **GitHub** — `git push` updates the repo. CI (push) only runs types/lint/format/tests.
-2. **Cloudflare** — `npm run deploy` with **Wrangler OAuth** (`npx wrangler login` / `npx wrangler whoami`) updates the live Worker. Do not use GitHub Actions **Deploy**.
+2. **Cloudflare** — `npm run deploy` with **Wrangler OAuth** (`npx wrangler login` / `npx wrangler whoami`) updates the live Worker.
 
 Requires **Node.js 22+**.
 
