@@ -21,7 +21,7 @@ export function ApplePwaSplash({
  * Copyright (c) 2023, Avadhesh B.
  * Released under the MIT License.
  */
-function iosPWASplash(icon: string, color = 'white') {
+function iosPWASplash(icon: string, color = '#030712') {
   // Check if the provided 'icon' is a valid URL
   if (typeof icon !== 'string' || icon.length === 0) {
     throw new Error('Invalid icon URL provided')

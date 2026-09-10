@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/groups',
     id: '/groups',
     display: 'standalone',
-    background_color: '#fff',
+    background_color: '#030712',
     theme_color: '#047857',
     icons: [
       {
