@@ -182,13 +182,16 @@ npm run db:migrate:local
 
 If you still have groups in the legacy KV namespace, set `CRON_SECRET` and `POST /api/cron/migrate-kv` once after D1 is live.
 
-**Note:** Local OpenNext/Wrangler needs **workerd**, which does **not** support Windows ARM64. On those machines, develop against the remote Worker or deploy from an x64/Linux host.
+**Note:** Local OpenNext/Wrangler needs **workerd**. Official packages are not published for Windows ARM64; on this machine install `@cloudflare/workerd-windows-64` with `--no-save --force` so Wrangler can run (do not commit that package).
 
 ## Deploy to Cloudflare
 
-Deploy to Cloudflare Workers. GitHub **CI** (push) only runs types/lint/format/tests. Live updates are **manual**: `npm run deploy` on a host where Wrangler works, or GitHub Actions **Deploy** (`workflow_dispatch`).
+GitHub and Cloudflare are **not** linked. Treat them as two separate actions:
 
-Requires **Node.js 22+** and a host where Wrangler/workerd runs (Linux / macOS / Windows x64 — not Windows ARM64).
+1. **GitHub** — `git push` updates the repo. CI (push) only runs types/lint/format/tests.
+2. **Cloudflare** — `npm run deploy` with **Wrangler OAuth** (`npx wrangler login` / `npx wrangler whoami`) updates the live Worker. Do not use GitHub Actions **Deploy**.
+
+Requires **Node.js 22+**.
 
 ```bash
 npm run db:migrate:remote
@@ -204,11 +207,11 @@ This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
 - `observability.enabled` is on so Workers Logs persist.
 - This account is on **Workers Free** (hard **10 ms** CPU per request). Do **not** set `limits.cpu_ms` — Wrangler rejects it with error 100328. OpenNext SSR of a large group can exceed 10 ms; Cloudflare may allow infrequent overage, then return **Error 1102** once traffic is consistent. The D1 keyset/surgical-write work is what keeps hot paths small. **Workers Paid** ($5/mo) raises the default to 30 s without any `cpu_ms` field.
 
-From this repo, production deploys are usually GitHub Actions **Deploy** (`workflow_dispatch` on `ubuntu-latest`, because Wrangler/`workerd` does not run on Windows ARM64). That still does **not** apply D1 migrations — run `npm run db:migrate:remote` (or equivalent) when `migrations/` changes.
+D1 migrations are **not** applied by `npm run deploy` — run `npm run db:migrate:remote` when `migrations/` changes.
 
 ### Ops notes
 
-- Pushing code to GitHub does **not** update the live Worker until you run `npm run deploy` or the **Deploy** workflow.
+- Pushing code to GitHub does **not** update the live Worker until you run `npm run deploy`.
 - Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories.
 - Set Worker secrets `PIN_SECRET` and `CRON_SECRET`. Call `/api/cron/cleanup-groups` and `/api/cron/recurring` daily.
 

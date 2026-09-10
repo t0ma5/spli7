@@ -1,3 +1,4 @@
+# Unused: GitHub is not linked to Cloudflare. Live deploys are `npm run deploy` with Wrangler OAuth.
 name: Deploy
 
 on:
