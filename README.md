@@ -34,6 +34,8 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Soft-delete / restore groups (30-day grace) + **24-month inactivity expiry**
 - [x] 🔴 Security headers, CSV formula escape, Zod input caps, expense date bounds
 - [x] 🔴 Error boundaries + Drawer accessibility titles
+- [x] 🔴 Field-array validation messages (no literal “undefined”)
+- [x] 🔴 Expense date defaults to local today (not UTC)
 - [x] 🔴 Paste-friendly amount parsing (US/EU grouped currency)
 - [x] 🔴 Keyboard navigation restored in category/currency selectors
 - [x] 🔴 Mobile group tab icons
@@ -83,6 +85,8 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Optional group PIN** | 6–8 digits for new PINs; HTTP-only unlock cookie; PBKDF2 hash; rate limited. | Upstream [#373](https://github.com/spliit-app/spliit/issues/373); on Spliit Cloud roadmap |
 | **Notes + history + document links in JSON** | Export/import round-trips expense notes, group information, activity history, and document **URLs** (`exportVersion: 3`). | Follow-up to upstream [#546](https://github.com/spliit-app/spliit/pull/546); expense notes also in [#165](https://github.com/spliit-app/spliit/pull/165) |
 | **Soft-delete + inactivity expiry** | Manual soft-delete with 30-day restore; auto soft-delete after 24 months without activity; cron hard-deletes after grace. | Inspired by [anon-spliit](https://github.com/sora-grayscale/anon-spliit) deletion/auto-delete work and upstream [#420](https://github.com/spliit-app/spliit/pull/420) |
+| **Local-today expense date** | New/duplicate/reimburse defaults use the local calendar day at UTC midnight, so the date input is not tomorrow (west of UTC) or yesterday (east of UTC). | Upstream [#629](https://github.com/spliit-app/spliit/pull/629) |
+| **Field-array form errors** | `FormMessage` reads `error.root.message` so split-mode refinements (percent/amount sums) never render the string `undefined`. | Upstream [#608](https://github.com/spliit-app/spliit/pull/608) |
 | **Paste amount parsing** | Normalizes pasted US/EU currency amounts in number fields. | Upstream [#531](https://github.com/spliit-app/spliit/pull/531) |
 | **Selector keyboard nav** | Category/currency pickers use cmdk CommandList. | Upstream [#491](https://github.com/spliit-app/spliit/pull/491) |
 | **Mobile tab icons** | Icon-only tabs on small screens; labels from sm. | Upstream [#539](https://github.com/spliit-app/spliit/pull/539) |

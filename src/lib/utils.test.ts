@@ -1,5 +1,5 @@
 import { Currency } from './currency'
-import { formatCurrency } from './utils'
+import { formatCurrency, getTodayForDateInput } from './utils'
 
 describe('formatCurrency', () => {
   const currency: Currency = {
@@ -77,4 +77,22 @@ describe('formatCurrency', () => {
       ).toBe(variation.result)
     })
   }
+})
+
+describe('getTodayForDateInput', () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('formats as the local calendar date via toISOString', () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date(2026, 8, 11, 1, 56, 0))
+
+    const isoDate = getTodayForDateInput().toISOString().substring(0, 10)
+    const now = new Date()
+    const local = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+    expect(isoDate).toBe(local)
+    expect(isoDate).toBe('2026-09-11')
+  })
 })

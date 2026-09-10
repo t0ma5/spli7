@@ -59,6 +59,7 @@ import {
   cn,
   formatCurrency,
   getCurrencyFromGroup,
+  getTodayForDateInput,
 } from '@/lib/utils'
 import { AppRouterOutput } from '@/trpc/routers/_app'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -161,7 +162,9 @@ function expenseToFormValues(
   return {
     title: expense.title,
     expenseDate:
-      mode === 'duplicate' ? new Date() : (expense.expenseDate ?? new Date()),
+      mode === 'duplicate'
+        ? getTodayForDateInput()
+        : (expense.expenseDate ?? getTodayForDateInput()),
     amount: amountAsDecimal(expense.amount, groupCurrency),
     originalCurrency: expense.originalCurrency ?? groupCurrencyCode,
     originalAmount: expense.originalAmount ?? undefined,
@@ -240,7 +243,7 @@ export function ExpenseForm({
         : searchParams.get('reimbursement')
           ? {
               title: t('reimbursement'),
-              expenseDate: new Date(),
+              expenseDate: getTodayForDateInput(),
               amount: amountAsDecimal(
                 Number(searchParams.get('amount')) || 0,
                 groupCurrency,
@@ -277,7 +280,7 @@ export function ExpenseForm({
               title: searchParams.get('title') ?? '',
               expenseDate: searchParams.get('date')
                 ? new Date(searchParams.get('date') as string)
-                : new Date(),
+                : getTodayForDateInput(),
               amount: Number(searchParams.get('amount')) || 0,
               originalCurrency: group.currencyCode ?? undefined,
               originalAmount: undefined,
@@ -1533,6 +1536,6 @@ export function ExpenseForm({
 }
 
 function formatDate(date?: Date) {
-  if (!date || isNaN(date as any)) date = new Date()
+  if (!date || isNaN(date as any)) date = getTodayForDateInput()
   return date.toISOString().substring(0, 10)
 }

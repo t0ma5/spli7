@@ -52,6 +52,16 @@ export function formatDateOnly(
   })
 }
 
+/**
+ * Local calendar today at UTC midnight, so `toISOString().slice(0, 10)` is
+ * today's date in the user's timezone (not UTC-today, which is tomorrow in the
+ * evening west of UTC and yesterday in the early morning east of UTC).
+ */
+export function getTodayForDateInput() {
+  const now = new Date()
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+}
+
 export function formatCategoryForAIPrompt(category: Category) {
   return `"${category.grouping}/${category.name}" (ID: ${category.id})`
 }
