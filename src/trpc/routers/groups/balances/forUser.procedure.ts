@@ -1,6 +1,7 @@
 import { getGroup, getGroupExpenses } from '@/lib/api'
 import { getBalances } from '@/lib/balances'
 import { isGroupUnlocked } from '@/lib/group-access'
+import { MAX_GROUPS_PER_QUERY } from '@/lib/group-query-limits'
 import { baseProcedure } from '@/trpc/init'
 import { z } from 'zod'
 
@@ -22,7 +23,7 @@ export const forUserBalancesProcedure = baseProcedure
             participantId: z.string().min(1).max(64),
           }),
         )
-        .max(100),
+        .max(MAX_GROUPS_PER_QUERY),
     }),
   )
   .query(async ({ input: { groups } }) => {

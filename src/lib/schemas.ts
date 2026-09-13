@@ -4,10 +4,13 @@ import Decimal from 'decimal.js'
 
 import * as z from 'zod'
 
+export const GROUP_INFORMATION_MAX = 10_000
+export const EXPENSE_NOTES_MAX = 5_000
+
 export const groupFormSchema = z
   .object({
     name: z.string().min(2, 'min2').max(50, 'max50'),
-    information: z.string().max(2000).optional(),
+    information: z.string().max(GROUP_INFORMATION_MAX, 'max10000').optional(),
     currency: z.string().min(1, 'min1').max(5, 'max5'),
     currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]), // ISO-4217 currency code
     defaultSplitMode: z
@@ -184,13 +187,13 @@ export const expenseFormSchema = z
         z.object({
           id: z.string().max(30),
           url: z.string().url().max(2000),
-          width: z.number().int().min(1).max(10000),
-          height: z.number().int().min(1).max(10000),
+          width: z.number().int().min(1),
+          height: z.number().int().min(1),
         }),
       )
       .max(100)
       .default([]),
-    notes: z.string().max(5000).optional(),
+    notes: z.string().max(EXPENSE_NOTES_MAX, 'max5000').optional(),
     recurrenceRule: z
       .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
       .default('NONE'),
@@ -221,11 +224,19 @@ export const expenseFormSchema = z
       case 'BY_SHARES':
         break // noop
       case 'BY_AMOUNT': {
-        const sum = expense.paidFor.reduce(
-          (sum, { shares }) => new Decimal(shares).add(sum),
-          new Decimal(0),
-        )
+        const sum = expense.paidFor.reduce((sum, { shares }) => {
+          // Same normalisation as the share itself above. An emptied or
+          // half-typed input is reported as an invalid share on its own; it
+          // must not make the sum of the others throw.
+          const value = String(shares).replace(/,/g, '.').trim()
+          return value === '' || Number.isNaN(Number(value))
+            ? sum
+            : sum.add(value)
+        }, new Decimal(0))
         if (!sum.equals(new Decimal(totalAmount))) {
+          // The message names the sum and how far off it is. Issue params do
+          // not survive the form resolver, so the expense form computes those
+          // values itself and hands them to the message.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'amountSum',
@@ -297,7 +308,7 @@ export const groupImportSchema = z
     exportVersion: z.number().int().optional(),
     id: z.string().optional(),
     name: z.string().min(1).max(50),
-    information: z.string().max(2000).nullish(),
+    information: z.string().max(GROUP_INFORMATION_MAX).nullish(),
     currency: z.string().min(1).max(5),
     currencyCode: z.union([z.string().length(3).nullish(), z.literal('')]),
     defaultSplitMode: z
@@ -350,14 +361,14 @@ export const groupImportSchema = z
           recurrenceRule: z
             .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
             .nullish(),
-          notes: z.string().nullish(),
+          notes: z.string().max(EXPENSE_NOTES_MAX).nullish(),
           documents: z
             .array(
               z.object({
                 id: z.string().min(1).max(30).optional(),
                 url: z.string().url().max(2000),
-                width: z.number().int().min(1).max(10000),
-                height: z.number().int().min(1).max(10000),
+                width: z.number().int().min(1),
+                height: z.number().int().min(1),
               }),
             )
             .max(100)

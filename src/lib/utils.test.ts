@@ -1,5 +1,10 @@
 import { Currency } from './currency'
-import { formatCurrency, getTodayForDateInput } from './utils'
+import {
+  dateOnlyToLocalDate,
+  formatCurrency,
+  formatDateOnly,
+  getTodayForDateInput,
+} from './utils'
 
 describe('formatCurrency', () => {
   const currency: Currency = {
@@ -94,5 +99,42 @@ describe('getTodayForDateInput', () => {
 
     expect(isoDate).toBe(local)
     expect(isoDate).toBe('2026-09-11')
+  })
+})
+
+describe('dateOnlyToLocalDate', () => {
+  it('keeps the stored calendar day for a DATE column value', () => {
+    const date = dateOnlyToLocalDate(new Date('2024-08-01T00:00:00.000Z'))
+
+    expect(date.getFullYear()).toBe(2024)
+    expect(date.getMonth()).toBe(7)
+    expect(date.getDate()).toBe(1)
+  })
+
+  it('keeps the first of January in its own year', () => {
+    const date = dateOnlyToLocalDate(new Date('2024-01-01T00:00:00.000Z'))
+
+    expect(date.getFullYear()).toBe(2024)
+    expect(date.getMonth()).toBe(0)
+    expect(date.getDate()).toBe(1)
+  })
+
+  it('keeps the last day of a month on that same day', () => {
+    const date = dateOnlyToLocalDate(new Date('2024-08-31T00:00:00.000Z'))
+
+    expect(date.getMonth()).toBe(7)
+    expect(date.getDate()).toBe(31)
+  })
+})
+
+describe('formatDateOnly', () => {
+  it('formats a DATE column value on its stored calendar day', () => {
+    const formatted = formatDateOnly(
+      new Date('2024-08-01T00:00:00.000Z'),
+      'en-US',
+      { dateStyle: 'medium' },
+    )
+
+    expect(formatted).toBe('Aug 1, 2024')
   })
 })

@@ -55,7 +55,10 @@ export function ExpenseList() {
 
   return (
     <>
-      <SearchBar onValueChange={(value) => setSearchText(value)} />
+      <SearchBar
+        maxLength={200}
+        onValueChange={(value) => setSearchText(value)}
+      />
       <ExpenseListForSearch
         groupId={groupId}
         searchText={debouncedSearchText}

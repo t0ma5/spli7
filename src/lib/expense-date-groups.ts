@@ -1,4 +1,5 @@
 import { getWeekStartsOn, isSameWeek } from '@/lib/date-groups'
+import { dateOnlyToLocalDate } from '@/lib/utils'
 import dayjs, { type Dayjs } from 'dayjs'
 
 export const RELATIVE_EXPENSE_DATE_GROUPS = {
@@ -55,7 +56,7 @@ export function groupExpensesByRelativeDate<TExpense extends ExpenseWithDate>(
   const groupedExpenses = expenses.reduce(
     (result, expense) => {
       const expenseGroup = getRelativeExpenseDateGroup(
-        dayjs(expense.expenseDate),
+        dayjs(dateOnlyToLocalDate(expense.expenseDate)),
         today,
         weekStartsOn,
       )

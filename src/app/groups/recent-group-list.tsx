@@ -9,6 +9,7 @@ import {
   getStarredGroups,
 } from '@/app/groups/recent-groups-helpers'
 import { Button } from '@/components/ui/button'
+import { MAX_GROUPS_PER_QUERY } from '@/lib/group-query-limits'
 import type { GroupListItem } from '@/lib/kv/types'
 import { trpc } from '@/trpc/client'
 import { AppRouterOutput } from '@/trpc/routers/_app'
@@ -106,7 +107,7 @@ function RecentGroupList_({
 }) {
   const t = useTranslations('Groups')
   const { data, isLoading, isError, refetch } = trpc.groups.list.useQuery({
-    groupIds: groups.map((group) => group.id),
+    groupIds: groups.map((group) => group.id).slice(0, MAX_GROUPS_PER_QUERY),
   })
 
   if (isError) {

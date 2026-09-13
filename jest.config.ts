@@ -6,14 +6,16 @@ const createJestConfig = nextJest({
   dir: './',
 })
 
-// Add any custom config to be passed to Jest
+// Date-only values (expenseDate) are carried at UTC midnight. A host at UTC
+// takes the passing side of the west-of-UTC grouping defect, so the suite is
+// pinned to America/Los_Angeles (see jest.environment.ts).
 const config: Config = {
   coverageProvider: 'v8',
-  testEnvironment: 'jsdom',
+  testEnvironment: '<rootDir>/jest.environment.ts',
+  testEnvironmentOptions: { tz: 'America/Los_Angeles' },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/.open-next/'],
   transformIgnorePatterns: ['/node_modules/(?!(nanoid)/)'],
 }
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
 export default createJestConfig(config)

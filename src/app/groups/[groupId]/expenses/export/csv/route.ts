@@ -3,7 +3,11 @@ import { escapeCsvCell } from '@/lib/csv-escape'
 import { getCurrency } from '@/lib/currency'
 import { assertExportAccess } from '@/lib/group-access'
 import { getExpenseShares } from '@/lib/shares'
-import { formatAmountAsDecimal, getCurrencyFromGroup } from '@/lib/utils'
+import {
+  dateOnlyToLocalDate,
+  formatAmountAsDecimal,
+  getCurrencyFromGroup,
+} from '@/lib/utils'
 import { Parser } from '@json2csv/plainjs'
 import contentDisposition from 'content-disposition'
 import { NextResponse } from 'next/server'
@@ -15,8 +19,8 @@ const splitModeLabel = {
   BY_AMOUNT: 'Unevenly – By amount',
 }
 
-function formatDate(isoDateString: Date): string {
-  const date = new Date(isoDateString)
+function formatDate(dateOnly: Date): string {
+  const date = dateOnlyToLocalDate(dateOnly)
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
