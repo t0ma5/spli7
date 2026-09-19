@@ -1,14 +1,12 @@
-[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spl1t.pages.dev)
+[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spli7.vercel.app)
 
-**spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Cloudflare Workers** (via OpenNext) with **Cloudflare D1** (SQLite) as the database — not Vercel Postgres / Prisma, and not KV documents.
+**spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Vercel** (project **spli7**) with **Turso** (libSQL/SQLite) as the database — not Prisma/Postgres.
 
-**Live:** [https://spl1t.pages.dev](https://spl1t.pages.dev)
-
-> `spl1t.pages.dev` is a Pages project that reverse-proxies Worker `spl1t`. OpenNext deploys the Worker; `NEXT_PUBLIC_BASE_URL` is `https://spl1t.pages.dev`.
+**Live:** [https://spli7.vercel.app](https://spli7.vercel.app)
 
 ## Features
 
-Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · 🔴 new in this Cloudflare Workers / D1 fork
+Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · 🔴 new in this Vercel / Turso fork
 
 - [x] 🟢 Create a group and share it with friends
 - [x] 🟢 Create expenses with description
@@ -59,21 +57,21 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [Next.js](https://nextjs.org/) for the web application
 - [TailwindCSS](https://tailwindcss.com/) for the styling
 - [shadcn/UI](https://ui.shadcn.com/) for the UI components
-- [Cloudflare D1](https://developers.cloudflare.com/d1/) for persistence (SQL, transactions, optimistic concurrency)
-- [OpenNext Cloudflare](https://opennext.js.org/cloudflare) + [Workers](https://developers.cloudflare.com/workers/) for hosting
+- [Turso](https://turso.tech/) (libSQL/SQLite) for persistence (SQL, transactions, optimistic concurrency)
+- [Vercel](https://vercel.com/) for hosting (project **spli7**)
 
 ## Data model notes
 
-- Groups, participants, expenses, payers, shares, and activity live in **D1** tables (see `migrations/0001_init.sql`, `0002_keyset_indexes.sql`).
+- Groups, participants, expenses, payers, shares, and activity live in **SQLite** tables on Turso (see `migrations/0001_init.sql`, `0002_keyset_indexes.sql`).
 - Concurrent edits use an integer `version` column and retry on conflict (not last-write-wins KV).
 - Expense lists and activity history page with **keyset cursors** (`expense_date`/`created_at`/`id`, not `OFFSET`). Adding or editing one expense writes only that row (plus an activity), not the whole group. Balances and stats still need every expense but skip documents and recurring links.
 - Optional group PIN is hashed with PBKDF2, never returned to clients, and enforced on tRPC + export routes via an HTTP-only cookie (`PIN_SECRET`).
 - Groups track `lastActivityAt` on mutations and `lastSeenAt` on reads. After **24 months** without either, cleanup soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted.
-- Cron (Bearer `CRON_SECRET`): `GET/POST /api/cron/cleanup-groups`, `/api/cron/recurring`, `/api/cron/backup`. One-shot KV import: `POST /api/cron/migrate-kv`.
+- Cron (Bearer `CRON_SECRET`): `GET/POST /api/cron/cleanup-groups`, `/api/cron/recurring`, `/api/cron/backup`. Vercel Cron runs cleanup + recurring daily. Legacy KV import (`/api/cron/migrate-kv`) returns 410.
 
 ## Extra UX (this fork)
 
-Ideas below track community demand from [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md), upstream Spliit issues/PRs, and hardening patterns from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (reimplemented for Workers/D1 — not a code port of their E2EE/auth stack).
+Ideas below track community demand from [Spliit Cloud’s roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md), upstream Spliit issues/PRs, and hardening patterns from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (reimplemented for this SQLite/Turso fork — not a code port of their E2EE/auth stack).
 
 | Feature                                      | Notes                                                                                                                                                    | Prior art                                                                                                                                                             |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -102,12 +100,12 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Translated page titles**                   | `generateMetadata` + next-intl on group pages.                                                                                                           | Upstream [#537](https://github.com/spliit-app/spliit/pull/537)                                                                                                        |
 | **Calendar month grouping**                  | Optional group setting for roommate-style monthly lists.                                                                                                 | Upstream [#530](https://github.com/spliit-app/spliit/pull/530)                                                                                                        |
 | **Multiple payers**                          | Split who paid an expense across several participants; balances/export/import aware. Legacy paidById migrates on read.                                   | Upstream [#396](https://github.com/spliit-app/spliit/pull/396)                                                                                                        |
-| **Reorder participants**                     | Drag-and-drop + Sort A–Z; order persisted in D1.                                                                                                         | Upstream [#416](https://github.com/spliit-app/spliit/pull/416)                                                                                                        |
+| **Reorder participants**                     | Drag-and-drop + Sort A–Z; order persisted in SQLite.                                                                                                     | Upstream [#416](https://github.com/spliit-app/spliit/pull/416)                                                                                                        |
 | **Tricount import**                          | GDPR CSV export via the same Import control as Spliit JSON.                                                                                              | Upstream [#526](https://github.com/spliit-app/spliit/pull/526)                                                                                                        |
 | **Keep by-amount shares on reopen**          | Nested share inputs no longer register as their own fields, so reopening an uneven-by-amount expense does not even-split it.                             | Upstream [#638](https://github.com/spliit-app/spliit/pull/638)                                                                                                        |
 | **Remainder + named split difference**       | Emptying a by-amount share suggests the remainder as a placeholder; the error names the sum and how far off it is.                                       | Upstream [#639](https://github.com/spliit-app/spliit/pull/639)                                                                                                        |
 | **Group expenses by stored calendar day**    | Expense list headers use the DATE column’s calendar day, so the 1st of a month is not filed under last month west of UTC.                                | Upstream [#635](https://github.com/spliit-app/spliit/pull/635)                                                                                                        |
-| **Export / input hardening**                 | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries.                                                               | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for Workers/D1)                                                          |
+| **Export / input hardening**                 | CSV formula escape, Zod max caps, expense date bounds, security headers, error boundaries.                                                               | Patterns reviewed from [anon-spliit](https://github.com/sora-grayscale/anon-spliit) (adapted for this fork)                                                          |
 
 ## Stats (this fork)
 
@@ -118,7 +116,7 @@ On each group’s **Stats** tab:
 - **Monthly spending** — stacked category chart for calendar months, with a category breakdown and legend controls.
 - **Balance timeline** — cumulative balances over time for participants (engineering fixes on this fork for share math / timeline consistency).
 
-Spending stats exclude reimbursements. Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555) / [#584](https://github.com/spliit-app/spliit/pull/584); reimplemented against the D1 group API.
+Spending stats exclude reimbursements. Inspired by upstream [#532](https://github.com/spliit-app/spliit/pull/532) / [#555](https://github.com/spliit-app/spliit/pull/555) / [#584](https://github.com/spliit-app/spliit/pull/584); reimplemented against the group API.
 
 ## Group import JSON / Tricount / Splitwise (this fork)
 
@@ -158,80 +156,81 @@ Shared behavior:
 
 ## Removed / disabled upstream features (S3 & OpenAI)
 
-Upstream Spliit optional features that depended on **AWS S3** and **OpenAI** are **not available** in this Cloudflare D1 fork:
+Upstream Spliit optional features that depended on **AWS S3** and **OpenAI** are **not available** in this fork:
 
-| Feature                          | Upstream dependency               | Status here                                                                                   |
-| -------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------- |
-| Expense document / image uploads | S3 (or compatible object storage) | **Removed** from the critical path; UI/API stubs keep flags off. D1 is not used for binaries. |
-| Create expense from receipt scan | OpenAI + storage                  | **Disabled**; no OpenAI client or API keys.                                                   |
-| Category extract from text/image | OpenAI                            | **Disabled**; same as above.                                                                  |
+| Feature                          | Upstream dependency               | Status here                                                                                      |
+| -------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Expense document / image uploads | S3 (or compatible object storage) | **Removed** from the critical path; UI/API stubs keep flags off. SQLite is not used for binaries. |
+| Create expense from receipt scan | OpenAI + storage                  | **Disabled**; no OpenAI client or API keys.                                                      |
+| Category extract from text/image | OpenAI                            | **Disabled**; same as above.                                                                     |
 
 What changed vs upstream:
 
-- Prisma, Postgres, and Vercel-oriented DB wiring were replaced first with KV, then with **Cloudflare D1**.
+- Prisma and Postgres were replaced with **Turso** (same SQLite schema as the later D1 tables).
 - S3/OpenAI packages and env vars were dropped; keep `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS`, `NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT`, and `NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT` unset or `false` (see `.env.example`).
-- Re-enabling uploads later would mean adding **R2**. Receipt/category AI would need a Workers-compatible provider and explicit product work.
+- Re-enabling uploads later would mean object storage. Receipt/category AI would need an explicit product decision.
+
+## Why not Cloudflare Workers Free
+
+Do **not** host this Next.js app on **Cloudflare Workers Free**. That plan caps CPU at **10 ms** per request. OpenNext SSR for this app measured ~23–90 ms (cold ~700 ms), so two people opening a group at once returned **Error 1102** (Worker exceeded resource limits).
+
+Workers Paid (~$5/month) raises the CPU cap. This fork uses **Vercel Hobby** instead (300 s duration, 4 CPU-hours/month) plus Turso, so concurrent group loads do not 1102.
 
 ## Run locally
 
 1. Clone the repository: `git clone https://github.com/t0ma5/spl1t.git`
-2. Copy `.env.example` to `.env` and `.dev.vars` as needed (`PIN_SECRET`, `CRON_SECRET`)
-3. Create a D1 database and put its id in [`wrangler.jsonc`](wrangler.jsonc) `d1_databases[0].database_id`:
+2. Copy `.env.example` to `.env.local` and set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, plus `PIN_SECRET` / `CRON_SECRET` if you need PIN or cron locally
+3. Install and apply Turso migrations:
 
 ```bash
-npx wrangler d1 create spl1t
+npm install
 npm run db:migrate:local
 ```
 
-4. Run `npm install` (uses `package-lock.json`)
-5. Set `NEXT_PUBLIC_BASE_URL` (production default in `wrangler.jsonc` `vars` is `https://spl1t.pages.dev`)
-6. Run `npm run dev` for Next.js local development (bindings via OpenNext), or `npm run preview` to build and run in the Workers runtime
+4. Set `NEXT_PUBLIC_BASE_URL` (production is `https://spli7.vercel.app`)
+5. Run `npm run dev`
 
-If you still have groups in the legacy KV namespace, set `CRON_SECRET` and `POST /api/cron/migrate-kv` once after D1 is live.
+## Deploy to Vercel
 
-**Note:** Local OpenNext/Wrangler needs **workerd**. Official packages are not published for Windows ARM64; on this machine install `@cloudflare/workerd-windows-64` with `--no-save --force` so Wrangler can run (do not commit that package).
-
-## Deploy to Cloudflare
-
-GitHub and Cloudflare are **not** linked. Treat them as two separate actions:
+GitHub and Vercel are **not** linked by default. Treat them as two separate actions:
 
 1. **GitHub** — `git push` updates the repo. CI (push) only runs types/lint/format/tests.
-2. **Cloudflare** — `npm run deploy` with **Wrangler OAuth** (`npx wrangler login` / `npx wrangler whoami`) updates the live Worker.
+2. **Vercel** — `npx vercel --prod` (or `npm run deploy`) updates project **spli7**.
 
 Requires **Node.js 22+**.
 
 ```bash
+npx turso db create spli7
+npx turso db show spli7 --url
+npx turso db tokens create spli7
 npm run db:migrate:remote
-npx wrangler secret put PIN_SECRET
-npx wrangler secret put CRON_SECRET
-npm run deploy
+npx vercel --prod --yes --name spli7
 ```
 
-This runs `opennextjs-cloudflare build` then deploys Worker **`spl1t`**. Ensure:
+Set these on the Vercel project:
 
-- `DATABASE` D1 binding in `wrangler.jsonc` points at your database.
-- `vars.NEXT_PUBLIC_BASE_URL` matches the URL users open (`https://spl1t.pages.dev`).
-- `observability.enabled` is on so Workers Logs persist.
-- This account is on **Workers Free** (hard **10 ms** CPU per request). Do **not** set `limits.cpu_ms` — Wrangler rejects it with error 100328. OpenNext SSR of a large group can exceed 10 ms; Cloudflare may allow infrequent overage, then return **Error 1102** once traffic is consistent. The D1 keyset/surgical-write work is what keeps hot paths small. **Workers Paid** ($5/mo) raises the default to 30 s without any `cpu_ms` field.
+- `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`
+- `PIN_SECRET` / `CRON_SECRET`
+- `NEXT_PUBLIC_BASE_URL=https://spli7.vercel.app`
 
-D1 migrations are **not** applied by `npm run deploy` — run `npm run db:migrate:remote` when `migrations/` changes.
+Turso migrations are **not** applied by `vercel --prod` — run `npm run db:migrate:remote` when `migrations/` changes.
 
 ### Ops notes
 
-- Pushing code to GitHub does **not** update the live Worker until you run `npm run deploy`.
+- Pushing code to GitHub does **not** update the live site until you deploy to Vercel (or link Git).
 - Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories.
-- Set Worker secrets `PIN_SECRET` and `CRON_SECRET`. Call `/api/cron/cleanup-groups` and `/api/cron/recurring` daily.
+- Vercel Cron in `vercel.json` calls `/api/cron/cleanup-groups` and `/api/cron/recurring` daily when `CRON_SECRET` is set.
 
 ## Health check
 
-- `GET /api/health/readiness` or `GET /api/health` — app ready, including a read-only D1 probe
+- `GET /api/health/readiness` or `GET /api/health` — app ready, including a read-only Turso probe
 - `GET /api/health/liveness` — process alive only
 
 ## Credits & provenance
 
 - **Original Spliit** — idea, UI, and core expense-splitting product by [Sebastien Castiel](https://github.com/scastiel) and contributors: [spliit-app/spliit](https://github.com/spliit-app/spliit) · [spliit.app](https://spliit.app).
-- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with new features. Several UX improvements in _this_ Workers/D1 fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for D1, not a code port of their Postgres/API stack).
-- **[anon-spliit](https://github.com/sora-grayscale/anon-spliit)** ([sora-grayscale](https://github.com/sora-grayscale)) — privacy-focused fork (E2EE, private instance, deletion/auto-delete). This Workers/D1 fork adapted selected **lifecycle and hardening** ideas from that work; it does **not** port their end-to-end encryption or account/2FA stack.
+- **[Spliit Cloud](https://spliit.cloud)** ([antonio-ivanovski/spliit-cloud](https://github.com/antonio-ivanovski/spliit-cloud)) — community fork that continues Spliit with new features. Several UX improvements in _this_ fork were prioritized from their [roadmap](https://github.com/antonio-ivanovski/spliit-cloud/blob/main/ROADMAP.md) and upstream issue links (reimplemented for SQLite, not a code port of their Postgres/API stack).
+- **[anon-spliit](https://github.com/sora-grayscale/anon-spliit)** ([sora-grayscale](https://github.com/sora-grayscale)) — privacy-focused fork (E2EE, private instance, deletion/auto-delete). This fork adapted selected **lifecycle and hardening** ideas from that work; it does **not** port their end-to-end encryption or account/2FA stack.
 
 ## License
 

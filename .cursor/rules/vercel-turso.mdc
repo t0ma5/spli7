@@ -1,0 +1,33 @@
+---
+description: Deploy target is Vercel (spli7) with Turso/libSQL as the database
+alwaysApply: true
+---
+
+# Vercel + Turso
+
+This app deploys on **Vercel** as project **`spli7`** (`https://spli7.vercel.app`), with **Turso** (libSQL/SQLite) as the primary database.
+
+## Platform
+
+- Host on Vercel. Do not reintroduce Cloudflare Workers, OpenNext, Wrangler, D1, or Prisma/Postgres.
+- Access the DB with `getSqlDatabase()` / `getD1()` in `src/lib/db/client.ts` (`@libsql/client`).
+- Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in Vercel env and local `.env`.
+
+## Data layer
+
+- Normalized SQLite tables (see `migrations/0001_init.sql` and `src/lib/db/`).
+- `src/lib/api.ts` loads a `GroupDocument`, mutates it, and saves with an optimistic `version` column (retry on conflict).
+- Do not store new groups in KV. Legacy `/api/cron/migrate-kv` returns 410.
+- Do not store large binaries in SQLite; document/receipt uploads stay out of scope.
+
+## Auth
+
+- Groups are capability URLs (unguessable ids). Optional PIN is **server-enforced** via an HTTP-only cookie (`src/lib/group-access.ts`).
+- New PINs are 6–8 digits, hashed with PBKDF2. Do not store or return `pinHash` to clients.
+
+## Local / deploy
+
+- Apply migrations: `npm run db:migrate:local` / `npm run db:migrate:remote` (same script; needs Turso env).
+- Local: `npm run dev`.
+- Live deploys are `npx vercel --prod` to project **spli7**. GitHub push does not deploy unless Vercel Git is linked.
+- Keep README and `.env.example` aligned with Vercel + Turso (no D1/Postgres URLs).

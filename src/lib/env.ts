@@ -30,7 +30,7 @@ const envSchema = z
       ctx.addIssue({
         code: ZodIssueCode.custom,
         message:
-          'Expense documents are not supported in this Cloudflare D1 deploy yet. Keep NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS unset/false.',
+          'Expense documents are not supported on this deploy yet. Keep NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS unset/false.',
       })
     }
     if (
@@ -40,7 +40,7 @@ const envSchema = z
       ctx.addIssue({
         code: ZodIssueCode.custom,
         message:
-          'Receipt/category extract features are not supported in this Cloudflare D1 deploy yet. Keep those flags unset/false.',
+          'Receipt/category extract features are not supported on this deploy yet. Keep those flags unset/false.',
       })
     }
   })

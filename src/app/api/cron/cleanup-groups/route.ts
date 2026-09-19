@@ -2,6 +2,8 @@ import { cleanupExpiredGroups } from '@/lib/api'
 import { isCronAuthorized, unauthorized } from '@/lib/cron-auth'
 import { NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return unauthorized()
   const result = await cleanupExpiredGroups()

@@ -295,7 +295,7 @@ function buildExpenseFromForm(
       participantId: paidFor.participant,
       shares: Number(paidFor.shares),
     })),
-    // Documents / uploads are out of scope for Cloudflare KV v1
+    // Documents / uploads are out of scope; SQLite is not used for binaries.
     documents: [],
     recurringExpenseLink,
   }

@@ -2,6 +2,8 @@ import { isCronAuthorized, unauthorized } from '@/lib/cron-auth'
 import { getD1 } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return unauthorized()
   const db = await getD1()
