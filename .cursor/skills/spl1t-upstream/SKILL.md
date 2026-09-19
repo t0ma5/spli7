@@ -3,7 +3,7 @@ name: spl1t-upstream
 description: >-
   Track upstream spliit-app/spliit PRs to port into this fork. Use when
   checking latest PRs, what's new upstream, what to port, next work,
-  improvements, or ideas for spl1t.
+  improvements, or ideas for spli7.
 ---
 
 # Upstream Spliit PRs

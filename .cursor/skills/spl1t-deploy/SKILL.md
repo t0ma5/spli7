@@ -1,12 +1,12 @@
 ---
 name: spl1t-deploy
 description: >-
-  Deploy spl1t to Vercel project spli7 (https://spli7.vercel.app), separately
+  Deploy spli7 to Vercel project spli7 (https://spli7.vercel.app), separately
   from GitHub. Use when the user asks to deploy, ship, npm run deploy, vercel
   --prod, or update spli7.vercel.app.
 ---
 
-# spl1t GitHub vs Vercel deploy
+# spli7 GitHub vs Vercel deploy
 
 GitHub and Vercel are **two independent actions** unless Git integration is linked. A git push does not go live by default. `npx vercel --prod` does not push git.
 

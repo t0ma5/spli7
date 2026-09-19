@@ -1,9 +1,10 @@
 ---
 name: spl1t-d1
-description: spl1t data layer, PIN auth, and Turso/libSQL conventions. Use when editing groups, expenses, tRPC procedures, migrations, cron jobs, or anything that reads/writes group data.
+description: >-
+  spli7 data layer, PIN auth, and Turso/libSQL conventions. Use when editing groups, expenses, tRPC procedures, migrations, cron jobs, or anything that reads/writes group data.
 ---
 
-# spl1t + Turso
+# spli7 + Turso
 
 ## Database
 

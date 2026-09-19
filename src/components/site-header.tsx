@@ -17,11 +17,11 @@ export function SiteHeader() {
       >
         <h1 className="flex items-center m-0 leading-none">
           <Image
-            src="/logo-with-text.png"
-            className="h-8 w-auto max-h-8 object-contain"
-            width={413}
-            height={180}
-            alt="Spl1t"
+            src="/logo/128x128.png"
+            className="h-8 w-8 object-contain"
+            width={128}
+            height={128}
+            alt="spli7"
             priority
           />
         </h1>
