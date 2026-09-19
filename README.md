@@ -4,6 +4,8 @@
 
 **Live:** [https://spli7.vercel.app](https://spli7.vercel.app)
 
+Do **not** host this app on **Cloudflare Workers Free**, CPU capped at **10 ms** per request. OpenNext SSR for this app measured ~23–90 ms (cold ~700 ms), so two people opening a group at once exceeded resource limits. CF Workers Paid (~$5/month) raises the CPU cap. This fork uses **Vercel Hobby** 300 s duration, 4 CPU-hours/month.
+
 ## Features
 
 Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · 🔴 new in this Vercel / Turso fork
@@ -169,12 +171,6 @@ What changed vs upstream:
 - Prisma and Postgres were replaced with **Turso** (same SQLite schema as the later D1 tables).
 - S3/OpenAI packages and env vars were dropped; keep `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS`, `NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT`, and `NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT` unset or `false` (see `.env.example`).
 - Re-enabling uploads later would mean object storage. Receipt/category AI would need an explicit product decision.
-
-## Why not Cloudflare Workers Free
-
-Do **not** host this Next.js app on **Cloudflare Workers Free**. That plan caps CPU at **10 ms** per request. OpenNext SSR for this app measured ~23–90 ms (cold ~700 ms), so two people opening a group at once returned **Error 1102** (Worker exceeded resource limits).
-
-Workers Paid (~$5/month) raises the CPU cap. This fork uses **Vercel Hobby** instead (300 s duration, 4 CPU-hours/month) plus Turso, so concurrent group loads do not 1102.
 
 ## Run locally
 
