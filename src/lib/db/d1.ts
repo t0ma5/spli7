@@ -1,4 +1,4 @@
-import { getD1 } from '@/lib/db/client'
+import { getD1, type SqlDatabase, type SqlStatement } from '@/lib/db/client'
 import { diffGroupChildren } from '@/lib/db/group-patch'
 import type {
   ActivityListOptions,
@@ -69,7 +69,7 @@ function bool01(value: boolean | null | undefined): number {
 }
 
 async function loadGroup(
-  db: D1Database,
+  db: SqlDatabase,
   id: string,
 ): Promise<GroupDocument | null> {
   const group = await db
@@ -139,11 +139,11 @@ function groupMetaBinds(group: GroupDocument) {
 }
 
 function participantUpsert(
-  db: D1Database,
+  db: SqlDatabase,
   groupId: string,
   participant: GroupDocument['participants'][number],
   index: number,
-): D1PreparedStatement {
+): SqlStatement {
   return db
     .prepare(
       `INSERT INTO participants (id, group_id, name, sort_order) VALUES (?, ?, ?, ?)
@@ -156,11 +156,11 @@ function participantUpsert(
 }
 
 function expenseInserts(
-  db: D1Database,
+  db: SqlDatabase,
   groupId: string,
   expense: GroupDocument['expenses'][number],
-): D1PreparedStatement[] {
-  const stmts: D1PreparedStatement[] = [
+): SqlStatement[] {
+  const stmts: SqlStatement[] = [
     db
       .prepare(
         `INSERT INTO expenses (
@@ -260,9 +260,9 @@ function expenseInserts(
 }
 
 function activityInsert(
-  db: D1Database,
+  db: SqlDatabase,
   activity: GroupDocument['activities'][number],
-): D1PreparedStatement {
+): SqlStatement {
   return db
     .prepare(
       `INSERT INTO activities (
@@ -281,9 +281,9 @@ function activityInsert(
 }
 
 function expenseChildDeletes(
-  db: D1Database,
+  db: SqlDatabase,
   expenseId: string,
-): D1PreparedStatement[] {
+): SqlStatement[] {
   return [
     db
       .prepare('DELETE FROM expense_documents WHERE expense_id = ?')
@@ -303,11 +303,11 @@ function expenseChildDeletes(
 }
 
 function inDeletes(
-  db: D1Database,
+  db: SqlDatabase,
   sqlBeforeIn: string,
   ids: string[],
-): D1PreparedStatement[] {
-  const stmts: D1PreparedStatement[] = []
+): SqlStatement[] {
+  const stmts: SqlStatement[] = []
   const size = 80
   for (let i = 0; i < ids.length; i += size) {
     const chunk = ids.slice(i, i + size)
@@ -317,11 +317,8 @@ function inDeletes(
   return stmts
 }
 
-function childInserts(
-  db: D1Database,
-  group: GroupDocument,
-): D1PreparedStatement[] {
-  const stmts: D1PreparedStatement[] = []
+function childInserts(db: SqlDatabase, group: GroupDocument): SqlStatement[] {
+  const stmts: SqlStatement[] = []
   group.participants.forEach((participant, index) => {
     stmts.push(participantUpsert(db, group.id, participant, index))
   })
@@ -335,12 +332,12 @@ function childInserts(
 }
 
 function childPatchStatements(
-  db: D1Database,
+  db: SqlDatabase,
   group: GroupDocument,
   previous: GroupDocument,
-): D1PreparedStatement[] {
+): SqlStatement[] {
   const patch = diffGroupChildren(previous, group)
-  const stmts: D1PreparedStatement[] = []
+  const stmts: SqlStatement[] = []
 
   if (patch.deleteExpenseIds.length > 0) {
     stmts.push(
@@ -410,11 +407,11 @@ function childPatchStatements(
 }
 
 function expenseMutationStatements(
-  db: D1Database,
+  db: SqlDatabase,
   groupId: string,
   mutation: GroupExpenseMutation,
-): D1PreparedStatement[] {
-  const stmts: D1PreparedStatement[] = []
+): SqlStatement[] {
+  const stmts: SqlStatement[] = []
   const deleteExpenseIds = mutation.deleteExpenseIds ?? []
   if (deleteExpenseIds.length > 0) {
     stmts.push(
@@ -451,7 +448,7 @@ function expenseMutationStatements(
   return stmts
 }
 
-function childDeletes(db: D1Database, groupId: string): D1PreparedStatement[] {
+function childDeletes(db: SqlDatabase, groupId: string): SqlStatement[] {
   return [
     db.prepare('DELETE FROM activities WHERE group_id = ?').bind(groupId),
     db
@@ -477,7 +474,7 @@ function childDeletes(db: D1Database, groupId: string): D1PreparedStatement[] {
   ]
 }
 
-async function runChunks(db: D1Database, stmts: D1PreparedStatement[]) {
+async function runChunks(db: SqlDatabase, stmts: SqlStatement[]) {
   const size = 40
   for (let i = 0; i < stmts.length; i += size) {
     await db.batch(stmts.slice(i, i + size))
@@ -498,7 +495,7 @@ type ActivityRow = {
 }
 
 async function selectWhereIdIn<T>(
-  db: D1Database,
+  db: SqlDatabase,
   sqlBeforeIn: string,
   ids: string[],
   extraBinds: unknown[] = [],
@@ -554,7 +551,7 @@ type ExpenseHydrate = {
 }
 
 async function hydrateExpenses(
-  db: D1Database,
+  db: SqlDatabase,
   expenseRows: ExpenseRow[],
   hydrate: ExpenseHydrate = {},
 ): Promise<Expense[]> {
@@ -670,7 +667,7 @@ async function hydrateExpenses(
 }
 
 async function listActivityRows(
-  db: D1Database,
+  db: SqlDatabase,
   groupId: string,
   options?: ActivityListOptions,
 ): Promise<Activity[]> {
@@ -700,7 +697,10 @@ async function listActivityRows(
   }))
 }
 
-async function loadMeta(db: D1Database, id: string): Promise<GroupMeta | null> {
+async function loadMeta(
+  db: SqlDatabase,
+  id: string,
+): Promise<GroupMeta | null> {
   const group = await db
     .prepare('SELECT * FROM groups WHERE id = ?')
     .bind(id)
@@ -736,7 +736,7 @@ async function loadMeta(db: D1Database, id: string): Promise<GroupMeta | null> {
 }
 
 async function selectExpenseRows(
-  db: D1Database,
+  db: SqlDatabase,
   groupId: string,
   options?: ExpenseListOptions,
 ): Promise<ExpenseRow[]> {
@@ -769,7 +769,7 @@ async function selectExpenseRows(
 }
 
 async function activeGroupId(
-  db: D1Database,
+  db: SqlDatabase,
   groupId: string,
 ): Promise<boolean> {
   const row = await db

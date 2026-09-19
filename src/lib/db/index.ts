@@ -1,3 +1,4 @@
+import { d1Repository } from '@/lib/db/d1'
 import { createMemoryRepository } from '@/lib/db/memory'
 import type { GroupRepository } from '@/lib/db/repository'
 
@@ -12,7 +13,5 @@ export function getRepository(): GroupRepository {
   if (process.env.SPL1T_MEMORY_DB === '1') {
     return createMemoryRepository()
   }
-  // Lazy so Jest can inject a memory repo without loading Workers bindings.
-  const { d1Repository } = require('./d1') as typeof import('./d1')
   return d1Repository
 }

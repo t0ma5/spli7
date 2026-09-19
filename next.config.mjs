@@ -1,4 +1,3 @@
-import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare'
 import createNextIntlPlugin from 'next-intl/plugin'
 
 // Relative path required for next-intl with Turbopack
@@ -6,12 +5,13 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['@libsql/client', '@libsql/hrana-client'],
   images: {
     remotePatterns: [],
   },
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000', 'spl1t.pages.dev'],
+      allowedOrigins: ['localhost:3000', 'spli7.vercel.app'],
     },
   },
   async headers() {
@@ -38,5 +38,3 @@ const nextConfig = {
 }
 
 export default withNextIntl(nextConfig)
-
-initOpenNextCloudflareForDev()

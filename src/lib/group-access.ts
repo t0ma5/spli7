@@ -61,8 +61,9 @@ export async function setUnlockCookie(groupId: string) {
 export async function clientKeyFromRequest(): Promise<string> {
   const h = await headers()
   const ip =
-    h.get('cf-connecting-ip') ||
     h.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    h.get('x-real-ip') ||
+    h.get('cf-connecting-ip') ||
     'unknown'
   const data = new TextEncoder().encode(ip)
   const digest = await crypto.subtle.digest('SHA-256', data)

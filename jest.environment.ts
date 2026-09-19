@@ -22,5 +22,10 @@ export default class TimezoneEnvironment extends JSDOMEnvironment {
       },
       context,
     )
+    this.global.fetch = fetch
+    this.global.Headers = Headers
+    this.global.Request = Request
+    this.global.Response = Response
+    this.global.FormData = FormData
   }
 }

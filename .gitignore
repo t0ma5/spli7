@@ -14,7 +14,8 @@
 /out/
 .open-next
 
-# cloudflare
+# local dumps / CLI leftovers
+.data/
 .dev.vars
 .wrangler
 
