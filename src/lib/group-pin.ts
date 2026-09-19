@@ -15,9 +15,9 @@ async function sha256Hex(value: string): Promise<string> {
   return bytesToHex(new Uint8Array(digest))
 }
 
-export async function hashGroupPin(
+async function hashGroupPinWithSalt(
   pin: string,
-  groupId: string,
+  salt: string,
 ): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
@@ -30,13 +30,20 @@ export async function hashGroupPin(
     {
       name: 'PBKDF2',
       hash: 'SHA-256',
-      salt: new TextEncoder().encode(`spl1t-pin:${groupId}`),
+      salt: new TextEncoder().encode(salt),
       iterations: PBKDF2_ITERATIONS,
     },
     key,
     256,
   )
   return `${PBKDF2_PREFIX}${PBKDF2_ITERATIONS}$${bytesToHex(new Uint8Array(bits))}`
+}
+
+export async function hashGroupPin(
+  pin: string,
+  groupId: string,
+): Promise<string> {
+  return hashGroupPinWithSalt(pin, `spli7-pin:${groupId}`)
 }
 
 /** Legacy SHA-256 used before the D1/PIN hardening. */
@@ -54,7 +61,9 @@ export async function pinMatchesHash(
 ): Promise<boolean> {
   if (pinHash.startsWith(PBKDF2_PREFIX)) {
     const expected = await hashGroupPin(pin, groupId)
-    return expected === pinHash
+    if (expected === pinHash) return true
+    const legacySalt = await hashGroupPinWithSalt(pin, `spl1t-pin:${groupId}`)
+    return legacySalt === pinHash
   }
   const legacy = await hashGroupPinLegacy(pin, groupId)
   return legacy === pinHash
@@ -69,5 +78,5 @@ export function groupPinUnlockStorageKey(groupId: string) {
 }
 
 export function pinCookieName(groupId: string) {
-  return `spl1t_pin_${groupId}`
+  return `spli7_pin_${groupId}`
 }

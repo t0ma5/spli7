@@ -1,7 +1,7 @@
 {
   "Homepage": {
     "title": "Share <strong>Expenses</strong> with <strong>Friends & Family</strong>",
-    "description": "Welcome to your new <strong>spl1t</strong> instance !",
+    "description": "Welcome to your new <strong>spli7</strong> instance !",
     "button": {
       "groups": "Go to groups",
       "github": "GitHub"
@@ -642,7 +642,7 @@
   },
   "Pwa": {
     "updateTitle": "Update available",
-    "updateDescription": "A new version of Spl1t is available.",
+    "updateDescription": "A new version of spli7 is available.",
     "reload": "Reload"
   }
 }

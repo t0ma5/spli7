@@ -1,6 +1,6 @@
-[<img alt="spl1t" height="60" src="./public/logo-with-text.png" />](https://spli7.vercel.app)
+[<img alt="spli7" height="60" src="./public/logo/128x128.png" />](https://spli7.vercel.app)
 
-**spl1t** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Vercel** (project **spli7**) with **Turso** (libSQL/SQLite) as the database — not Prisma/Postgres.
+**spli7** is an open source expense-tracking app based on [Spliit](https://github.com/spliit-app/spliit). This fork deploys on **Vercel** (project **spli7**) with **Turso** (libSQL/SQLite) as the database — not Prisma/Postgres.
 
 **Live:** [https://spli7.vercel.app](https://spli7.vercel.app)
 
@@ -12,7 +12,7 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🟢 Create expenses with description
 - [x] 🟢 Display group balances
 - [x] 🟢 Create reimbursement expenses
-- [x] 🟢 Progressive Web App (**Spl1t** home-screen name; service worker + offline page + update prompt)
+- [x] 🟢 Progressive Web App (**spli7** home-screen name; service worker + offline page + update prompt)
 - [x] 🟢 Select all/no participant for expenses
 - [x] 🟢 Split expenses unevenly
 - [x] 🟢 Mark a group as favorite
@@ -94,7 +94,7 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 | **Settle in another currency**               | Reimbursements can show the transfer amount in a non-group currency; group amount stays authoritative.                                                   | Upstream [#588](https://github.com/spliit-app/spliit/pull/588)                                                                                                        |
 | **Unified share math**                       | One apportionment for balances, stats, CSV, and the form (Hamilton remainder).                                                                           | Upstream [#562](https://github.com/spliit-app/spliit/pull/562)                                                                                                        |
 | **Locale week start**                        | Expense/activity “this week” follows the UI locale, not Sunday.                                                                                          | Upstream [#559](https://github.com/spliit-app/spliit/pull/559)                                                                                                        |
-| **PWA service worker**                       | Offline shell + update Reload toast; never caches API or mutations. Home-screen name **Spl1t**.                                                          | Upstream [#587](https://github.com/spliit-app/spliit/pull/587)                                                                                                        |
+| **PWA service worker**                       | Offline shell + update Reload toast; never caches API or mutations. Home-screen name **spli7**.                                                          | Upstream [#587](https://github.com/spliit-app/spliit/pull/587)                                                                                                        |
 | **Splitwise import**                         | CSV reconstruction (EN/DE headers) via the same Import control.                                                                                          | Upstream [#483](https://github.com/spliit-app/spliit/pull/483)                                                                                                        |
 | **CSV saldo export**                         | Participant columns are per-expense saldo; reimbursements Cost=0.                                                                                        | Upstream [#473](https://github.com/spliit-app/spliit/pull/473)                                                                                                        |
 | **Translated page titles**                   | `generateMetadata` + next-intl on group pages.                                                                                                           | Upstream [#537](https://github.com/spliit-app/spliit/pull/537)                                                                                                        |
@@ -178,7 +178,7 @@ Workers Paid (~$5/month) raises the CPU cap. This fork uses **Vercel Hobby** ins
 
 ## Run locally
 
-1. Clone the repository: `git clone https://github.com/t0ma5/spl1t.git`
+1. Clone the repository: `git clone https://github.com/t0ma5/spli7.git`
 2. Copy `.env.example` to `.env.local` and set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, plus `PIN_SECRET` / `CRON_SECRET` if you need PIN or cron locally
 3. Install and apply Turso migrations:
 

@@ -1,5 +1,5 @@
 /*
- * Spl1t service worker.
+ * spli7 service worker.
  *
  * A lightweight, dependency-free service worker that caches static assets to
  * save bandwidth and improve load performance, while always serving fresh data
@@ -17,17 +17,17 @@
  * Bump CACHE_VERSION to invalidate all previously cached content on deploy.
  */
 
-const CACHE_VERSION = 'v1'
-const PRECACHE = `spl1t-precache-${CACHE_VERSION}`
-const RUNTIME = `spl1t-runtime-${CACHE_VERSION}`
-const IMAGE_CACHE = `spl1t-images-${CACHE_VERSION}`
+const CACHE_VERSION = 'v2'
+const PRECACHE = `spli7-precache-${CACHE_VERSION}`
+const RUNTIME = `spli7-runtime-${CACHE_VERSION}`
+const IMAGE_CACHE = `spli7-images-${CACHE_VERSION}`
 
 const OFFLINE_URL = '/offline.html'
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
   '/manifest.webmanifest',
-  '/logo-with-text.png',
+  '/logo/128x128.png',
   '/logo/192x192.png',
   '/logo/512x512.png',
 ]

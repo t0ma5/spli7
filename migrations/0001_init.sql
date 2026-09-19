@@ -1,4 +1,4 @@
--- spl1t D1 schema. Normalized rows + version column for optimistic concurrency.
+-- spli7 schema. Normalized rows + version column for optimistic concurrency.
 
 CREATE TABLE groups (
   id TEXT PRIMARY KEY,

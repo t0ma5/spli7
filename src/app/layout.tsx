@@ -15,15 +15,15 @@ import './globals.css'
 export const metadata: Metadata = {
   metadataBase: new URL(env.NEXT_PUBLIC_BASE_URL),
   title: {
-    default: 'Spl1t · Share Expenses with Friends & Family',
-    template: '%s · Spl1t',
+    default: 'spli7 · Share Expenses with Friends & Family',
+    template: '%s · spli7',
   },
   description:
-    'Spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
+    'spli7 is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
   openGraph: {
-    title: 'Spl1t · Share Expenses with Friends & Family',
+    title: 'spli7 · Share Expenses with Friends & Family',
     description:
-      'Spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
+      'spli7 is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
     images: `/banner.png`,
     type: 'website',
     url: '/',
@@ -33,15 +33,15 @@ export const metadata: Metadata = {
     creator: '@scastiel',
     site: '@scastiel',
     images: `/banner.png`,
-    title: 'Spl1t · Share Expenses with Friends & Family',
+    title: 'spli7 · Share Expenses with Friends & Family',
     description:
-      'Spl1t is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
+      'spli7 is a minimalist web application to share expenses with friends and family. No ads, no account, no problem. Based on Spliit.',
   },
   appleWebApp: {
     capable: true,
-    title: 'Spl1t',
+    title: 'spli7',
   },
-  applicationName: 'Spl1t',
+  applicationName: 'spli7',
   icons: [
     {
       url: '/android-chrome-192x192.png',

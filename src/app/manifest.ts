@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Spl1t',
-    short_name: 'Spl1t',
+    name: 'spli7',
+    short_name: 'spli7',
     description:
       'A minimalist web application to share expenses with friends and family. No ads, no account, no problem.',
     start_url: '/groups',
