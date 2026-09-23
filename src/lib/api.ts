@@ -533,15 +533,28 @@ export async function createGroupFromSplitwiseCsv(csvText: string) {
   return mapGroup(group)
 }
 
+const CLIENT_EXPENSE_ID = /^[A-Za-z0-9_-]{21}$/
+
 export async function createExpense(
   expenseFormValues: ExpenseFormValues,
   groupId: string,
   participantId?: string,
+  // The expense form mints this so the split it previews is the one saved
+  // (the id seeds who takes the leftover minor unit). Omitted → server mint.
+  expenseId?: string,
 ): Promise<Expense> {
+  const id = expenseId ?? randomId()
+  if (expenseId !== undefined && !CLIENT_EXPENSE_ID.test(expenseId)) {
+    throw new Error('Invalid expense id')
+  }
+  // Inserts upsert on the global primary key. A reused id would overwrite
+  // the existing row, including one in another group.
+  if (await getRepository().expenseIdExists(id)) {
+    throw new Error('Expense id already exists')
+  }
   return withExpenseWrite(groupId, (meta) => {
     assertParticipantsInGroup(meta.participants, expenseFormValues)
-    const expenseId = randomId()
-    const expense = buildExpenseFromForm(expenseFormValues, groupId, expenseId)
+    const expense = buildExpenseFromForm(expenseFormValues, groupId, id)
     return {
       value: expense,
       mutation: {
@@ -549,7 +562,7 @@ export async function createExpense(
         insertActivities: [
           makeActivity(groupId, ActivityType.CREATE_EXPENSE, {
             participantId,
-            expenseId,
+            expenseId: id,
             data: expenseFormValues.title,
           }),
         ],

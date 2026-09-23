@@ -86,6 +86,75 @@ describe('api + memory repository', () => {
     expect(expense.amount).toBe(1000)
   })
 
+  it('stores a client-minted expense id and refuses a reuse', async () => {
+    const group = await createGroup({
+      name: 'Trip',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }, { name: 'Bob' }],
+    })
+    const other = await createGroup({
+      name: 'Other',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Cara' }, { name: 'Dan' }],
+    })
+    const ada = group.participants[0].id
+    const bob = group.participants[1].id
+    const form = {
+      expenseDate: new Date('2026-01-01'),
+      title: 'Dinner',
+      category: 0,
+      amount: 1657,
+      paidBy: [{ participant: ada, amount: 1657 }],
+      paidFor: [
+        { participant: ada, shares: 1 },
+        { participant: bob, shares: 1 },
+      ],
+      splitMode: 'EVENLY' as const,
+      saveDefaultSplittingOptions: false,
+      isReimbursement: false,
+      documents: [] as [],
+      recurrenceRule: 'NONE' as const,
+    }
+    const minted = 'abcdefghijklmnopqrstu'
+    const expense = await createExpense(form, group.id, undefined, minted)
+    expect(expense.id).toBe(minted)
+
+    await expect(
+      createExpense({ ...form, title: 'Again' }, group.id, undefined, minted),
+    ).rejects.toThrow('Expense id already exists')
+    expect(await getGroupExpenseCount(group.id)).toBe(1)
+
+    const cara = other.participants[0].id
+    const dan = other.participants[1].id
+    await expect(
+      createExpense(
+        {
+          ...form,
+          paidBy: [{ participant: cara, amount: 1657 }],
+          paidFor: [
+            { participant: cara, shares: 1 },
+            { participant: dan, shares: 1 },
+          ],
+        },
+        other.id,
+        undefined,
+        minted,
+      ),
+    ).rejects.toThrow('Expense id already exists')
+    expect(await getGroupExpenseCount(other.id)).toBe(0)
+    expect((await getExpense(group.id, minted))?.title).toBe('Dinner')
+
+    await expect(
+      createExpense(form, group.id, undefined, 'short'),
+    ).rejects.toThrow('Invalid expense id')
+  })
+
   it('creates, updates, and deletes an expense without loading the group document', async () => {
     const { repo, getCount } = countingGetRepository()
     setRepositoryForTests(repo)

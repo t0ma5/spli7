@@ -66,6 +66,8 @@ export interface GroupRepository {
     options?: ActivityListOptions,
   ): Promise<Activity[]>
   getExpense(groupId: string, expenseId: string): Promise<Expense | null>
+  /** Primary key is global. Create must not upsert over another group's row. */
+  expenseIdExists(expenseId: string): Promise<boolean>
   /** Distinct payer/share participant ids — no expense rows. */
   listExpenseParticipantIds(groupId: string): Promise<string[]>
   /** Active recurring frames (next copy not yet created). */

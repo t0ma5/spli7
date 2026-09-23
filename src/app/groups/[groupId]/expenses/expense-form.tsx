@@ -214,6 +214,7 @@ export function ExpenseForm({
   categories,
   expense,
   duplicateFrom,
+  expenseId,
   onSubmit,
   onDelete,
   runtimeFeatureFlags,
@@ -222,6 +223,11 @@ export function ExpenseForm({
   categories: AppRouterOutput['categories']['list']['categories']
   expense?: LoadedExpense
   duplicateFrom?: LoadedExpense
+  /**
+   * Id a new expense will be created with. Only the split preview reads it.
+   * When editing, `expense.id` wins.
+   */
+  expenseId?: string
   onSubmit: (value: ExpenseFormValues, participantId?: string) => Promise<void>
   onDelete?: (participantId?: string) => Promise<void>
   runtimeFeatureFlags: RuntimeFeatureFlags
@@ -1271,7 +1277,10 @@ export function ExpenseForm({
                                       {formatCurrency(
                                         groupCurrency,
                                         calculateShare(id, {
-                                          id: expense?.id,
+                                          // Id seeds who takes the leftover
+                                          // minor unit, so the preview matches
+                                          // the saved split.
+                                          id: expense?.id ?? expenseId,
                                           amount: amountAsMinorUnits(
                                             calcTotalAmountMajor(
                                               form.watch('paidBy') as any,
