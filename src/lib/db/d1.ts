@@ -888,6 +888,15 @@ export const d1Repository: GroupRepository = {
     return expense ?? null
   },
 
+  async expenseIdExists(expenseId) {
+    const db = await getD1()
+    const row = await db
+      .prepare('SELECT 1 AS ok FROM expenses WHERE id = ?')
+      .bind(expenseId)
+      .first<{ ok: number }>()
+    return Boolean(row)
+  },
+
   async listExpenseParticipantIds(groupId) {
     const db = await getD1()
     if (!(await activeGroupId(db, groupId))) return []

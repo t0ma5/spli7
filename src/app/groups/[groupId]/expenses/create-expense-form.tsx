@@ -1,7 +1,9 @@
 'use client'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
+import { randomId } from '@/lib/randomId'
 import { trpc } from '@/trpc/client'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { ExpenseForm } from './expense-form'
 
 export function CreateExpenseForm({
@@ -9,7 +11,6 @@ export function CreateExpenseForm({
   runtimeFeatureFlags,
 }: {
   groupId: string
-  expenseId?: string
   runtimeFeatureFlags: RuntimeFeatureFlags
 }) {
   const searchParams = useSearchParams()
@@ -30,6 +31,11 @@ export function CreateExpenseForm({
   const { mutateAsync: createExpenseMutateAsync } =
     trpc.groups.expenses.create.useMutation()
 
+  // Minted here rather than on save: the id seeds which participant takes the
+  // leftover minor unit, so the preview matches the saved split. Per mount, so
+  // a fresh visit gets a fresh id.
+  const [expenseId, setExpenseId] = useState(() => randomId())
+
   const utils = trpc.useUtils()
   const router = useRouter()
 
@@ -42,12 +48,21 @@ export function CreateExpenseForm({
       group={group}
       categories={categories}
       duplicateFrom={fromExpenseData?.expense ?? undefined}
+      expenseId={expenseId}
       onSubmit={async (expenseFormValues, participantId) => {
-        await createExpenseMutateAsync({
-          groupId,
-          expenseFormValues,
-          participantId,
-        })
+        try {
+          await createExpenseMutateAsync({
+            groupId,
+            expenseFormValues,
+            participantId,
+            expenseId,
+          })
+        } catch (error) {
+          // The server may have saved the expense and only the response was
+          // lost. Reusing this id would upsert over that row.
+          setExpenseId(randomId())
+          throw error
+        }
         utils.groups.expenses.invalidate()
         utils.groups.stats.invalidate()
         router.push(`/groups/${group.id}`)

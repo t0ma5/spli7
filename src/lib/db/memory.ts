@@ -152,6 +152,12 @@ export function createMemoryRepository(
       const expense = group.expenses.find((item) => item.id === expenseId)
       return expense ? clone(expense) : null
     },
+    async expenseIdExists(expenseId) {
+      for (const group of groups.values()) {
+        if (group.expenses.some((item) => item.id === expenseId)) return true
+      }
+      return false
+    },
     async listExpenseParticipantIds(groupId) {
       const group = groups.get(groupId)
       if (!group || group.deletedAt) return []
