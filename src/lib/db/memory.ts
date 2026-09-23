@@ -153,7 +153,7 @@ export function createMemoryRepository(
       return expense ? clone(expense) : null
     },
     async expenseIdExists(expenseId) {
-      for (const group of groups.values()) {
+      for (const group of Array.from(groups.values())) {
         if (group.expenses.some((item) => item.id === expenseId)) return true
       }
       return false
