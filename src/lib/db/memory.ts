@@ -49,8 +49,10 @@ function applyExpenseOptions(
   let next = sortExpenses(expenses)
   const filter = options?.filter?.trim().toLowerCase()
   if (filter) {
-    next = next.filter((expense) =>
-      expense.title.toLowerCase().includes(filter),
+    next = next.filter(
+      (expense) =>
+        expense.title.toLowerCase().includes(filter) ||
+        (expense.notes ?? '').toLowerCase().includes(filter),
     )
   }
   if (options?.after) {
