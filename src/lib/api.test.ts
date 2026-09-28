@@ -519,4 +519,50 @@ describe('api + memory repository', () => {
       }),
     ])
   })
+
+  it('matches an expense search against notes as well as the title', async () => {
+    const group = await createGroup({
+      name: 'Notes search',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }, { name: 'Bob' }],
+    })
+    const ada = group.participants[0].id
+    const bob = group.participants[1].id
+    const form = {
+      expenseDate: new Date('2026-01-01'),
+      category: 0,
+      amount: 100,
+      paidBy: [{ participant: ada, amount: 100 }],
+      paidFor: [
+        { participant: ada, shares: 1 },
+        { participant: bob, shares: 1 },
+      ],
+      splitMode: 'EVENLY' as const,
+      saveDefaultSplittingOptions: false,
+      isReimbursement: false,
+      documents: [] as [],
+      recurrenceRule: 'NONE' as const,
+    }
+    await createExpense(
+      { ...form, title: 'Dinner', notes: 'Birthday at the lake house' },
+      group.id,
+    )
+    await createExpense({ ...form, title: 'Groceries' }, group.id)
+
+    const byNote = await getGroupExpenses(group.id, {
+      filter: 'Lake House',
+      length: 10,
+    })
+    expect(byNote.map((expense) => expense.title)).toEqual(['Dinner'])
+    expect(
+      (
+        await getGroupExpenses(group.id, { filter: 'groc', length: 10 })
+      ).map((expense) => expense.title),
+    ).toEqual(['Groceries'])
+    expect(await getRepository().countExpenses(group.id, 'lake house')).toBe(1)
+    expect(await getRepository().countExpenses(group.id, 'zzz')).toBe(0)
+  })
 })

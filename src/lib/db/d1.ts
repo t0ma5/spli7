@@ -735,6 +735,12 @@ async function loadMeta(
   }
 }
 
+function expenseSearchPattern(filter: string): string {
+  return `%${filter.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`
+}
+
+const EXPENSE_SEARCH_SQL = `(LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(IFNULL(notes, '')) LIKE ? ESCAPE '\\')`
+
 async function selectExpenseRows(
   db: SqlDatabase,
   groupId: string,
@@ -744,10 +750,9 @@ async function selectExpenseRows(
   const clauses = ['group_id = ?']
   const binds: unknown[] = [groupId]
   if (filter) {
-    clauses.push(`LOWER(title) LIKE ? ESCAPE '\\'`)
-    binds.push(
-      `%${filter.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`,
-    )
+    clauses.push(EXPENSE_SEARCH_SQL)
+    const pattern = expenseSearchPattern(filter)
+    binds.push(pattern, pattern)
   }
   if (options?.after) {
     clauses.push(
@@ -847,15 +852,13 @@ export const d1Repository: GroupRepository = {
     if (!(await activeGroupId(db, groupId))) return 0
     const trimmed = filter?.trim()
     if (trimmed) {
+      const pattern = expenseSearchPattern(trimmed)
       const row = await db
         .prepare(
           `SELECT COUNT(*) AS n FROM expenses
-           WHERE group_id = ? AND LOWER(title) LIKE ? ESCAPE '\\'`,
+           WHERE group_id = ? AND ${EXPENSE_SEARCH_SQL}`,
         )
-        .bind(
-          groupId,
-          `%${trimmed.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`,
-        )
+        .bind(groupId, pattern, pattern)
         .first<{ n: number }>()
       return row?.n ?? 0
     }
