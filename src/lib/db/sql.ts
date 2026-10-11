@@ -2,6 +2,7 @@ import {
   createClient,
   type Client,
   type InStatement,
+  type Transaction,
   type Value,
 } from '@libsql/client/http'
 
@@ -17,6 +18,16 @@ export type SqlStatement = {
 export type SqlDatabase = {
   prepare(query: string): SqlStatement
   batch(stmts: SqlStatement[]): Promise<unknown>
+  /** Run `fn` in one write transaction. Commit on success, roll back on throw. */
+  transaction<T>(fn: (db: SqlDatabase) => Promise<T>): Promise<T>
+}
+
+type SqlExecutor = {
+  execute(stmt: {
+    sql: string
+    args: Value[]
+  }): Promise<{ rows: unknown[]; rowsAffected: number }>
+  batch(stmts: InStatement[]): Promise<unknown>
 }
 
 function asValues(values: unknown[]): Value[] {
@@ -39,17 +50,17 @@ function asValues(values: unknown[]): Value[] {
 
 class LibsqlStatement implements SqlStatement {
   constructor(
-    private readonly client: Client,
+    private readonly executor: SqlExecutor,
     readonly sql: string,
     readonly args: Value[] = [],
   ) {}
 
   bind(...values: unknown[]): SqlStatement {
-    return new LibsqlStatement(this.client, this.sql, asValues(values))
+    return new LibsqlStatement(this.executor, this.sql, asValues(values))
   }
 
   async first<T>(): Promise<T | null> {
-    const result = await this.client.execute({
+    const result = await this.executor.execute({
       sql: this.sql,
       args: this.args,
     })
@@ -58,7 +69,7 @@ class LibsqlStatement implements SqlStatement {
   }
 
   async all<T>(): Promise<{ results: T[] }> {
-    const result = await this.client.execute({
+    const result = await this.executor.execute({
       sql: this.sql,
       args: this.args,
     })
@@ -66,7 +77,7 @@ class LibsqlStatement implements SqlStatement {
   }
 
   async run(): Promise<{ meta: { changes: number } }> {
-    const result = await this.client.execute({
+    const result = await this.executor.execute({
       sql: this.sql,
       args: this.args,
     })
@@ -74,11 +85,34 @@ class LibsqlStatement implements SqlStatement {
   }
 }
 
+function clientExecutor(client: Client): SqlExecutor {
+  return {
+    execute: async (stmt) => {
+      const result = await client.execute(stmt)
+      return { rows: result.rows, rowsAffected: result.rowsAffected }
+    },
+    batch: (stmts) => client.batch(stmts, 'write'),
+  }
+}
+
+function transactionExecutor(tx: Transaction): SqlExecutor {
+  return {
+    execute: async (stmt) => {
+      const result = await tx.execute(stmt)
+      return { rows: result.rows, rowsAffected: result.rowsAffected }
+    },
+    batch: (stmts) => tx.batch(stmts),
+  }
+}
+
 class LibsqlDatabase implements SqlDatabase {
-  constructor(private readonly client: Client) {}
+  constructor(
+    private readonly executor: SqlExecutor,
+    private readonly beginWrite?: () => Promise<Transaction>,
+  ) {}
 
   prepare(query: string): SqlStatement {
-    return new LibsqlStatement(this.client, query)
+    return new LibsqlStatement(this.executor, query)
   }
 
   async batch(stmts: SqlStatement[]): Promise<unknown> {
@@ -87,7 +121,26 @@ class LibsqlDatabase implements SqlDatabase {
       sql: stmt.sql,
       args: stmt.args,
     }))
-    return this.client.batch(statements, 'write')
+    return this.executor.batch(statements)
+  }
+
+  async transaction<T>(fn: (db: SqlDatabase) => Promise<T>): Promise<T> {
+    if (!this.beginWrite) return fn(this)
+    const tx = await this.beginWrite()
+    try {
+      const result = await fn(new LibsqlDatabase(transactionExecutor(tx)))
+      await tx.commit()
+      return result
+    } catch (error) {
+      try {
+        await tx.rollback()
+      } catch {
+        // The transaction may already be closed.
+      }
+      throw error
+    } finally {
+      tx.close()
+    }
   }
 }
 
@@ -103,6 +156,8 @@ export function getSqlDatabase(): SqlDatabase {
     url,
     authToken: process.env.TURSO_AUTH_TOKEN,
   })
-  cached = new LibsqlDatabase(client)
+  cached = new LibsqlDatabase(clientExecutor(client), () =>
+    client.transaction('write'),
+  )
   return cached
 }

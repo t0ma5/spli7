@@ -152,3 +152,9 @@ export function distributeAmount(amount: number, count: number): number[] {
     0,
   )
 }
+
+/** Split `total` by `weights` so the parts add up to exactly `total`. */
+export function distributeWeighted(total: number, weights: number[]): number[] {
+  const totalShares = weights.reduce((sum, weight) => sum + weight, 0)
+  return apportion(total, weights, totalShares, 0)
+}

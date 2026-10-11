@@ -56,7 +56,7 @@ function snapshotExpense(expense: Expense): string {
     paidFor.join(','),
     documents.join(','),
     link
-      ? `${link.id}:${link.nextExpenseCreatedAt}:${link.nextExpenseDate}`
+      ? `${link.id}:${link.nextExpenseCreatedAt}:${link.nextExpenseDate}:${link.anchorDay ?? ''}`
       : '',
   ].join('\0')
 }

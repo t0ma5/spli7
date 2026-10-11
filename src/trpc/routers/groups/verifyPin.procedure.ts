@@ -1,8 +1,7 @@
 import { verifyGroupPin } from '@/lib/api'
 import {
-  assertPinNotRateLimited,
+  beginPinAttempt,
   clearPinFailures,
-  recordPinFailure,
   setUnlockCookie,
 } from '@/lib/group-access'
 import { baseProcedure } from '@/trpc/init'
@@ -21,10 +20,9 @@ export const verifyGroupPinProcedure = baseProcedure
     }),
   )
   .mutation(async ({ input: { groupId, pin } }) => {
-    await assertPinNotRateLimited(groupId)
+    await beginPinAttempt(groupId)
     const ok = await verifyGroupPin(groupId, pin)
     if (!ok) {
-      await recordPinFailure(groupId)
       throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Incorrect PIN' })
     }
     await clearPinFailures(groupId)

@@ -1,3 +1,4 @@
+import { getCurrency } from '@/lib/currency'
 import dayjs from 'dayjs'
 
 import { mapSplitwiseCategoryLabel } from './category-mapping'
@@ -91,13 +92,17 @@ export function parseSplitwiseToInternal(
       continue
     }
 
-    const totalC = Math.round(row.amount * 100)
+    const scale = 10 ** (getCurrency(row.currency || 'EUR').decimal_digits ?? 2)
+    let totalC = Math.round(row.amount * scale)
+    const income = totalC < 0
+    if (income) totalC = -totalC
 
     const deltasC: Deltas = {}
     for (let i = 0; i < participantIds.length; i++) {
       const id = participantIds[i]
       const balance = row.balances[i] ?? 0
-      deltasC[id] = Math.round(balance * 100)
+      const minor = Math.round(balance * scale)
+      deltasC[id] = income ? -minor : minor
     }
 
     const mappedCategory = mapSplitwiseCategoryLabel(
@@ -129,7 +134,7 @@ export function parseSplitwiseToInternal(
         expenseDate: expenseDate.toDate(),
         title: ge.description,
         category: mappedCategory?.id ?? 0,
-        amount: ge.totalC,
+        amount: income ? -ge.totalC : ge.totalC,
         originalCurrency: row.currency || undefined,
         paidBy: ge.payer,
         paidFor: Object.entries(ge.sharesC).map(([participant, share]) => ({
@@ -153,7 +158,7 @@ export function parseSplitwiseToInternal(
         expenseDate: expenseDate.toDate(),
         title: reimbursementTitle,
         category: mappedCategory?.id ?? 0,
-        amount: r.amountC,
+        amount: income ? -r.amountC : r.amountC,
         originalCurrency: row.currency || undefined,
         paidBy: r.payer,
         paidFor: [

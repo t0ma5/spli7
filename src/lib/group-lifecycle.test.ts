@@ -4,7 +4,9 @@ import {
   isInactive,
   isSoftDeleteExpired,
   monthsAgo,
+  nextRecurringDate,
 } from '@/lib/group-lifecycle'
+import { RecurrenceRule } from '@/lib/kv/types'
 
 describe('group-lifecycle', () => {
   const now = new Date('2026-08-30T00:00:00.000Z')
@@ -40,5 +42,13 @@ describe('group-lifecycle', () => {
       now.getTime() - (SOFT_DELETE_GRACE_DAYS + 1) * 24 * 60 * 60 * 1000,
     ).toISOString()
     expect(isSoftDeleteExpired(deletedAt, now)).toBe(true)
+  })
+
+  it('keeps the monthly anchor day after a short month', () => {
+    const january = new Date(Date.UTC(2025, 0, 31))
+    const february = nextRecurringDate(RecurrenceRule.MONTHLY, january, 31)
+    expect(february.toISOString().slice(0, 10)).toBe('2025-02-28')
+    const march = nextRecurringDate(RecurrenceRule.MONTHLY, february, 31)
+    expect(march.toISOString().slice(0, 10)).toBe('2025-03-31')
   })
 })

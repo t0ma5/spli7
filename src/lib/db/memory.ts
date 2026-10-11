@@ -16,6 +16,7 @@ import {
   type Expense,
   type GroupDocument,
 } from '@/lib/kv/types'
+import { nextPinAttemptState } from '@/lib/pin-attempt'
 
 function clone<T>(value: T): T {
   return structuredClone(value)
@@ -123,6 +124,7 @@ export function createMemoryRepository(
             createdAt: group.createdAt,
             deletedAt: group.deletedAt ?? null,
             participantCount: group.participants.length,
+            pinHash: group.pinHash ?? null,
           },
         ]
       })
@@ -268,6 +270,16 @@ export function createMemoryRepository(
     },
     async getPinAttempt(groupId, clientKey) {
       return pinAttempts.get(`${groupId}:${clientKey}`) ?? null
+    },
+    async reservePinAttempt(groupId, clientKey, now, limits) {
+      const key = `${groupId}:${clientKey}`
+      const next = nextPinAttemptState(
+        pinAttempts.get(key) ?? null,
+        now,
+        limits,
+      )
+      pinAttempts.set(key, next)
+      return next
     },
     async putPinAttempt(groupId, clientKey, state) {
       pinAttempts.set(`${groupId}:${clientKey}`, { ...state })

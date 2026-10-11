@@ -49,6 +49,8 @@ export type RecurringExpenseLink = {
   currentFrameExpenseId: string
   nextExpenseCreatedAt: string | null
   nextExpenseDate: string
+  /** Day of month (1–31) the series repeats on. Null for daily and weekly. */
+  anchorDay: number | null
 }
 
 export type ExpensePaidFor = {
