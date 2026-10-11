@@ -27,6 +27,12 @@ function toIsoDateOnly(date: Date): string {
 
 export function parseSplitwiseCsv(csvText: string): ParsedTricountGroup {
   const parsed = parseSplitwiseToInternal(csvText)
+  const firstError = parsed.errors?.[0]
+  if (firstError) {
+    throw new Error(
+      `Splitwise import failed at row ${firstError.row}: ${firstError.message}`,
+    )
+  }
   const groupId = randomId()
   const now = new Date().toISOString()
 

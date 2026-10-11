@@ -239,13 +239,14 @@ function expenseInserts(
       db
         .prepare(
           `INSERT INTO recurring_expense_links (
-            id, group_id, current_frame_expense_id, next_expense_created_at, next_expense_date
-          ) VALUES (?, ?, ?, ?, ?)
+            id, group_id, current_frame_expense_id, next_expense_created_at, next_expense_date, anchor_day
+          ) VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
             group_id = excluded.group_id,
             current_frame_expense_id = excluded.current_frame_expense_id,
             next_expense_created_at = excluded.next_expense_created_at,
-            next_expense_date = excluded.next_expense_date`,
+            next_expense_date = excluded.next_expense_date,
+            anchor_day = excluded.anchor_day`,
         )
         .bind(
           link.id,
@@ -253,6 +254,7 @@ function expenseInserts(
           expense.id,
           link.nextExpenseCreatedAt,
           link.nextExpenseDate,
+          link.anchorDay,
         ),
     )
   }
@@ -642,6 +644,7 @@ async function hydrateExpenses(
           current_frame_expense_id: string
           next_expense_created_at: string | null
           next_expense_date: string
+          anchor_day: number | null
         }>()
       for (const row of recurringRows) {
         recurringByExpense.set(row.current_frame_expense_id, {
@@ -650,6 +653,7 @@ async function hydrateExpenses(
           currentFrameExpenseId: row.current_frame_expense_id,
           nextExpenseCreatedAt: row.next_expense_created_at,
           nextExpenseDate: row.next_expense_date,
+          anchorDay: row.anchor_day,
         })
       }
     }
@@ -784,6 +788,13 @@ async function activeGroupId(
   return Boolean(row)
 }
 
+class VersionConflict extends Error {
+  constructor() {
+    super('version conflict')
+    this.name = 'VersionConflict'
+  }
+}
+
 export const d1Repository: GroupRepository = {
   async get(id) {
     return loadGroup(await getD1(), id)
@@ -816,6 +827,7 @@ export const d1Repository: GroupRepository = {
           createdAt: row.created_at,
           deletedAt: row.deleted_at,
           participantCount: row.participant_count,
+          pinHash: row.pin_hash,
         } satisfies GroupSummary,
       ]),
     )
@@ -996,25 +1008,30 @@ export const d1Repository: GroupRepository = {
 
   async save(group, expectedVersion, previous): Promise<WriteResult> {
     const db = await getD1()
-    const claimed = await db
-      .prepare(
-        `UPDATE groups SET
-          name = ?, information = ?, currency = ?, currency_code = ?, pin_hash = ?,
-          default_split_mode = ?, fixed_expense_date_groups = ?,
-          created_at = ?, last_activity_at = ?, last_seen_at = ?, deleted_at = ?,
-          version = version + 1
-         WHERE id = ? AND version = ?`,
-      )
-      .bind(...groupMetaBinds(group), expectedVersion)
-      .run()
-    if ((claimed.meta.changes ?? 0) !== 1) return 'conflict'
-
-    if (previous) {
-      await runChunks(db, childPatchStatements(db, group, previous))
-    } else {
-      const deletes = childDeletes(db, group.id)
-      await db.batch(deletes)
-      await runChunks(db, childInserts(db, group))
+    try {
+      await db.transaction(async (tx) => {
+        const claimed = await tx
+          .prepare(
+            `UPDATE groups SET
+              name = ?, information = ?, currency = ?, currency_code = ?, pin_hash = ?,
+              default_split_mode = ?, fixed_expense_date_groups = ?,
+              created_at = ?, last_activity_at = ?, last_seen_at = ?, deleted_at = ?,
+              version = version + 1
+             WHERE id = ? AND version = ?`,
+          )
+          .bind(...groupMetaBinds(group), expectedVersion)
+          .run()
+        if ((claimed.meta.changes ?? 0) !== 1) throw new VersionConflict()
+        if (previous) {
+          await runChunks(tx, childPatchStatements(tx, group, previous))
+        } else {
+          await tx.batch(childDeletes(tx, group.id))
+          await runChunks(tx, childInserts(tx, group))
+        }
+      })
+    } catch (error) {
+      if (error instanceof VersionConflict) return 'conflict'
+      throw error
     }
     group.version = expectedVersion + 1
     return 'ok'
@@ -1023,17 +1040,24 @@ export const d1Repository: GroupRepository = {
   async mutateExpenses(groupId, expectedVersion, mutation) {
     const db = await getD1()
     const lastActivityAt = mutation.lastActivityAt ?? new Date().toISOString()
-    const claimed = await db
-      .prepare(
-        `UPDATE groups SET
-          last_activity_at = ?,
-          version = version + 1
-         WHERE id = ? AND version = ? AND deleted_at IS NULL`,
-      )
-      .bind(lastActivityAt, groupId, expectedVersion)
-      .run()
-    if ((claimed.meta.changes ?? 0) !== 1) return 'conflict'
-    await runChunks(db, expenseMutationStatements(db, groupId, mutation))
+    try {
+      await db.transaction(async (tx) => {
+        const claimed = await tx
+          .prepare(
+            `UPDATE groups SET
+              last_activity_at = ?,
+              version = version + 1
+             WHERE id = ? AND version = ? AND deleted_at IS NULL`,
+          )
+          .bind(lastActivityAt, groupId, expectedVersion)
+          .run()
+        if ((claimed.meta.changes ?? 0) !== 1) throw new VersionConflict()
+        await runChunks(tx, expenseMutationStatements(tx, groupId, mutation))
+      })
+    } catch (error) {
+      if (error instanceof VersionConflict) return 'conflict'
+      throw error
+    }
     return 'ok'
   },
 
@@ -1079,6 +1103,72 @@ export const d1Repository: GroupRepository = {
       failCount: row.fail_count,
       windowStart: row.window_start,
       lockedUntil: row.locked_until,
+    }
+  },
+
+  async reservePinAttempt(groupId, clientKey, now, limits) {
+    const db = await getD1()
+    const row = await db
+      .prepare(
+        `INSERT INTO pin_attempts (group_id, client_key, fail_count, window_start, locked_until)
+         VALUES (?, ?, 1, ?, NULL)
+         ON CONFLICT(group_id, client_key) DO UPDATE SET
+           fail_count = CASE
+             WHEN pin_attempts.locked_until IS NOT NULL AND pin_attempts.locked_until > excluded.window_start
+               THEN pin_attempts.fail_count + 1
+             WHEN pin_attempts.locked_until IS NOT NULL AND pin_attempts.locked_until <= excluded.window_start
+               THEN 1
+             WHEN excluded.window_start - pin_attempts.window_start < ?
+               THEN pin_attempts.fail_count + 1
+             ELSE 1
+           END,
+           window_start = CASE
+             WHEN pin_attempts.locked_until IS NOT NULL AND pin_attempts.locked_until > excluded.window_start
+               THEN pin_attempts.window_start
+             WHEN pin_attempts.locked_until IS NOT NULL AND pin_attempts.locked_until <= excluded.window_start
+               THEN excluded.window_start
+             WHEN excluded.window_start - pin_attempts.window_start < ?
+               THEN pin_attempts.window_start
+             ELSE excluded.window_start
+           END,
+           locked_until = CASE
+             WHEN pin_attempts.locked_until IS NOT NULL AND pin_attempts.locked_until > excluded.window_start
+               THEN pin_attempts.locked_until
+             WHEN (
+               CASE
+                 WHEN pin_attempts.locked_until IS NOT NULL AND pin_attempts.locked_until <= excluded.window_start
+                   THEN 1
+                 WHEN excluded.window_start - pin_attempts.window_start < ?
+                   THEN pin_attempts.fail_count + 1
+                 ELSE 1
+               END
+             ) >= ? THEN excluded.window_start + ?
+             ELSE NULL
+           END
+         RETURNING fail_count, window_start, locked_until`,
+      )
+      .bind(
+        groupId,
+        clientKey,
+        now,
+        limits.windowMs,
+        limits.windowMs,
+        limits.windowMs,
+        limits.maxFailures,
+        limits.lockMs,
+      )
+      .first<{
+        fail_count: number
+        window_start: number
+        locked_until: number | null
+      }>()
+    if (!row) {
+      throw new Error('PIN attempt was not recorded')
+    }
+    return {
+      failCount: Number(row.fail_count),
+      windowStart: Number(row.window_start),
+      lockedUntil: row.locked_until == null ? null : Number(row.locked_until),
     }
   },
 

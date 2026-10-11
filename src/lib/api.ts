@@ -14,6 +14,7 @@ import {
   isInactive,
   isSoftDeleteExpired,
   MAX_RECURRING_GENERATIONS_PER_RUN,
+  nextRecurringDate,
 } from '@/lib/group-lifecycle'
 import { hashGroupPin, isLegacyPinHash, pinMatchesHash } from '@/lib/group-pin'
 import {
@@ -203,6 +204,14 @@ function assertIntegerMinorUnits(amount: number, label: string) {
   }
 }
 
+function integerOriginalAmount(
+  amount: number | null | undefined,
+): number | null {
+  if (amount == null) return null
+  assertIntegerMinorUnits(amount, 'originalAmount')
+  return amount
+}
+
 function appendActivity(
   group: GroupDocument,
   activityType: ActivityType,
@@ -230,25 +239,41 @@ function buildExpenseFromForm(
 
   let recurringExpenseLink: RecurringExpenseLink | null =
     existing?.recurringExpenseLink ?? null
+  const formDate = toDate(expenseFormValues.expenseDate)
+  const activeLink =
+    existing?.recurringExpenseLink?.nextExpenseCreatedAt === null
+      ? existing.recurringExpenseLink
+      : null
+  const dateChanged =
+    existing != null &&
+    toIsoDateOnly(formDate) !== toIsoDateOnly(toDate(existing.expenseDate))
+  const ruleChanged =
+    existing != null &&
+    existing.recurrenceRule !== expenseFormValues.recurrenceRule
 
   if (
     existing &&
     existing.recurrenceRule !== RecurrenceRule.NONE &&
     expenseFormValues.recurrenceRule === RecurrenceRule.NONE &&
-    existing.recurringExpenseLink?.nextExpenseCreatedAt === null
+    activeLink
   ) {
     recurringExpenseLink = null
   } else if (
     existing &&
-    existing.recurrenceRule !== expenseFormValues.recurrenceRule &&
-    existing.recurringExpenseLink?.nextExpenseCreatedAt === null &&
-    expenseFormValues.recurrenceRule !== RecurrenceRule.NONE
+    activeLink &&
+    expenseFormValues.recurrenceRule !== RecurrenceRule.NONE &&
+    (ruleChanged || dateChanged)
   ) {
+    const rule = expenseFormValues.recurrenceRule as RecurrenceRule
+    const anchorDay =
+      rule === RecurrenceRule.MONTHLY ? formDate.getUTCDate() : null
     recurringExpenseLink = {
-      ...existing.recurringExpenseLink!,
-      nextExpenseDate: calculateNextDate(
-        expenseFormValues.recurrenceRule as RecurrenceRule,
-        toDate(existing.expenseDate),
+      ...activeLink,
+      anchorDay,
+      nextExpenseDate: nextRecurringDate(
+        rule,
+        formDate,
+        anchorDay,
       ).toISOString(),
     }
   } else if (
@@ -271,7 +296,7 @@ function buildExpenseFromForm(
     title: expenseFormValues.title,
     categoryId: expenseFormValues.category,
     amount: expenseFormValues.amount,
-    originalAmount: expenseFormValues.originalAmount ?? null,
+    originalAmount: integerOriginalAmount(expenseFormValues.originalAmount),
     originalCurrency: expenseFormValues.originalCurrency || null,
     conversionRate: expenseFormValues.conversionRate ?? null,
     paidBy: expenseFormValues.paidBy.map((paidBy) => {
@@ -600,17 +625,24 @@ export async function getGroupExpensesParticipants(groupId: string) {
 
 export async function getGroups(groupIds: string[]) {
   const summaries = await getRepository().listSummaries(groupIds)
-  return summaries
-    .filter((group) => !group.deletedAt)
-    .map((group) => ({
-      id: group.id,
-      name: group.name,
-      information: group.information,
-      currency: group.currency,
-      currencyCode: group.currencyCode,
-      createdAt: toDate(group.createdAt).toISOString(),
-      _count: { participants: group.participantCount },
-    }))
+  const visible = summaries.filter((group) => !group.deletedAt)
+  const { isGroupUnlocked } = await import('@/lib/group-access')
+  return Promise.all(
+    visible.map(async (group) => {
+      const locked =
+        Boolean(group.pinHash) &&
+        !(await isGroupUnlocked(group.id, group.pinHash))
+      return {
+        id: group.id,
+        name: group.name,
+        information: locked ? null : group.information,
+        currency: group.currency,
+        currencyCode: group.currencyCode,
+        createdAt: toDate(group.createdAt).toISOString(),
+        _count: { participants: group.participantCount },
+      }
+    }),
+  )
 }
 
 export async function updateExpense(
@@ -1055,9 +1087,15 @@ function createRecurringExpensesForGroup(group: GroupDocument): boolean {
       generations += 1
       const newExpenseId = randomId()
       const newRecurringExpenseLinkId = randomId()
-      const newRecurringExpenseNextExpenseDate = calculateNextDate(
+      const anchorDay =
+        link?.anchorDay ??
+        (currentExpenseRecord.recurrenceRule === RecurrenceRule.MONTHLY
+          ? toDate(currentExpenseRecord.expenseDate).getUTCDate()
+          : null)
+      const newRecurringExpenseNextExpenseDate = nextRecurringDate(
         currentExpenseRecord.recurrenceRule as RecurrenceRule,
         newExpenseDate,
+        anchorDay,
       )
 
       const createdAt = new Date().toISOString()
@@ -1093,12 +1131,16 @@ function createRecurringExpensesForGroup(group: GroupDocument): boolean {
           currentFrameExpenseId: newExpenseId,
           nextExpenseCreatedAt: null,
           nextExpenseDate: newRecurringExpenseNextExpenseDate.toISOString(),
+          anchorDay,
         },
       }
 
       if (currentExpenseRecord.recurringExpenseLink) {
         currentExpenseRecord.recurringExpenseLink.nextExpenseCreatedAt =
           createdAt
+        if (currentExpenseRecord.recurringExpenseLink.anchorDay == null) {
+          currentExpenseRecord.recurringExpenseLink.anchorDay = anchorDay
+        }
       }
 
       group.expenses.push(newExpense)
@@ -1119,53 +1161,22 @@ function createPayloadForNewRecurringExpenseLink(
   groupId: string,
   currentFrameExpenseId: string,
 ): RecurringExpenseLink {
+  const anchorDay =
+    recurrenceRule === RecurrenceRule.MONTHLY
+      ? priorDateToNextRecurrence.getUTCDate()
+      : null
   return {
     id: randomId(),
     groupId,
     currentFrameExpenseId,
     nextExpenseCreatedAt: null,
-    nextExpenseDate: calculateNextDate(
+    nextExpenseDate: nextRecurringDate(
       recurrenceRule,
       priorDateToNextRecurrence,
+      anchorDay,
     ).toISOString(),
+    anchorDay,
   }
-}
-
-function calculateNextDate(
-  recurrenceRule: RecurrenceRule,
-  priorDateToNextRecurrence: Date,
-): Date {
-  const nextDate = new Date(priorDateToNextRecurrence)
-  switch (recurrenceRule) {
-    case RecurrenceRule.DAILY:
-      nextDate.setUTCDate(nextDate.getUTCDate() + 1)
-      break
-    case RecurrenceRule.WEEKLY:
-      nextDate.setUTCDate(nextDate.getUTCDate() + 7)
-      break
-    case RecurrenceRule.MONTHLY: {
-      const nextYear = nextDate.getUTCFullYear()
-      const nextMonth = nextDate.getUTCMonth() + 1
-      let nextDay = nextDate.getUTCDate()
-
-      while (!isDateInNextMonth(nextYear, nextMonth, nextDay)) {
-        nextDay -= 1
-      }
-      nextDate.setUTCMonth(nextMonth, nextDay)
-      break
-    }
-  }
-
-  return nextDate
-}
-
-function isDateInNextMonth(
-  utcYear: number,
-  utcMonth: number,
-  utcDate: number,
-): boolean {
-  const testDate = new Date(Date.UTC(utcYear, utcMonth, utcDate))
-  return testDate.getUTCDate() === utcDate
 }
 
 export async function getGroupForExport(groupId: string) {

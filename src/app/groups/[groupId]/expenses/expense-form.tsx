@@ -54,7 +54,7 @@ import {
   SplittingOptions,
   expenseFormSchema,
 } from '@/lib/schemas'
-import { distributeAmount } from '@/lib/shares'
+import { distributeAmount, distributeWeighted } from '@/lib/shares'
 import { calculateShare } from '@/lib/totals'
 import {
   amountAsDecimal,
@@ -184,7 +184,17 @@ function expenseToFormValues(
         : (expense.expenseDate ?? getTodayForDateInput()),
     amount: amountAsDecimal(expense.amount, groupCurrency),
     originalCurrency: expense.originalCurrency ?? groupCurrencyCode,
-    originalAmount: expense.originalAmount ?? undefined,
+    originalAmount:
+      expense.originalAmount != null
+        ? (formatAmountAsDecimal(
+            expense.originalAmount,
+            getCurrency(
+              expense.originalCurrency ?? groupCurrencyCode,
+              'en-US',
+              'Custom',
+            ),
+          ) as unknown as ExpenseFormValues['originalAmount'])
+        : undefined,
     conversionRate: expense.conversionRate ?? undefined,
     category: expense.categoryId,
     paidBy: expense.paidBy.map(({ participantId, amount }) => ({
@@ -376,8 +386,12 @@ export function ExpenseForm({
           : shares,
     }))
 
-    // Currency should be blank if same as group currency
-    if (!conversionRequired) {
+    if (conversionRequired && values.originalAmount != null) {
+      values.originalAmount = amountAsMinorUnits(
+        Number(values.originalAmount),
+        originalCurrency,
+      )
+    } else {
       delete values.originalAmount
       delete values.originalCurrency
     }
@@ -546,15 +560,18 @@ export function ExpenseForm({
         } else if (paidBy.length > 1) {
           const currentSum = calcTotalAmountMajor(paidBy)
           if (currentSum !== 0) {
-            const scale = Number(v) / currentSum
+            const weights = paidBy.map((entry) =>
+              amountAsMinorUnits(Number(entry.amount) || 0, groupCurrency),
+            )
+            const totalMinor = amountAsMinorUnits(Number(v), groupCurrency)
+            const parts = distributeWeighted(totalMinor, weights)
             form.setValue(
               'paidBy',
-              paidBy.map((entry) => ({
+              paidBy.map((entry, index) => ({
                 ...entry,
-                amount: normalizeNumberInput(
-                  (Number(entry.amount) * scale).toFixed(
-                    groupCurrency.decimal_digits,
-                  ),
+                amount: formatAmountAsDecimal(
+                  parts[index] ?? 0,
+                  groupCurrency,
                 ) as any,
               })),
               { shouldDirty: true, shouldValidate: true },

@@ -216,4 +216,20 @@ describe('SplitwiseCsvFormat', () => {
     expect(expense!.amount).toBe(3000)
     expect(expense!.paidBy).toBe('p0')
   })
+
+  it('scales zero-decimal currencies and keeps refunds as negative amounts', async () => {
+    const csv = [
+      'Date,Description,Category,Cost,Currency,Alice,Bob',
+      '2025-11-15,Train,General,1500,JPY,750,-750',
+      '2025-11-16,Refund,General,-20.00,EUR,-10.00,10.00',
+    ].join('\n')
+    const parsed = await splitwiseCsvFormat.parseToInternal(csv)
+    const train = parsed.expenses.find((expense) => expense.title === 'Train')
+    const refund = parsed.expenses.find((expense) =>
+      expense.title.startsWith('Refund'),
+    )
+    expect(train?.amount).toBe(1500)
+    expect(refund?.amount).toBeLessThan(0)
+    expect(Math.abs(refund?.amount ?? 0)).toBe(2000)
+  })
 })

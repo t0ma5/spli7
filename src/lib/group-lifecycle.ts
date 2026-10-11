@@ -1,3 +1,5 @@
+import { RecurrenceRule } from '@/lib/kv/types'
+
 /** Soft-delete grace before hard purge (days). */
 export const SOFT_DELETE_GRACE_DAYS = 30
 
@@ -43,4 +45,44 @@ export function isSoftDeleteExpired(
   now = new Date(),
 ): boolean {
   return new Date(deletedAt) < daysAgo(SOFT_DELETE_GRACE_DAYS, now)
+}
+
+function utcDaysInMonth(year: number, monthIndex: number): number {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
+}
+
+/**
+ * Next occurrence of a recurrence.
+ *
+ * Monthly dates keep `anchorDay` (the day the series was created on). A 31st
+ * clamps to the 28th in February, then returns to the 31st in March.
+ */
+export function nextRecurringDate(
+  recurrenceRule: RecurrenceRule,
+  prior: Date,
+  anchorDay?: number | null,
+): Date {
+  const nextDate = new Date(prior)
+  switch (recurrenceRule) {
+    case RecurrenceRule.DAILY:
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1)
+      break
+    case RecurrenceRule.WEEKLY:
+      nextDate.setUTCDate(nextDate.getUTCDate() + 7)
+      break
+    case RecurrenceRule.MONTHLY: {
+      const anchor = anchorDay ?? nextDate.getUTCDate()
+      const probe = new Date(
+        Date.UTC(nextDate.getUTCFullYear(), nextDate.getUTCMonth() + 1, 1),
+      )
+      const year = probe.getUTCFullYear()
+      const month = probe.getUTCMonth()
+      const day = Math.min(Math.max(anchor, 1), utcDaysInMonth(year, month))
+      nextDate.setUTCFullYear(year, month, day)
+      break
+    }
+    default:
+      break
+  }
+  return nextDate
 }

@@ -11,7 +11,7 @@ async function getExchangeRate(
   date: Date,
   base: string,
   target: string,
-): Promise<number> {
+): Promise<number | null> {
   if (base === target) return 1
   const dateString = date.toISOString().split('T')[0]
   try {
@@ -23,20 +23,21 @@ async function getExchangeRate(
       if (data.rates?.[target]) return data.rates[target]
     }
   } catch {
-    // fall through
+    return null
   }
-  return 1
+  return null
 }
 
 async function getRate(
   date: Date,
   base: string,
   target: string,
-): Promise<number> {
+): Promise<number | null> {
   const dateString = date.toISOString().split('T')[0]
   const cacheKey = `${dateString}_${base}_${target}`
   if (rateCache.has(cacheKey)) return rateCache.get(cacheKey)!
   const rate = await getExchangeRate(date, base, target)
+  if (rate == null) return null
   rateCache.set(cacheKey, rate)
   return rate
 }
@@ -246,9 +247,7 @@ export async function parseTricountCsv(
     const isReimbursement =
       title.toLowerCase().includes('recouvrement de dette') ||
       title.toLowerCase().includes('repayment') ||
-      title.toLowerCase().includes('reimbursement') ||
-      title.toLowerCase().includes('transfer') ||
-      title.toLowerCase().includes('settlement')
+      title.toLowerCase().includes('reimbursement')
 
     const categoryName = categoryIdx !== -1 ? row[categoryIdx] : ''
     const categoryId = findCategoryId(categoryName, isReimbursement)
@@ -265,11 +264,17 @@ export async function parseTricountCsv(
       if (mapped) {
         targetToDefaultRate = mapped
       } else {
-        targetToDefaultRate = await getRate(
+        const fetchedRate = await getRate(
           expenseDate,
           resolvedTarget,
           defaultCurrencyCode,
         )
+        if (fetchedRate == null) {
+          throw new Error(
+            `No exchange rate for ${resolvedTarget} to ${defaultCurrencyCode} on ${expenseDate.toISOString().slice(0, 10)}`,
+          )
+        }
+        targetToDefaultRate = fetchedRate
       }
     }
 

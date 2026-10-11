@@ -2,6 +2,7 @@ import { SplitMode } from '@/lib/kv/types'
 import {
   ShareInput,
   distributeAmount,
+  distributeWeighted,
   getExpenseShares,
   getParticipantShare,
 } from './shares'
@@ -284,5 +285,14 @@ describe('distributeAmount', () => {
 
   it('has nothing to distribute over nobody', () => {
     expect(distributeAmount(100, 0)).toEqual([])
+  })
+})
+
+describe('distributeWeighted', () => {
+  it('keeps a converted total when each payer is rounded alone would drift', () => {
+    expect(distributeWeighted(1001, [5000, 5000])).toEqual([501, 500])
+    expect(
+      distributeWeighted(1001, [1, 1]).reduce((sum, part) => sum + part, 0),
+    ).toBe(1001)
   })
 })

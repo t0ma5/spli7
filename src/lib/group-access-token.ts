@@ -31,15 +31,19 @@ async function hmacHex(value: string): Promise<string> {
     .join('')
 }
 
-export async function issueUnlockToken(groupId: string): Promise<string> {
+export async function issueUnlockToken(
+  groupId: string,
+  pinHash: string,
+): Promise<string> {
   const issuedAt = Date.now().toString()
-  const sig = await hmacHex(`${groupId}:${issuedAt}`)
+  const sig = await hmacHex(`${groupId}:${issuedAt}:${pinHash}`)
   return `${issuedAt}.${sig}`
 }
 
 export async function verifyUnlockToken(
   groupId: string,
   token: string,
+  pinHash: string,
 ): Promise<boolean> {
   const dot = token.indexOf('.')
   if (dot <= 0) return false
@@ -48,7 +52,7 @@ export async function verifyUnlockToken(
   const issued = Number(issuedAt)
   if (!Number.isFinite(issued)) return false
   if (Date.now() - issued > UNLOCK_MAX_AGE_SECONDS * 1000) return false
-  const expected = await hmacHex(`${groupId}:${issuedAt}`)
+  const expected = await hmacHex(`${groupId}:${issuedAt}:${pinHash}`)
   if (expected.length !== sig.length) return false
   let mismatch = 0
   for (let i = 0; i < expected.length; i++) {

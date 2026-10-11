@@ -23,6 +23,8 @@ export type GroupSummary = {
   createdAt: string
   deletedAt: string | null
   participantCount: number
+  /** Server-only. Strip before sending a summary to the client. */
+  pinHash: string | null
 }
 
 /** Group row + participants; no expenses or activities. */
@@ -107,6 +109,16 @@ export interface GroupRepository {
     groupId: string,
     clientKey: string,
   ): Promise<PinAttemptState | null>
+  /**
+   * Record one PIN failure in a single write. Callers reject when
+   * `failCount` is above the limit.
+   */
+  reservePinAttempt(
+    groupId: string,
+    clientKey: string,
+    now: number,
+    limits: { windowMs: number; maxFailures: number; lockMs: number },
+  ): Promise<PinAttemptState>
   putPinAttempt(
     groupId: string,
     clientKey: string,

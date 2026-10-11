@@ -22,10 +22,18 @@ export async function readUnlockCookie(
   return jar.get(pinCookieName(groupId))?.value
 }
 
-export async function isGroupUnlocked(groupId: string): Promise<boolean> {
+export async function isGroupUnlocked(
+  groupId: string,
+  pinHash?: string | null,
+): Promise<boolean> {
   const token = await readUnlockCookie(groupId)
   if (!token) return false
-  return verifyUnlockToken(groupId, token)
+  const hash =
+    pinHash === undefined
+      ? (await getRepository().getMeta(groupId))?.pinHash
+      : pinHash
+  if (!hash) return false
+  return verifyUnlockToken(groupId, token, hash)
 }
 
 export async function groupRequiresPin(groupId: string): Promise<boolean> {
@@ -47,7 +55,9 @@ export async function assertGroupUnlocked(groupId: string) {
 }
 
 export async function setUnlockCookie(groupId: string) {
-  const token = await issueUnlockToken(groupId)
+  const group = await getRepository().getMeta(groupId)
+  if (!group?.pinHash) return
+  const token = await issueUnlockToken(groupId, group.pinHash)
   const jar = await cookies()
   jar.set(pinCookieName(groupId), token, {
     httpOnly: true,
@@ -73,38 +83,24 @@ export async function clientKeyFromRequest(): Promise<string> {
     .join('')
 }
 
-export async function assertPinNotRateLimited(groupId: string) {
+export async function beginPinAttempt(groupId: string) {
   const clientKey = await clientKeyFromRequest()
-  const repo = getRepository()
-  const state = await repo.getPinAttempt(groupId, clientKey)
-  if (!state) return
-  if (state.lockedUntil && Date.now() < state.lockedUntil) {
+  const state = await getRepository().reservePinAttempt(
+    groupId,
+    clientKey,
+    Date.now(),
+    {
+      windowMs: PIN_WINDOW_MS,
+      maxFailures: PIN_MAX_FAILURES,
+      lockMs: PIN_LOCK_MS,
+    },
+  )
+  if (state.failCount > PIN_MAX_FAILURES) {
     throw new TRPCError({
       code: 'TOO_MANY_REQUESTS',
       message: 'Too many PIN attempts. Try again later.',
     })
   }
-}
-
-export async function recordPinFailure(groupId: string) {
-  const clientKey = await clientKeyFromRequest()
-  const repo = getRepository()
-  const now = Date.now()
-  const existing = await repo.getPinAttempt(groupId, clientKey)
-  const windowStart =
-    existing && now - existing.windowStart < PIN_WINDOW_MS
-      ? existing.windowStart
-      : now
-  const failCount =
-    existing && now - existing.windowStart < PIN_WINDOW_MS
-      ? existing.failCount + 1
-      : 1
-  const lockedUntil = failCount >= PIN_MAX_FAILURES ? now + PIN_LOCK_MS : null
-  await repo.putPinAttempt(groupId, clientKey, {
-    failCount,
-    windowStart,
-    lockedUntil,
-  })
 }
 
 export async function clearPinFailures(groupId: string) {
@@ -117,15 +113,15 @@ export async function clearPinFailures(groupId: string) {
 }
 
 export async function assertExportAccess(req: Request, groupId: string) {
-  const group = await getGroupIncludingDeleted(groupId)
+  const group = await getRepository().getMeta(groupId)
   if (!group) return false
-  if (!group.hasPin) return true
+  if (!group.pinHash) return true
   const cookieHeader = req.headers.get('cookie') ?? ''
   const match = cookieHeader
     .split(';')
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${pinCookieName(groupId)}=`))
   const token = match?.slice(`${pinCookieName(groupId)}=`.length)
-  if (!token) return false
-  return verifyUnlockToken(groupId, decodeURIComponent(token))
+  if (!token || !group.pinHash) return false
+  return verifyUnlockToken(groupId, decodeURIComponent(token), group.pinHash)
 }
