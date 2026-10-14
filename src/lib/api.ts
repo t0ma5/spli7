@@ -1084,16 +1084,20 @@ function createRecurringExpensesForGroup(group: GroupDocument): boolean {
       newExpenseDate < utcDateFromLocal &&
       generations < MAX_RECURRING_GENERATIONS_PER_RUN
     ) {
+      // NONE never advances the date, so a stale link would copy the same day.
+      const recurrenceRule = currentExpenseRecord.recurrenceRule
+      if (recurrenceRule == null || recurrenceRule === RecurrenceRule.NONE)
+        break
       generations += 1
       const newExpenseId = randomId()
       const newRecurringExpenseLinkId = randomId()
       const anchorDay =
         link?.anchorDay ??
-        (currentExpenseRecord.recurrenceRule === RecurrenceRule.MONTHLY
+        (recurrenceRule === RecurrenceRule.MONTHLY
           ? toDate(currentExpenseRecord.expenseDate).getUTCDate()
           : null)
       const newRecurringExpenseNextExpenseDate = nextRecurringDate(
-        currentExpenseRecord.recurrenceRule as RecurrenceRule,
+        recurrenceRule as RecurrenceRule,
         newExpenseDate,
         anchorDay,
       )
