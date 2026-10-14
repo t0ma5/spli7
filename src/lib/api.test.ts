@@ -16,6 +16,7 @@ import {
   getGroupExpensesParticipants,
   getGroupForExport,
   getGroups,
+  materializeDueRecurringExpenses,
   updateExpense,
   updateGroup,
 } from '@/lib/api'
@@ -518,6 +519,55 @@ describe('api + memory repository', () => {
         isReimbursement: false,
       }),
     ])
+  })
+
+  it('creates nothing from a due link whose rule is NONE', async () => {
+    const repo = createMemoryRepository()
+    setRepositoryForTests(repo)
+    const group = await createGroup({
+      name: 'Stale',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }],
+    })
+    const doc = await repo.get(group.id)
+    if (!doc) throw new Error('missing group')
+    const ada = doc.participants[0].id
+    doc.expenses.push({
+      id: 'stale',
+      groupId: group.id,
+      expenseDate: '2025-01-31',
+      title: 'Rent',
+      categoryId: 0,
+      amount: 10,
+      originalAmount: null,
+      originalCurrency: null,
+      conversionRate: null,
+      paidBy: [{ expenseId: 'stale', participantId: ada, amount: 10 }],
+      isReimbursement: false,
+      splitMode: 'EVENLY',
+      createdAt: new Date().toISOString(),
+      notes: null,
+      recurrenceRule: 'NONE',
+      paidFor: [{ expenseId: 'stale', participantId: ada, shares: 1 }],
+      documents: [],
+      recurringExpenseLink: {
+        id: 'stale-link',
+        groupId: group.id,
+        currentFrameExpenseId: 'stale',
+        nextExpenseCreatedAt: null,
+        nextExpenseDate: '2025-02-28T00:00:00.000Z',
+        anchorDay: null,
+      },
+    })
+    expect(await repo.save(doc, doc.version ?? 0)).toBe('ok')
+
+    await materializeDueRecurringExpenses(group.id)
+
+    const latest = await repo.get(group.id)
+    expect(latest?.expenses.map((expense) => expense.id)).toEqual(['stale'])
   })
 
   it('matches an expense search against notes as well as the title', async () => {
