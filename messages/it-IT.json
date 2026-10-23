@@ -163,7 +163,8 @@
         "none": "Mai",
         "daily": "Giornaliera",
         "weekly": "Settimanale",
-        "monthly": "Mensile"
+        "monthly": "Mensile",
+        "yearly": "Annuale"
       },
       "paidFor": {
         "title": "Ricevuto per",
@@ -196,7 +197,8 @@
         "none": "Mai",
         "daily": "Giornaliera",
         "weekly": "Settimanale",
-        "monthly": "Mensile"
+        "monthly": "Mensile",
+        "yearly": "Annuale"
       },
       "paidFor": {
         "title": "Pagato per",

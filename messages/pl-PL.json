@@ -185,7 +185,8 @@
         "none": "Jednorazowo",
         "daily": "Codziennie",
         "weekly": "Co tydzień",
-        "monthly": "Co miesiąc"
+        "monthly": "Co miesiąc",
+        "yearly": "Co rok"
       },
       "paidFor": {
         "title": "Opłacone dla",

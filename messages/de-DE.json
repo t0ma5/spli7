@@ -169,7 +169,8 @@
         "none": "Keine Wiederholung",
         "daily": "Täglich",
         "weekly": "Wöchentlich",
-        "monthly": "Monatlich"
+        "monthly": "Monatlich",
+        "yearly": "Jährlich"
       },
       "paidFor": {
         "title": "Empfangen für",
@@ -206,7 +207,8 @@
         "none": "Keine Wiederholung",
         "daily": "Täglich",
         "weekly": "Wöchentlich",
-        "monthly": "Monatlich"
+        "monthly": "Monatlich",
+        "yearly": "Jährlich"
       },
       "paidFor": {
         "title": "Gezahlt für",

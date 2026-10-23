@@ -195,7 +195,7 @@ export const expenseFormSchema = z
       .default([]),
     notes: z.string().max(EXPENSE_NOTES_MAX, 'max5000').optional(),
     recurrenceRule: z
-      .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
+      .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'])
       .default('NONE'),
   })
   .superRefine((expense, ctx) => {
@@ -359,7 +359,7 @@ export const groupImportSchema = z
             'BY_AMOUNT',
           ]),
           recurrenceRule: z
-            .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'])
+            .enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'])
             .nullish(),
           notes: z.string().max(EXPENSE_NOTES_MAX).nullish(),
           documents: z

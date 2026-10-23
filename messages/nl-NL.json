@@ -169,7 +169,8 @@
         "none": "Niet",
         "daily": "Dagelijks",
         "weekly": "Wekelijks",
-        "monthly": "Maandelijks"
+        "monthly": "Maandelijks",
+        "yearly": "Jaarlijks"
       },
       "paidFor": {
         "title": "Ontvangen voor",
@@ -206,7 +207,8 @@
         "none": "Niet",
         "daily": "Dagelijks",
         "weekly": "Wekelijks",
-        "monthly": "Maandelijks"
+        "monthly": "Maandelijks",
+        "yearly": "Jaarlijks"
       },
       "paidFor": {
         "title": "Betaald voor",

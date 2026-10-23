@@ -15,6 +15,7 @@ import {
   isSoftDeleteExpired,
   MAX_RECURRING_GENERATIONS_PER_RUN,
   nextRecurringDate,
+  usesAnchorDay,
 } from '@/lib/group-lifecycle'
 import { hashGroupPin, isLegacyPinHash, pinMatchesHash } from '@/lib/group-pin'
 import {
@@ -265,8 +266,7 @@ function buildExpenseFromForm(
     (ruleChanged || dateChanged)
   ) {
     const rule = expenseFormValues.recurrenceRule as RecurrenceRule
-    const anchorDay =
-      rule === RecurrenceRule.MONTHLY ? formDate.getUTCDate() : null
+    const anchorDay = usesAnchorDay(rule) ? formDate.getUTCDate() : null
     recurringExpenseLink = {
       ...activeLink,
       anchorDay,
@@ -1093,7 +1093,7 @@ function createRecurringExpensesForGroup(group: GroupDocument): boolean {
       const newRecurringExpenseLinkId = randomId()
       const anchorDay =
         link?.anchorDay ??
-        (recurrenceRule === RecurrenceRule.MONTHLY
+        (usesAnchorDay(recurrenceRule as RecurrenceRule)
           ? toDate(currentExpenseRecord.expenseDate).getUTCDate()
           : null)
       const newRecurringExpenseNextExpenseDate = nextRecurringDate(
@@ -1165,10 +1165,9 @@ function createPayloadForNewRecurringExpenseLink(
   groupId: string,
   currentFrameExpenseId: string,
 ): RecurringExpenseLink {
-  const anchorDay =
-    recurrenceRule === RecurrenceRule.MONTHLY
-      ? priorDateToNextRecurrence.getUTCDate()
-      : null
+  const anchorDay = usesAnchorDay(recurrenceRule)
+    ? priorDateToNextRecurrence.getUTCDate()
+    : null
   return {
     id: randomId(),
     groupId,

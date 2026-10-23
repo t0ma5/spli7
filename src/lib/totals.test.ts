@@ -353,22 +353,24 @@ describe('getRecurringSpending', () => {
       { amount: 500, recurrenceRule: 'MONTHLY', isReimbursement: false },
       { amount: 700, recurrenceRule: 'WEEKLY', isReimbursement: false },
       { amount: 100, recurrenceRule: 'DAILY', isReimbursement: false },
+      { amount: 12000, recurrenceRule: 'YEARLY', isReimbursement: false },
       { amount: 999, recurrenceRule: 'NONE', isReimbursement: false },
       { amount: 999, recurrenceRule: 'MONTHLY', isReimbursement: true },
     ])
 
-    expect(result.count).toBe(4)
+    expect(result.count).toBe(5)
     expect(result.byPeriod).toEqual([
       { period: 'DAILY', count: 1, total: 100 },
       { period: 'WEEKLY', count: 1, total: 700 },
       { period: 'MONTHLY', count: 2, total: 1500 },
+      { period: 'YEARLY', count: 1, total: 12000 },
     ])
     const expectedMonthly = Math.round(
-      100 * (365.25 / 12) + 700 * (365.25 / 12 / 7) + 1500,
+      100 * (365.25 / 12) + 700 * (365.25 / 12 / 7) + 1500 + 12000 / 12,
     )
     expect(result.estimatedMonthly).toBe(expectedMonthly)
     const expectedYearly = Math.round(
-      100 * 365.25 + 700 * (365.25 / 7) + 1500 * 12,
+      100 * 365.25 + 700 * (365.25 / 7) + 1500 * 12 + 12000,
     )
     expect(result.estimatedYearly).toBe(expectedYearly)
   })

@@ -205,7 +205,8 @@
         "none": "无",
         "daily": "每天",
         "weekly": "每周",
-        "monthly": "每月"
+        "monthly": "每月",
+        "yearly": "每年"
       }
     },
     "amountField": {

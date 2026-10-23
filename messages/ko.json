@@ -145,7 +145,8 @@
         "description": "지출 반복 주기를 선택해 주세요.",
         "daily": "매일",
         "weekly": "매주",
-        "monthly": "매달"
+        "monthly": "매달",
+        "yearly": "매년"
       },
       "paidFor": {
         "title": "비용 부담자들",

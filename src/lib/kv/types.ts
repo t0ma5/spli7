@@ -11,6 +11,7 @@ export const RecurrenceRule = {
   DAILY: 'DAILY',
   WEEKLY: 'WEEKLY',
   MONTHLY: 'MONTHLY',
+  YEARLY: 'YEARLY',
 } as const
 export type RecurrenceRule =
   (typeof RecurrenceRule)[keyof typeof RecurrenceRule]

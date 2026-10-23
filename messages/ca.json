@@ -169,7 +169,8 @@
         "none": "Puntual",
         "daily": "Diària",
         "weekly": "Setmanal",
-        "monthly": "Mensual"
+        "monthly": "Mensual",
+        "yearly": "Anual"
       },
       "paidFor": {
         "title": "Pagat per a",
@@ -216,7 +217,8 @@
         "none": "Cap",
         "daily": "Diàriament",
         "weekly": "Setmanalment",
-        "monthly": "Mensualment"
+        "monthly": "Mensualment",
+        "yearly": "Anualment"
       }
     },
     "amountField": {

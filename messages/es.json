@@ -198,7 +198,8 @@
         "none": "Ninguno",
         "daily": "Diario",
         "weekly": "Semanal",
-        "monthly": "Mensual"
+        "monthly": "Mensual",
+        "yearly": "Anual"
       },
       "paidFor": {
         "title": "Pagado para",

@@ -5,6 +5,7 @@ import {
   isSoftDeleteExpired,
   monthsAgo,
   nextRecurringDate,
+  usesAnchorDay,
 } from '@/lib/group-lifecycle'
 import { RecurrenceRule } from '@/lib/kv/types'
 
@@ -50,5 +51,49 @@ describe('group-lifecycle', () => {
     expect(february.toISOString().slice(0, 10)).toBe('2025-02-28')
     const march = nextRecurringDate(RecurrenceRule.MONTHLY, february, 31)
     expect(march.toISOString().slice(0, 10)).toBe('2025-03-31')
+  })
+})
+
+describe('nextRecurringDate yearly', () => {
+  const day = (date: Date) => date.toISOString().slice(0, 10)
+
+  it('repeats on the same day one year later', () => {
+    const start = new Date(Date.UTC(2025, 2, 15))
+    expect(day(nextRecurringDate(RecurrenceRule.YEARLY, start, 15))).toBe(
+      '2026-03-15',
+    )
+  })
+
+  it('returns to 29 February in the next leap year', () => {
+    let date = new Date(Date.UTC(2024, 1, 29))
+    const dates = []
+    for (let i = 0; i < 4; i++) {
+      date = nextRecurringDate(RecurrenceRule.YEARLY, date, 29)
+      dates.push(day(date))
+    }
+    expect(dates).toEqual([
+      '2025-02-28',
+      '2026-02-28',
+      '2027-02-28',
+      '2028-02-29',
+    ])
+  })
+
+  it('falls back to the day of the prior date without an anchor', () => {
+    const start = new Date(Date.UTC(2025, 11, 31))
+    expect(day(nextRecurringDate(RecurrenceRule.YEARLY, start))).toBe(
+      '2026-12-31',
+    )
+  })
+})
+
+describe('usesAnchorDay', () => {
+  it('is true only for monthly and yearly', () => {
+    expect(usesAnchorDay(RecurrenceRule.MONTHLY)).toBe(true)
+    expect(usesAnchorDay(RecurrenceRule.YEARLY)).toBe(true)
+    expect(usesAnchorDay(RecurrenceRule.DAILY)).toBe(false)
+    expect(usesAnchorDay(RecurrenceRule.WEEKLY)).toBe(false)
+    expect(usesAnchorDay(RecurrenceRule.NONE)).toBe(false)
+    expect(usesAnchorDay(null)).toBe(false)
   })
 })

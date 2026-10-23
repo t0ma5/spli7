@@ -51,11 +51,22 @@ function utcDaysInMonth(year: number, monthIndex: number): number {
   return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
 }
 
+/** Whether a series repeats on a fixed day of month (stored as `anchorDay`). */
+export function usesAnchorDay(
+  recurrenceRule: RecurrenceRule | null | undefined,
+): boolean {
+  return (
+    recurrenceRule === RecurrenceRule.MONTHLY ||
+    recurrenceRule === RecurrenceRule.YEARLY
+  )
+}
+
 /**
  * Next occurrence of a recurrence.
  *
- * Monthly dates keep `anchorDay` (the day the series was created on). A 31st
- * clamps to the 28th in February, then returns to the 31st in March.
+ * Monthly and yearly dates keep `anchorDay` (the day the series was created
+ * on). A 31st clamps to the 28th in February, then returns to the 31st in
+ * March. A yearly series on 29 February falls on the 28th in common years.
  */
 export function nextRecurringDate(
   recurrenceRule: RecurrenceRule,
@@ -70,10 +81,16 @@ export function nextRecurringDate(
     case RecurrenceRule.WEEKLY:
       nextDate.setUTCDate(nextDate.getUTCDate() + 7)
       break
-    case RecurrenceRule.MONTHLY: {
+    case RecurrenceRule.MONTHLY:
+    case RecurrenceRule.YEARLY: {
+      const monthsAhead = recurrenceRule === RecurrenceRule.MONTHLY ? 1 : 12
       const anchor = anchorDay ?? nextDate.getUTCDate()
       const probe = new Date(
-        Date.UTC(nextDate.getUTCFullYear(), nextDate.getUTCMonth() + 1, 1),
+        Date.UTC(
+          nextDate.getUTCFullYear(),
+          nextDate.getUTCMonth() + monthsAhead,
+          1,
+        ),
       )
       const year = probe.getUTCFullYear()
       const month = probe.getUTCMonth()

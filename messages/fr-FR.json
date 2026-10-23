@@ -169,7 +169,8 @@
         "none": "Aucune",
         "daily": "Quotidienne",
         "weekly": "Hebdomadaire",
-        "monthly": "Mensuelle"
+        "monthly": "Mensuelle",
+        "yearly": "Annuelle"
       },
       "paidFor": {
         "title": "Reçu pour",
@@ -206,7 +207,8 @@
         "none": "Aucune",
         "daily": "Quotidienne",
         "weekly": "Hebdomadaire",
-        "monthly": "Mensuelle"
+        "monthly": "Mensuelle",
+        "yearly": "Annuelle"
       },
       "paidFor": {
         "title": "Payé pour",

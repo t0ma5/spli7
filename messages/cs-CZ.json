@@ -185,7 +185,8 @@
         "none": "Žádné",
         "daily": "Denně",
         "weekly": "Týdně",
-        "monthly": "Měsíčně"
+        "monthly": "Měsíčně",
+        "yearly": "Ročně"
       },
       "paidFor": {
         "title": "Zaplaceno pro",

@@ -198,7 +198,8 @@
         "none": "なし",
         "daily": "毎日",
         "weekly": "毎週",
-        "monthly": "毎月"
+        "monthly": "毎月",
+        "yearly": "毎年"
       },
       "paidFor": {
         "title": "支払い対象",
