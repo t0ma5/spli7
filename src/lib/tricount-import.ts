@@ -16,11 +16,12 @@ async function getExchangeRate(
   const dateString = date.toISOString().split('T')[0]
   try {
     const res = await fetch(
-      `https://api.frankfurter.dev/${dateString}?base=${base}&symbols=${target}`,
+      `https://api.frankfurter.dev/v2/rates?date=${dateString}&base=${base}&quotes=${target}`,
     )
     if (res.ok) {
-      const data = (await res.json()) as { rates?: Record<string, number> }
-      if (data.rates?.[target]) return data.rates[target]
+      const data = (await res.json()) as { quote: string; rate: number }[]
+      const rate = data.find(({ quote }) => quote === target)?.rate
+      if (rate) return rate
     }
   } catch {
     return null
