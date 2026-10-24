@@ -52,12 +52,12 @@ desktop.ini
 
 tmp396/
 
-# Cursor IDE local state; keep shared rules/skills
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
-!.cursor/skills/
-!.cursor/skills/**
+# Agent files stay local: instructions, skills, rules, audits, worktrees
+.cursor/
+.claude/
+AGENTS.md
+CLAUDE.md
+CLAUDE_*.md
 
 tmp-pages-bind/
 
