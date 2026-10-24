@@ -24,10 +24,10 @@ export async function GET(req: Request) {
     })
   }
 
-  // The Blob token doubles as the "backups are configured" switch.
+  // A connected Blob store doubles as the "backups are configured" switch.
   if (!documentsConfigured()) {
     return NextResponse.json(
-      { ok: false, error: 'BLOB_READ_WRITE_TOKEN is not set' },
+      { ok: false, error: 'No Blob store is connected' },
       { status: 503 },
     )
   }

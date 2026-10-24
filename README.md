@@ -232,7 +232,7 @@ What changed vs upstream:
 
 - Prisma and Postgres were replaced with **Turso** (same SQLite schema as the later D1 tables).
 - S3/OpenAI packages and env vars were dropped. Keep `NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT` and `NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT` unset or `false` (the app refuses to start otherwise).
-- Receipt photos need `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS=true` **and** `BLOB_READ_WRITE_TOKEN` (a private Vercel Blob store, e.g. `npx vercel blob create-store spli7-private --access private`). Receipt/category AI would need an explicit product decision.
+- Receipt photos need `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS=true` **and** a connected private Vercel Blob store (e.g. `npx vercel blob create-store spli7-private --access private`). Connecting the store gives either `BLOB_STORE_ID` (the current default: the app then uses Vercel's short-lived OIDC token, nothing long-lived to leak) or an older `BLOB_READ_WRITE_TOKEN`; both work. Receipt/category AI would need an explicit product decision.
 
 ## Run locally
 
@@ -270,7 +270,7 @@ Set these on the Vercel project:
 - `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` (Preview should point at the test DB, not live)
 - `PIN_SECRET` / `CRON_SECRET`
 - `NEXT_PUBLIC_BASE_URL=https://spli7.vercel.app`
-- `BLOB_READ_WRITE_TOKEN` (added by `vercel blob create-store`) and `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS=true` for receipt photos and daily backups
+- `BLOB_STORE_ID` (added when the Blob store is connected; an older `BLOB_READ_WRITE_TOKEN` also works) and `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS=true` for receipt photos and daily backups. Locally, `npx vercel env pull` refreshes the OIDC token, which expires after about 12 hours
 
 Turso migrations are **not** applied by `vercel --prod` — run `npm run db:migrate:remote` when `migrations/` changes.
 

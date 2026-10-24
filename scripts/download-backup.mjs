@@ -9,8 +9,13 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { get, list } from '@vercel/blob'
 
-if (!process.env.BLOB_READ_WRITE_TOKEN) {
-  console.error('Set BLOB_READ_WRITE_TOKEN (npx vercel env pull)')
+// Either a read-write token, or BLOB_STORE_ID + VERCEL_OIDC_TOKEN from
+// `npx vercel env pull` (the OIDC token expires after about 12 hours).
+if (
+  !process.env.BLOB_READ_WRITE_TOKEN &&
+  !(process.env.BLOB_STORE_ID && process.env.VERCEL_OIDC_TOKEN)
+) {
+  console.error('No Blob credentials: run npx vercel env pull')
   process.exit(1)
 }
 

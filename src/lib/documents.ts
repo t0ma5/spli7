@@ -15,8 +15,13 @@ const DOCUMENT_URL =
 export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 export const DOCUMENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 
+/**
+ * A connected Blob store gives either a long-lived read-write token or, the
+ * newer default, a store id that @vercel/blob pairs with the deployment's
+ * short-lived OIDC token.
+ */
 export function documentsConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN)
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
 }
 
 export function documentPathname(groupId: string, docId: string): string {

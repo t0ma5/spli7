@@ -86,6 +86,8 @@ async function writeEnv() {
     'CRON_SECRET',
     'NEXT_PUBLIC_BASE_URL',
     'BLOB_READ_WRITE_TOKEN',
+    'BLOB_STORE_ID',
+    'VERCEL_OIDC_TOKEN',
     'NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS',
   ]
     .filter((key) => process.env[key])
