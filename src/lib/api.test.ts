@@ -209,7 +209,51 @@ describe('api + memory repository', () => {
         name: participant.name,
       })),
     })
-    expect(getCount()).toBeGreaterThan(0)
+    // Group settings touch the group row and participants only.
+    expect(getCount()).toBe(0)
+    expect((await getGroup(group.id))?.name).toBe('Renamed')
+  })
+
+  it('renaming a group keeps its expenses and activity', async () => {
+    const group = await createGroup({
+      name: 'Trip',
+      currency: '$',
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: [{ name: 'Ada' }, { name: 'Bob' }],
+    })
+    const ada = group.participants[0].id
+    await createExpense(
+      {
+        expenseDate: new Date('2026-01-01'),
+        title: 'Dinner',
+        category: 0,
+        amount: 1000,
+        paidBy: [{ participant: ada, amount: 1000 }],
+        paidFor: [{ participant: ada, shares: 1 }],
+        splitMode: 'EVENLY',
+        saveDefaultSplittingOptions: false,
+        isReimbursement: false,
+        documents: [],
+        recurrenceRule: 'NONE',
+      },
+      group.id,
+    )
+    await updateGroup(group.id, {
+      name: 'Renamed',
+      currency: group.currency,
+      currencyCode: 'USD',
+      defaultSplitMode: 'EVENLY',
+      fixedExpenseDateGroups: false,
+      participants: group.participants.map(({ id, name }) => ({ id, name })),
+    })
+    expect(await getGroupExpenseCount(group.id)).toBe(1)
+    const activities = await getActivities(group.id)
+    expect(activities.map((a) => a.activityType).sort()).toEqual([
+      'CREATE_EXPENSE',
+      'UPDATE_GROUP',
+    ])
   })
 
   it('last-write-wins is replaced by conflict retries that keep both expenses', async () => {
@@ -608,9 +652,9 @@ describe('api + memory repository', () => {
     })
     expect(byNote.map((expense) => expense.title)).toEqual(['Dinner'])
     expect(
-      (
-        await getGroupExpenses(group.id, { filter: 'groc', length: 10 })
-      ).map((expense) => expense.title),
+      (await getGroupExpenses(group.id, { filter: 'groc', length: 10 })).map(
+        (expense) => expense.title,
+      ),
     ).toEqual(['Groceries'])
     expect(await getRepository().countExpenses(group.id, 'lake house')).toBe(1)
     expect(await getRepository().countExpenses(group.id, 'zzz')).toBe(0)

@@ -29,7 +29,7 @@ export function DeletePopup({ onDelete }: { onDelete: () => Promise<void> }) {
           <AsyncButton
             type="button"
             variant="destructive"
-            loadingContent="Deleting…"
+            loadingContent={t('deleting')}
             action={onDelete}
           >
             {t('yes')}

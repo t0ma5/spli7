@@ -37,11 +37,14 @@ for (const name of files) {
     continue
   }
   const sql = readFileSync(join(dir, name), 'utf8')
-  await client.executeMultiple(sql)
-  await client.execute({
-    sql: 'INSERT INTO _migrations (name, applied_at) VALUES (?, ?)',
-    args: [name, new Date().toISOString()],
-  })
+  // One transaction: a failing statement must not leave the file half
+  // applied with no record, or the next run would replay its first half.
+  await client.executeMultiple(
+    `BEGIN;
+${sql}
+INSERT INTO _migrations (name, applied_at) VALUES ('${name.replace(/'/g, "''")}', '${new Date().toISOString()}');
+COMMIT;`,
+  )
   console.log(`applied ${name}`)
 }
 

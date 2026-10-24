@@ -3,12 +3,16 @@ import {
   createGroupFromSplitwiseCsv,
   createGroupFromTricountCsv,
 } from '@/lib/api'
+import { assertRateLimit } from '@/lib/group-access'
 import { groupImportSchema } from '@/lib/schemas'
 import { looksLikeSplitwiseCsv } from '@/lib/splitwise-import'
 import { looksLikeTricountCsv } from '@/lib/tricount-detect'
 import { baseProcedure } from '@/trpc/init'
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
+
+// Imports write up to thousands of rows each.
+const IMPORT_LIMIT = { windowMs: 60 * 60 * 1000, maxRequests: 10 }
 
 export const importGroupProcedure = baseProcedure
   .input(
@@ -17,6 +21,7 @@ export const importGroupProcedure = baseProcedure
     }),
   )
   .mutation(async ({ input: { groupImportValues } }) => {
+    await assertRateLimit('import-group', IMPORT_LIMIT)
     try {
       const group = await createGroupFromImport(groupImportValues)
       return { groupId: group.id, groupName: group.name }
@@ -37,6 +42,7 @@ export const importTricountProcedure = baseProcedure
     }),
   )
   .mutation(async ({ input: { csvText, targetCurrencyCode } }) => {
+    await assertRateLimit('import-group', IMPORT_LIMIT)
     try {
       if (!looksLikeTricountCsv(csvText)) {
         throw new Error('Invalid Tricount CSV format')
@@ -64,6 +70,7 @@ export const importSplitwiseProcedure = baseProcedure
     }),
   )
   .mutation(async ({ input: { csvText } }) => {
+    await assertRateLimit('import-group', IMPORT_LIMIT)
     try {
       if (!looksLikeSplitwiseCsv(csvText)) {
         throw new Error('Invalid Splitwise CSV format')

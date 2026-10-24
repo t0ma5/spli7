@@ -1,5 +1,6 @@
 export { looksLikeTricountCsv } from '@/lib/tricount-detect'
 import { getCurrency } from '@/lib/currency'
+import { parseIsoDateTimeAsUtc } from '@/lib/imports/date'
 import { SEEDED_CATEGORIES } from '@/lib/kv/categories'
 import type { Expense, Participant } from '@/lib/kv/types'
 import { SplitMode } from '@/lib/kv/types'
@@ -107,6 +108,26 @@ function findCategoryId(
   return match ? match.id : 0
 }
 
+const MAX_REPORTED_ERRORS = 5
+
+/**
+ * Makes the entries add up to `total` by moving single minor units, which
+ * absorbs the rounding of converting each participant's column separately.
+ * The largest entries take the units first. A gap of more than one unit per
+ * entry is not rounding, so the entries are left alone and false is returned.
+ */
+function absorbRounding(entries: { cents: number }[], total: number): boolean {
+  const gap = total - entries.reduce((sum, e) => sum + e.cents, 0)
+  if (gap === 0) return true
+  if (Math.abs(gap) > entries.length) return false
+  const step = Math.sign(gap)
+  const order = entries
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => b.entry.cents - a.entry.cents || a.index - b.index)
+  for (let i = 0; i < Math.abs(gap); i++) order[i].entry.cents += step
+  return entries.every((e) => e.cents > 0)
+}
+
 export type ParsedTricountGroup = {
   name: string
   currency: string
@@ -173,9 +194,12 @@ export async function parseTricountCsv(
     titleIdx === -1 ||
     amountIdx === -1 ||
     currencyIdx === -1 ||
+    dateTimeIdx === -1 ||
     (paidByIdx === -1 && !hasPerPersonPaidBy)
   ) {
-    throw new Error('Invalid Tricount CSV format: missing required columns')
+    throw new Error(
+      'Invalid Tricount CSV format: missing required columns (Title, Amount, Currency, Date & time, Paid by)',
+    )
   }
 
   let defaultCurrencyCode = 'EUR'
@@ -214,12 +238,34 @@ export async function parseTricountCsv(
     participants.map((p) => [p.name, p.id] as const),
   )
 
+  // Every cell the parser reads; a data row shorter than this is malformed.
+  const usedIndices = [
+    titleIdx,
+    amountIdx,
+    currencyIdx,
+    exchangeRateIdx,
+    amountInDefaultIdx,
+    categoryIdx,
+    paidByIdx,
+    dateTimeIdx,
+    ...Array.from(participantMap.values()).flatMap((p) => [
+      p.paidByIdx,
+      p.impactedIdx,
+    ]),
+  ]
+  const minCells = Math.max(...usedIndices) + 1
+
+  const isSkippableRow = (row: string[]) =>
+    row.every((cell) => cell.trim() === '') ||
+    (row[0].startsWith('tricount ') && row[0].includes(' - Exported on'))
+
   const expenses: Expense[] = []
+  const errors: string[] = []
   const rateByCurrency = new Map<string, number>()
   if (exchangeRateIdx !== -1 && currencyIdx !== -1) {
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i]
-      if (r.length < 8) continue
+      if (r.length < minCells) continue
       const code = r[currencyIdx]
       const rate = parseFloat(r[exchangeRateIdx])
       if (code && rate && !Number.isNaN(rate) && !rateByCurrency.has(code)) {
@@ -230,8 +276,17 @@ export async function parseTricountCsv(
 
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
     const row = rows[rowIndex]
-    if (row.length < 8) continue
-    if (row[0].startsWith('tricount ') && row[0].includes(' - Exported on')) {
+    if (isSkippableRow(row)) continue
+
+    // The header is row 1, so data rows are numbered as a spreadsheet shows them.
+    const rowTitle = row[titleIdx]
+    const rowLabel = `Row ${rowIndex + 1}${rowTitle ? ` ("${rowTitle}")` : ''}`
+    const rowError = (message: string) => {
+      errors.push(`${rowLabel}: ${message}`)
+    }
+
+    if (row.length < minCells) {
+      rowError(`has ${row.length} cells, expected at least ${minCells}`)
       continue
     }
 
@@ -241,10 +296,17 @@ export async function parseTricountCsv(
     const amountInDefaultStr =
       amountInDefaultIdx !== -1 ? row[amountInDefaultIdx] : amountStr
 
-    if (!amountStr || Number.isNaN(parseFloat(amountStr))) continue
-
     const amountOriginalVal = parseFloat(amountStr)
+    if (!amountStr || !Number.isFinite(amountOriginalVal)) {
+      rowError(`invalid amount "${amountStr}"`)
+      continue
+    }
     const amountDefaultVal = parseFloat(amountInDefaultStr || amountStr)
+    if (!Number.isFinite(amountDefaultVal)) {
+      rowError(`invalid amount in default currency "${amountInDefaultStr}"`)
+      continue
+    }
+
     const isReimbursement =
       title.toLowerCase().includes('recouvrement de dette') ||
       title.toLowerCase().includes('repayment') ||
@@ -253,10 +315,11 @@ export async function parseTricountCsv(
     const categoryName = categoryIdx !== -1 ? row[categoryIdx] : ''
     const categoryId = findCategoryId(categoryName, isReimbursement)
 
-    let expenseDate = new Date()
-    if (dateTimeIdx !== -1 && row[dateTimeIdx]) {
-      const parsedDate = new Date(row[dateTimeIdx])
-      if (!Number.isNaN(parsedDate.getTime())) expenseDate = parsedDate
+    const dateCell = row[dateTimeIdx]
+    const expenseDateTime = parseIsoDateTimeAsUtc(dateCell)
+    if (!expenseDateTime) {
+      rowError(`invalid date "${dateCell}", expected YYYY-MM-DD HH:mm:ss`)
+      continue
     }
 
     let targetToDefaultRate = 1
@@ -266,13 +329,13 @@ export async function parseTricountCsv(
         targetToDefaultRate = mapped
       } else {
         const fetchedRate = await getRate(
-          expenseDate,
+          expenseDateTime,
           resolvedTarget,
           defaultCurrencyCode,
         )
         if (fetchedRate == null) {
           throw new Error(
-            `No exchange rate for ${resolvedTarget} to ${defaultCurrencyCode} on ${expenseDate.toISOString().slice(0, 10)}`,
+            `No exchange rate for ${resolvedTarget} to ${defaultCurrencyCode} on ${expenseDateTime.toISOString().slice(0, 10)}`,
           )
         }
         targetToDefaultRate = fetchedRate
@@ -299,104 +362,130 @@ export async function parseTricountCsv(
         amountOriginalVal !== 0 ? amountTargetVal / amountOriginalVal : null
     }
 
+    if (amountCents === 0) {
+      rowError('the amount is zero')
+      continue
+    }
+    // A refund has a negative amount: its "Paid by" columns are negative and
+    // its "Impacted to" columns positive, the opposite of an expense. Both are
+    // read as magnitudes and the sign goes back on the amount and the payers,
+    // so a refund keeps everyone's share.
+    const sign = Math.sign(amountCents)
+    const totalCents = Math.abs(amountCents)
+
     const toTargetCents = (defaultCurrencyAmount: number) =>
       Math.round(
         (Math.abs(defaultCurrencyAmount) / targetToDefaultRate) *
           10 ** targetCurrencyDigits,
       )
 
-    const paidByList: { participantId: string; amount: number }[] = []
-    for (const name of participantNames) {
-      const pMap = participantMap.get(name)!
-      if (pMap.paidByIdx !== -1 && row[pMap.paidByIdx]) {
-        const paidVal = parseFloat(row[pMap.paidByIdx])
-        if (!Number.isNaN(paidVal) && paidVal > 0) {
-          const paidAmount = toTargetCents(paidVal)
-          if (paidAmount > 0) {
-            paidByList.push({
-              participantId: participantDbIds.get(name)!,
-              amount: paidAmount,
-            })
-          }
+    // Reads one column per participant. Values of the expected sign become
+    // magnitudes in target minor units; non-numbers and values of the other
+    // sign are reported, and null is returned.
+    const readColumns = (
+      kind: 'paid' | 'impacted',
+      expectedSign: number,
+    ): { name: string; cents: number }[] | null => {
+      const entries: { name: string; cents: number }[] = []
+      let ok = true
+      for (const name of participantNames) {
+        const pMap = participantMap.get(name)!
+        const idx = kind === 'paid' ? pMap.paidByIdx : pMap.impactedIdx
+        const cell = idx === -1 ? '' : row[idx].trim()
+        if (!cell) continue
+        const value = parseFloat(cell)
+        if (!Number.isFinite(value)) {
+          rowError(`invalid ${kind} value "${cell}" for ${name}`)
+          ok = false
+          continue
         }
-      }
-    }
-
-    if (paidByList.length === 0) {
-      if (paidByIdx === -1) continue
-      const paidByName = row[paidByIdx]
-      const paidById = participantDbIds.get(paidByName)
-      if (!paidById) continue
-      paidByList.push({ participantId: paidById, amount: amountCents })
-    } else {
-      const paidSum = paidByList.reduce((sum, p) => sum + p.amount, 0)
-      const paidDiscrepancy = amountCents - paidSum
-      if (paidDiscrepancy !== 0) {
-        paidByList[paidByList.length - 1].amount += paidDiscrepancy
-      }
-    }
-
-    const paidForList: { participantId: string; shares: number }[] = []
-    let sumShares = 0
-
-    for (const name of participantNames) {
-      const pMap = participantMap.get(name)!
-      if (pMap.impactedIdx !== -1 && row[pMap.impactedIdx]) {
-        const impactedVal = parseFloat(row[pMap.impactedIdx])
-        if (impactedVal < 0) {
-          const shareAmount = toTargetCents(impactedVal)
-          if (shareAmount > 0) {
-            paidForList.push({
-              participantId: participantDbIds.get(name)!,
-              shares: shareAmount,
-            })
-            sumShares += shareAmount
-          }
+        if (value === 0) continue
+        if (Math.sign(value) !== expectedSign) {
+          rowError(
+            `${kind} value ${cell} for ${name} has the wrong sign for an amount of ${amountStr}`,
+          )
+          ok = false
+          continue
         }
+        const cents = toTargetCents(value)
+        if (cents > 0) entries.push({ name, cents })
       }
+      return ok ? entries : null
     }
 
-    const discrepancy = amountCents - sumShares
-    if (discrepancy !== 0 && paidForList.length > 0) {
-      paidForList[paidForList.length - 1].shares += discrepancy
+    const paidEntries = readColumns('paid', sign)
+    const impactedEntries = readColumns('impacted', -sign)
+    if (!paidEntries || !impactedEntries) continue
+
+    if (paidEntries.length === 0) {
+      const paidByName = paidByIdx === -1 ? '' : row[paidByIdx].trim()
+      if (!paidByName) {
+        rowError('no payer')
+        continue
+      }
+      if (!participantDbIds.has(paidByName)) {
+        rowError(`unknown payer "${paidByName}"`)
+        continue
+      }
+      paidEntries.push({ name: paidByName, cents: totalCents })
+    }
+    if (impactedEntries.length === 0) {
+      rowError('nobody is impacted')
+      continue
     }
 
-    if (paidForList.length === 0) {
-      paidForList.push({
-        participantId: paidByList[0].participantId,
-        shares: amountCents,
-      })
+    const sumCents = (entries: { cents: number }[]) =>
+      entries.reduce((sum, entry) => sum + entry.cents, 0)
+    const paidSum = sumCents(paidEntries)
+    const impactedSum = sumCents(impactedEntries)
+    if (
+      !absorbRounding(paidEntries, totalCents) ||
+      !absorbRounding(impactedEntries, totalCents)
+    ) {
+      rowError(
+        `the participant columns (paid ${paidSum}, impacted ${impactedSum} minor units) do not add up to the amount (${totalCents} minor units)`,
+      )
+      continue
     }
 
     const expenseId = randomId()
     expenses.push({
       id: expenseId,
       groupId,
-      expenseDate: toIsoDateOnly(expenseDate),
+      expenseDate: toIsoDateOnly(expenseDateTime),
       title,
       categoryId,
       amount: amountCents,
       originalAmount: originalAmountCents,
       originalCurrency: originalCurrencyCode,
       conversionRate: conversionRateVal,
-      paidBy: paidByList.map(({ participantId, amount }) => ({
+      paidBy: paidEntries.map(({ name, cents }) => ({
         expenseId,
-        participantId,
-        amount,
+        participantId: participantDbIds.get(name)!,
+        amount: sign * cents,
       })),
       isReimbursement,
       splitMode: SplitMode.BY_AMOUNT,
-      createdAt: expenseDate.toISOString(),
+      createdAt: expenseDateTime.toISOString(),
       notes: null,
       recurrenceRule: null,
-      paidFor: paidForList.map(({ participantId, shares }) => ({
+      paidFor: impactedEntries.map(({ name, cents }) => ({
         expenseId,
-        participantId,
-        shares,
+        participantId: participantDbIds.get(name)!,
+        shares: cents,
       })),
       documents: [],
       recurringExpenseLink: null,
     })
+  }
+
+  if (errors.length > 0) {
+    const shown = errors.slice(0, MAX_REPORTED_ERRORS).join('; ')
+    const more =
+      errors.length > MAX_REPORTED_ERRORS
+        ? ` (and ${errors.length - MAX_REPORTED_ERRORS} more)`
+        : ''
+    throw new Error(`Tricount import failed. ${shown}${more}`)
   }
 
   return {

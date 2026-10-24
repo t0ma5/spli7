@@ -8,7 +8,7 @@ export const getGroupExpenseProcedure = baseProcedure
   .input(
     z.object({
       groupId: z.string().min(1).max(64),
-      expenseId: z.string().min(1),
+      expenseId: z.string().min(1).max(64),
     }),
   )
   .query(async ({ input: { groupId, expenseId } }) => {

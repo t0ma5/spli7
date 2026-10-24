@@ -14,7 +14,10 @@ import {
   isInactive,
   isSoftDeleteExpired,
   MAX_RECURRING_GENERATIONS_PER_RUN,
+  monthsAgo,
   nextRecurringDate,
+  PENDING_CREATE_DELETED_AT,
+  SOFT_DELETE_GRACE_DAYS,
   usesAnchorDay,
 } from '@/lib/group-lifecycle'
 import { hashGroupPin, isLegacyPinHash, pinMatchesHash } from '@/lib/group-pin'
@@ -43,6 +46,7 @@ import {
 } from '@/lib/schemas'
 import { parseSplitwiseCsv } from '@/lib/splitwise-import'
 import { parseTricountCsv } from '@/lib/tricount-import'
+import { after } from 'next/server'
 
 function toDate(value: string | Date): Date {
   return value instanceof Date ? value : new Date(value)
@@ -108,23 +112,49 @@ class ConflictError extends Error {
   }
 }
 
+/**
+ * A group with its participants but no expenses or activities. Saving it with
+ * itself as `previous` writes only meta, participant and new activity rows,
+ * because the empty child lists diff to no change.
+ */
+async function getGroupMetaDocument(
+  groupId: string,
+): Promise<GroupDocument | null> {
+  const meta = await getRepository().getMeta(groupId)
+  return meta ? { ...meta, expenses: [], activities: [] } : null
+}
+
 async function withGroupWrite<T>(
   groupId: string,
   fn: (group: GroupDocument) => T | Promise<T>,
-  options?: { touchActivity?: boolean; allowDeleted?: boolean },
+  options?: {
+    touchActivity?: boolean
+    allowDeleted?: boolean
+    /** 'meta' skips loading expenses and activities. Default 'full'. */
+    load?: 'meta' | 'full'
+    /** Skip the write (and the version bump) when this returns false. */
+    commit?: (value: T) => boolean
+  },
 ): Promise<T> {
   const touchActivity = options?.touchActivity ?? true
   const allowDeleted = options?.allowDeleted ?? false
+  const load = options?.load ?? 'full'
   let lastError: unknown
   for (let attempt = 0; attempt < WRITE_RETRIES; attempt++) {
-    const group = await getGroupDocument(groupId)
-    if (!group) throw new Error(`Invalid group ID: ${groupId}`)
+    const group =
+      load === 'meta'
+        ? await getGroupMetaDocument(groupId)
+        : await getGroupDocument(groupId)
+    if (!group || group.deletedAt === PENDING_CREATE_DELETED_AT) {
+      throw new Error(`Invalid group ID: ${groupId}`)
+    }
     if (group.deletedAt && !allowDeleted) {
       throw new Error(`Invalid group ID: ${groupId}`)
     }
     try {
       const previous = structuredClone(group)
       const value = await fn(group)
+      if (options?.commit && !options.commit(value)) return value
       await persistGroup(group, previous, touchActivity)
       return value
     } catch (error) {
@@ -169,6 +199,25 @@ async function withExpenseWrite<T>(
   throw lastError instanceof Error ? lastError : new ConflictError()
 }
 
+/**
+ * Record a read without delaying the response. A bare un-awaited promise can
+ * be dropped once a serverless response is sent; `after` keeps the function
+ * alive for it. Outside a request (tests, scripts) it just runs.
+ */
+function touchLastSeen(groupId: string) {
+  const bump = () =>
+    getRepository()
+      .bumpLastSeen(groupId, new Date().toISOString())
+      .catch(() => {
+        // Best effort: a missed bump only delays expiry bookkeeping.
+      })
+  try {
+    after(bump)
+  } catch {
+    void bump()
+  }
+}
+
 function makeActivity(
   groupId: string,
   activityType: ActivityType,
@@ -195,6 +244,32 @@ function assertParticipantsInGroup(
   ]) {
     if (!participants.some((item) => item.id === participant)) {
       throw new Error(`Invalid participant ID: ${participant}`)
+    }
+  }
+}
+
+/**
+ * The acting participant is only a label on the activity row, sent by the
+ * client. Keep it only if it belongs to the group.
+ */
+function actingParticipant(
+  participants: Participant[],
+  participantId: string | undefined,
+): string | undefined {
+  return participantId && participants.some((p) => p.id === participantId)
+    ? participantId
+    : undefined
+}
+
+function assertValidShares(expenseFormValues: ExpenseFormValues) {
+  for (const { shares } of expenseFormValues.paidFor) {
+    const value = Number(shares)
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error('Shares must be positive numbers')
+    }
+    // By-amount shares are minor units, like every other stored amount.
+    if (expenseFormValues.splitMode === 'BY_AMOUNT') {
+      assertIntegerMinorUnits(value, 'paidFor.shares')
     }
   }
 }
@@ -579,14 +654,15 @@ export async function createExpense(
   }
   return withExpenseWrite(groupId, (meta) => {
     assertParticipantsInGroup(meta.participants, expenseFormValues)
+    assertValidShares(expenseFormValues)
     const expense = buildExpenseFromForm(expenseFormValues, groupId, id)
     return {
       value: expense,
       mutation: {
-        upsertExpenses: [expense],
+        insertExpenses: [expense],
         insertActivities: [
           makeActivity(groupId, ActivityType.CREATE_EXPENSE, {
-            participantId,
+            participantId: actingParticipant(meta.participants, participantId),
             expenseId: id,
             data: expenseFormValues.title,
           }),
@@ -601,7 +677,7 @@ export async function deleteExpense(
   expenseId: string,
   participantId?: string,
 ) {
-  await withExpenseWrite(groupId, async () => {
+  await withExpenseWrite(groupId, async (meta) => {
     const existingExpense = await getRepository().getExpense(groupId, expenseId)
     return {
       value: undefined,
@@ -609,7 +685,7 @@ export async function deleteExpense(
         deleteExpenseIds: existingExpense ? [expenseId] : [],
         insertActivities: [
           makeActivity(groupId, ActivityType.DELETE_EXPENSE, {
-            participantId,
+            participantId: actingParticipant(meta.participants, participantId),
             expenseId,
             data: existingExpense?.title,
           }),
@@ -655,6 +731,7 @@ export async function updateExpense(
     const existingExpense = await getRepository().getExpense(groupId, expenseId)
     if (!existingExpense) throw new Error(`Invalid expense ID: ${expenseId}`)
     assertParticipantsInGroup(meta.participants, expenseFormValues)
+    assertValidShares(expenseFormValues)
     const updated = buildExpenseFromForm(
       expenseFormValues,
       groupId,
@@ -667,7 +744,7 @@ export async function updateExpense(
         upsertExpenses: [updated],
         insertActivities: [
           makeActivity(groupId, ActivityType.UPDATE_EXPENSE, {
-            participantId,
+            participantId: actingParticipant(meta.participants, participantId),
             expenseId,
             data: expenseFormValues.title,
           }),
@@ -682,86 +759,91 @@ export async function updateGroup(
   groupFormValues: GroupFormValues,
   participantId?: string,
 ) {
-  return withGroupWrite(groupId, async (group) => {
-    appendActivity(group, ActivityType.UPDATE_GROUP, { participantId })
+  return withGroupWrite(
+    groupId,
+    async (group) => {
+      appendActivity(group, ActivityType.UPDATE_GROUP, {
+        participantId: actingParticipant(group.participants, participantId),
+      })
 
-    group.name = groupFormValues.name
-    group.information = groupFormValues.information ?? null
-    group.currency = groupFormValues.currency
-    group.currencyCode = groupFormValues.currencyCode || null
-    group.defaultSplitMode =
-      groupFormValues.defaultSplitMode ?? SplitMode.EVENLY
-    group.fixedExpenseDateGroups =
-      groupFormValues.fixedExpenseDateGroups ?? false
+      group.name = groupFormValues.name
+      group.information = groupFormValues.information ?? null
+      group.currency = groupFormValues.currency
+      group.currencyCode = groupFormValues.currencyCode || null
+      group.defaultSplitMode =
+        groupFormValues.defaultSplitMode ?? SplitMode.EVENLY
+      group.fixedExpenseDateGroups =
+        groupFormValues.fixedExpenseDateGroups ?? false
 
-    if (groupFormValues.clearPin) {
-      if (group.pinHash) {
-        if (!groupFormValues.currentPin) {
-          throw new Error('Current PIN required to clear PIN')
+      if (groupFormValues.clearPin) {
+        if (group.pinHash) {
+          if (!groupFormValues.currentPin) {
+            throw new Error('Current PIN required to clear PIN')
+          }
+          const matches = await pinMatchesHash(
+            groupFormValues.currentPin,
+            groupId,
+            group.pinHash,
+          )
+          if (!matches) {
+            throw new Error('Incorrect PIN')
+          }
         }
-        const matches = await pinMatchesHash(
-          groupFormValues.currentPin,
-          groupId,
-          group.pinHash,
-        )
-        if (!matches) {
-          throw new Error('Incorrect PIN')
+        group.pinHash = null
+      } else if (groupFormValues.newPin) {
+        if (group.pinHash) {
+          if (!groupFormValues.currentPin) {
+            throw new Error('Current PIN required to change PIN')
+          }
+          const matches = await pinMatchesHash(
+            groupFormValues.currentPin,
+            groupId,
+            group.pinHash,
+          )
+          if (!matches) {
+            throw new Error('Incorrect PIN')
+          }
         }
+        group.pinHash = await hashGroupPin(groupFormValues.newPin, groupId)
       }
-      group.pinHash = null
-    } else if (groupFormValues.newPin) {
-      if (group.pinHash) {
-        if (!groupFormValues.currentPin) {
-          throw new Error('Current PIN required to change PIN')
-        }
-        const matches = await pinMatchesHash(
-          groupFormValues.currentPin,
-          groupId,
-          group.pinHash,
-        )
-        if (!matches) {
-          throw new Error('Incorrect PIN')
-        }
-      }
-      group.pinHash = await hashGroupPin(groupFormValues.newPin, groupId)
-    }
 
-    const nextIds = new Set(
-      groupFormValues.participants
-        .map((participant) => participant.id)
-        .filter((id): id is string => Boolean(id)),
-    )
-    for (const existing of group.participants) {
-      if (nextIds.has(existing.id)) continue
-      const referenced = group.expenses.some(
-        (expense) =>
-          expense.paidBy.some((paid) => paid.participantId === existing.id) ||
-          expense.paidFor.some((paid) => paid.participantId === existing.id),
+      const nextIds = new Set(
+        groupFormValues.participants
+          .map((participant) => participant.id)
+          .filter((id): id is string => Boolean(id)),
       )
-      if (referenced) {
-        throw new Error(
-          `Cannot remove ${existing.name}: they are still on an expense. Reassign or delete those expenses first.`,
-        )
-      }
-    }
-
-    const existingById = new Map(group.participants.map((p) => [p.id, p]))
-    group.participants = groupFormValues.participants.map((participant) => {
-      if (participant.id) {
-        const existing = existingById.get(participant.id)
-        if (existing) {
-          return { ...existing, name: participant.name }
+      const removed = group.participants.filter((p) => !nextIds.has(p.id))
+      const referencedIds =
+        removed.length > 0
+          ? new Set(await getRepository().listExpenseParticipantIds(groupId))
+          : new Set<string>()
+      for (const existing of removed) {
+        if (referencedIds.has(existing.id)) {
+          throw new Error(
+            `Cannot remove ${existing.name}: they are still on an expense. Reassign or delete those expenses first.`,
+          )
         }
       }
-      return {
-        id: randomId(),
-        name: participant.name,
-        groupId,
-      }
-    })
 
-    return mapGroup(group)
-  })
+      const existingById = new Map(group.participants.map((p) => [p.id, p]))
+      group.participants = groupFormValues.participants.map((participant) => {
+        if (participant.id) {
+          const existing = existingById.get(participant.id)
+          if (existing) {
+            return { ...existing, name: participant.name }
+          }
+        }
+        return {
+          id: randomId(),
+          name: participant.name,
+          groupId,
+        }
+      })
+
+      return mapGroup(group)
+    },
+    { load: 'meta' },
+  )
 }
 
 export async function verifyGroupPin(groupId: string, pin: string) {
@@ -772,11 +854,15 @@ export async function verifyGroupPin(groupId: string, pin: string) {
   if (!matches) return false
   if (isLegacyPinHash(group.pinHash)) {
     try {
-      await withGroupWrite(groupId, async (fresh) => {
-        if (fresh.pinHash && isLegacyPinHash(fresh.pinHash)) {
-          fresh.pinHash = await hashGroupPin(pin, groupId)
-        }
-      })
+      await withGroupWrite(
+        groupId,
+        async (fresh) => {
+          if (fresh.pinHash && isLegacyPinHash(fresh.pinHash)) {
+            fresh.pinHash = await hashGroupPin(pin, groupId)
+          }
+        },
+        { load: 'meta', touchActivity: false },
+      )
     } catch {
       // Upgrade is best-effort; verification already succeeded.
     }
@@ -787,14 +873,14 @@ export async function verifyGroupPin(groupId: string, pin: string) {
 export async function getGroup(groupId: string) {
   const group = await getRepository().getMeta(groupId)
   if (!group || group.deletedAt) return null
-  void getRepository().bumpLastSeen(groupId, new Date().toISOString())
+  touchLastSeen(groupId)
   return mapGroup(group)
 }
 
 /** Includes soft-deleted groups (for restore UI). */
 export async function getGroupIncludingDeleted(groupId: string) {
   const group = await getRepository().getMeta(groupId)
-  if (!group) return null
+  if (!group || group.deletedAt === PENDING_CREATE_DELETED_AT) return null
   return mapGroup(group)
 }
 
@@ -807,7 +893,7 @@ export async function softDeleteGroup(groupId: string) {
       }
       return mapGroup(group)
     },
-    { allowDeleted: true, touchActivity: true },
+    { allowDeleted: true, touchActivity: true, load: 'meta' },
   )
 }
 
@@ -818,7 +904,7 @@ export async function restoreGroup(groupId: string) {
       group.deletedAt = null
       return mapGroup(group)
     },
-    { allowDeleted: true },
+    { allowDeleted: true, load: 'meta' },
   )
 }
 
@@ -827,42 +913,41 @@ export async function restoreGroup(groupId: string) {
  * (24 months without mutating or viewing activity).
  */
 export async function cleanupExpiredGroups(now = new Date()) {
-  const ids = await getRepository().listIds()
+  // Timestamps only: loading each group's expenses here would not scale.
+  const rows = await getRepository().listLifecycle()
+  const inactiveBefore = monthsAgo(INACTIVITY_MONTHS, now).toISOString()
   let softDeleted = 0
   let hardDeleted = 0
 
-  for (const groupId of ids) {
-    const group = await getGroupDocument(groupId)
-    if (!group) continue
-
+  for (const group of rows) {
     if (group.deletedAt) {
       if (isSoftDeleteExpired(group.deletedAt, now)) {
-        await getRepository().delete(groupId)
+        await getRepository().delete(group.id)
         hardDeleted += 1
       }
       continue
     }
 
     if (isInactive(group, now)) {
-      try {
-        await withGroupWrite(
-          groupId,
-          (fresh) => {
-            fresh.deletedAt = now.toISOString()
-          },
-          { touchActivity: false },
-        )
-        softDeleted += 1
-      } catch {
-        // Skip groups that changed under us; next cron will retry.
-      }
+      // Re-checked in the UPDATE, so a group touched since the listing stays.
+      const done = await getRepository().softDeleteIfInactive(
+        group.id,
+        now.toISOString(),
+        inactiveBefore,
+      )
+      if (done) softDeleted += 1
     }
   }
 
+  const prunedPinAttempts = await getRepository().prunePinAttempts(
+    now.getTime() - SOFT_DELETE_GRACE_DAYS * 24 * 60 * 60 * 1000,
+  )
+
   return {
-    scanned: ids.length,
+    scanned: rows.length,
     softDeleted,
     hardDeleted,
+    prunedPinAttempts,
     inactivityMonths: INACTIVITY_MONTHS,
   }
 }
@@ -885,23 +970,30 @@ export async function materializeDueRecurringExpenses(groupId: string) {
   if (!(await getRepository().hasDueRecurring(groupId, utcNow.toISOString()))) {
     return false
   }
-  await withGroupWrite(groupId, (fresh) => {
-    createRecurringExpensesForGroup(fresh)
-  })
-  return true
+  // Generated copies are not user activity: touching lastActivityAt here
+  // would keep an abandoned group with a recurring expense alive forever.
+  return withGroupWrite(
+    groupId,
+    (fresh) => createRecurringExpensesForGroup(fresh),
+    { touchActivity: false, commit: (mutated) => mutated },
+  )
 }
 
 export async function materializeAllDueRecurringExpenses() {
-  const ids = await getRepository().listIds()
+  const ids = await getRepository().listGroupIdsWithDueRecurring(
+    new Date().toISOString(),
+  )
   let updated = 0
+  let failed = 0
   for (const id of ids) {
     try {
       if (await materializeDueRecurringExpenses(id)) updated += 1
-    } catch {
-      // next cron retries
+    } catch (error) {
+      failed += 1
+      console.error('recurring: group failed', id, error)
     }
   }
-  return { scanned: ids.length, updated }
+  return { scanned: ids.length, updated, failed }
 }
 
 export async function getGroupExpenses(
@@ -917,7 +1009,7 @@ export async function getGroupExpenses(
   }
   const group = await getRepository().getMeta(groupId)
   if (!group || group.deletedAt) return []
-  void getRepository().bumpLastSeen(groupId, new Date().toISOString())
+  touchLastSeen(groupId)
 
   const compact = options?.length === undefined
   const expenses = await getRepository().listExpenses(groupId, {
@@ -1184,8 +1276,9 @@ function createPayloadForNewRecurringExpenseLink(
 
 export async function getGroupForExport(groupId: string) {
   const group = await getRepository().getMeta(groupId)
-  if (!group) return null
-  void getRepository().bumpLastSeen(groupId, new Date().toISOString())
+  // Soft-deleted groups list no expenses, so an export would be misleading.
+  if (!group || group.deletedAt) return null
+  touchLastSeen(groupId)
 
   const [expenses, activities] = await Promise.all([
     getRepository().listExpenses(groupId),

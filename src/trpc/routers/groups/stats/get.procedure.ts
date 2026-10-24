@@ -18,7 +18,7 @@ export const getGroupStatsProcedure = baseProcedure
   .input(
     z.object({
       groupId: z.string().min(1).max(64),
-      participantId: z.string().optional(),
+      participantId: z.string().max(64).optional(),
       // Optional on purpose: Totals does not pass these, so we skip monthly /
       // timeline aggregation and avoid a second heavy payload on stats load.
       monthlySpendingGrouping: z

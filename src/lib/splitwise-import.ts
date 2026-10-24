@@ -69,7 +69,7 @@ export function parseSplitwiseCsv(csvText: string): ParsedTricountGroup {
       categoryId: expense.category,
       amount: expense.amount,
       originalAmount: null,
-      originalCurrency: expense.originalCurrency ?? null,
+      originalCurrency: null,
       conversionRate: null,
       paidBy: [
         {

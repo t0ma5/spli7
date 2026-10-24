@@ -231,5 +231,10 @@ describe('SplitwiseCsvFormat', () => {
     expect(train?.amount).toBe(1500)
     expect(refund?.amount).toBeLessThan(0)
     expect(Math.abs(refund?.amount ?? 0)).toBe(2000)
+    // Amounts are not converted, so a mixed export cannot be imported.
+    expect(parsed.errors?.[0]).toEqual({
+      row: 3,
+      message: expect.stringContaining('several currencies (JPY, EUR)'),
+    })
   })
 })

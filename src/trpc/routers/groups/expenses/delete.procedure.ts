@@ -6,9 +6,9 @@ import { z } from 'zod'
 export const deleteGroupExpenseProcedure = baseProcedure
   .input(
     z.object({
-      expenseId: z.string().min(1),
+      expenseId: z.string().min(1).max(64),
       groupId: z.string().min(1).max(64),
-      participantId: z.string().optional(),
+      participantId: z.string().max(64).optional(),
     }),
   )
   .mutation(async ({ input: { expenseId, groupId, participantId } }) => {

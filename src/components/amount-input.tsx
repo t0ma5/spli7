@@ -38,7 +38,13 @@ const AmountInput = React.forwardRef<HTMLInputElement, Props>(
           step={step}
           placeholder={step >= 1 ? '0' : String(step).replace(/\d/g, '0')}
           onChange={(event) =>
-            onChange(normalizeNumberInput(event.target.value))
+            // Keep + - * / ( ) so formulas like `10+5` survive typing. The
+            // caller evaluates them on blur and on submit.
+            onChange(
+              normalizeNumberInput(event.target.value, {
+                allowExpression: true,
+              }),
+            )
           }
           onFocus={(e) => {
             // small delay to work around Safari clearing selection on mouse up

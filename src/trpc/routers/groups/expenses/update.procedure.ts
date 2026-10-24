@@ -7,10 +7,10 @@ import { z } from 'zod'
 export const updateGroupExpenseProcedure = baseProcedure
   .input(
     z.object({
-      expenseId: z.string().min(1),
+      expenseId: z.string().min(1).max(64),
       groupId: z.string().min(1).max(64),
       expenseFormValues: expenseFormSchema,
-      participantId: z.string().optional(),
+      participantId: z.string().max(64).optional(),
     }),
   )
   .mutation(

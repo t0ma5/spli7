@@ -6,23 +6,49 @@
  * for dynamic/API requests.
  *
  * Caching strategy:
- *  - Immutable, content-hashed assets (/_next/static, /logo, icons, fonts):
- *    cache-first — fetched from the network once, then served from cache.
+ *  - Immutable, content-hashed assets (/_next/static): cache-first — fetched
+ *    from the network once, then served from cache.
+ *  - Other static files (/logo, icons, fonts in /public): their URLs carry no
+ *    hash, so stale-while-revalidate picks up a changed file on the next load.
  *  - Optimized images (/_next/image): stale-while-revalidate.
  *  - Page navigations: network-first with a cached fallback, then the offline
  *    page when both network and cache miss.
  *  - API / tRPC requests and any non-GET request: never cached (always network),
  *    so expense data is never stale.
  *
+ * Runtime and image caches are trimmed to a maximum number of entries (oldest
+ * first), so old hashed chunks from earlier deploys do not pile up forever.
+ *
  * Bump CACHE_VERSION to invalidate all previously cached content on deploy.
  */
 
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v3'
 const PRECACHE = `spli7-precache-${CACHE_VERSION}`
 const RUNTIME = `spli7-runtime-${CACHE_VERSION}`
 const IMAGE_CACHE = `spli7-images-${CACHE_VERSION}`
 
 const OFFLINE_URL = '/offline.html'
+
+const MAX_ENTRIES = {
+  [`spli7-runtime-${CACHE_VERSION}`]: 200,
+  [`spli7-images-${CACHE_VERSION}`]: 60,
+}
+
+/** Deletes the oldest entries (Cache keys keep insertion order). */
+async function trimCache(cacheName) {
+  const max = MAX_ENTRIES[cacheName]
+  if (!max) return
+  const cache = await caches.open(cacheName)
+  const keys = await cache.keys()
+  const excess = keys.length - max
+  if (excess <= 0) return
+  await Promise.all(keys.slice(0, excess).map((key) => cache.delete(key)))
+}
+
+async function putAndTrim(cache, cacheName, request, response) {
+  await cache.put(request, response)
+  await trimCache(cacheName)
+}
 
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -37,7 +63,9 @@ self.addEventListener('install', (event) => {
     (async () => {
       const cache = await caches.open(PRECACHE)
       await Promise.allSettled(
-        PRECACHE_URLS.map((url) => cache.add(new Request(url, { cache: 'reload' }))),
+        PRECACHE_URLS.map((url) =>
+          cache.add(new Request(url, { cache: 'reload' })),
+        ),
       )
       // Intentionally do NOT call skipWaiting() here. A new worker stays waiting
       // until the page posts SKIP_WAITING after the user chooses Reload.
@@ -63,7 +91,8 @@ async function cacheFirst(request, cacheName) {
   if (cached) return cached
   const cache = await caches.open(cacheName)
   const response = await fetch(request)
-  if (response && response.ok) cache.put(request, response.clone())
+  if (response && response.ok)
+    putAndTrim(cache, cacheName, request, response.clone()).catch(() => {})
   return response
 }
 
@@ -72,7 +101,8 @@ async function staleWhileRevalidate(request, cacheName) {
   const cached = await cache.match(request)
   const network = fetch(request)
     .then((response) => {
-      if (response && response.ok) cache.put(request, response.clone())
+      if (response && response.ok)
+        putAndTrim(cache, cacheName, request, response.clone()).catch(() => {})
       return response
     })
     .catch(() => undefined)
@@ -83,7 +113,8 @@ async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
   try {
     const response = await fetch(request)
-    if (response && response.ok) cache.put(request, response.clone())
+    if (response && response.ok)
+      putAndTrim(cache, cacheName, request, response.clone()).catch(() => {})
     return response
   } catch (err) {
     const cached = await cache.match(request)
@@ -94,9 +125,12 @@ async function networkFirst(request, cacheName) {
   }
 }
 
+function isHashedAsset(url) {
+  return url.pathname.startsWith('/_next/static/')
+}
+
 function isStaticAsset(url) {
   return (
-    url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/logo/') ||
     /\.(?:js|css|woff2?|ttf|otf|eot|png|svg|ico|webp|gif|jpg|jpeg)$/.test(
       url.pathname,
@@ -122,8 +156,13 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (isStaticAsset(url)) {
+  if (isHashedAsset(url)) {
     event.respondWith(cacheFirst(request, RUNTIME))
+    return
+  }
+
+  if (isStaticAsset(url)) {
+    event.respondWith(staleWhileRevalidate(request, RUNTIME))
     return
   }
 })

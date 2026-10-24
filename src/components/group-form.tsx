@@ -51,6 +51,11 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { CurrencySelector } from './currency-selector'
 import { Textarea } from './ui/textarea'
 
+/** Stored as `${groupId}-activeUser` when nobody is the active user. */
+const NO_ACTIVE_USER = 'None'
+/** Select value prefix for a participant that is not saved yet (no id). */
+const NEW_PARTICIPANT_PREFIX = 'new:'
+
 export type Props = {
   group?: Group
   onSubmit: (
@@ -107,28 +112,70 @@ export function GroupForm({
     keyName: 'key',
   })
 
+  // The active user select holds a stable value, never a translated label:
+  // NO_ACTIVE_USER, a saved participant's id, or NEW_PARTICIPANT_PREFIX plus
+  // the name of a participant that has no id until the form is saved.
   const [activeUser, setActiveUser] = useState<string | null>(null)
   useEffect(() => {
     if (activeUser === null) {
-      const currentActiveUser =
-        fields.find(
-          (f) => f.id === localStorage.getItem(`${group?.id}-activeUser`),
-        )?.name || t('Settings.ActiveUserField.none')
-      setActiveUser(currentActiveUser)
+      let stored: string | null = null
+      try {
+        stored = group ? localStorage.getItem(`${group.id}-activeUser`) : null
+      } catch {
+        // Storage unavailable: start from "None".
+      }
+      const known = fields.some((f) => f.id && f.id === stored)
+      setActiveUser(known && stored ? stored : NO_ACTIVE_USER)
     }
-  }, [t, activeUser, fields, group?.id])
+  }, [activeUser, fields, group])
+
+  const watchedParticipants = form.watch('participants')
+  const activeUserOptions = [
+    { value: NO_ACTIVE_USER, label: t('Settings.ActiveUserField.none') },
+    ...watchedParticipants
+      .filter((participant) => participant.name.length > 0)
+      .map((participant) => ({
+        value: participant.id
+          ? participant.id
+          : `${NEW_PARTICIPANT_PREFIX}${participant.name}`,
+        label: participant.name,
+      })),
+  ]
+
+  /** The saved participant id behind the selection, if it has one. */
+  const activeUserId =
+    activeUser &&
+    activeUser !== NO_ACTIVE_USER &&
+    !activeUser.startsWith(NEW_PARTICIPANT_PREFIX)
+      ? group?.participants.find((p) => p.id === activeUser)?.id
+      : undefined
 
   const updateActiveUser = () => {
     if (!activeUser) return
-    if (group?.id) {
-      const participant = group.participants.find((p) => p.name === activeUser)
-      if (participant?.id) {
-        localStorage.setItem(`${group.id}-activeUser`, participant.id)
+    try {
+      const newParticipantName = activeUser.startsWith(NEW_PARTICIPANT_PREFIX)
+        ? activeUser.slice(NEW_PARTICIPANT_PREFIX.length)
+        : null
+      if (group?.id) {
+        if (newParticipantName !== null) {
+          // Gets an id only once saved. The expense list maps this name to
+          // the new id when it loads the group again.
+          localStorage.setItem(`${group.id}-newUser`, newParticipantName)
+        } else {
+          localStorage.setItem(
+            `${group.id}-activeUser`,
+            activeUserId ?? NO_ACTIVE_USER,
+          )
+        }
       } else {
-        localStorage.setItem(`${group.id}-activeUser`, activeUser)
+        // A new group: the expense list maps the name to its id after create.
+        localStorage.setItem(
+          'newGroup-activeUser',
+          newParticipantName ?? NO_ACTIVE_USER,
+        )
       }
-    } else {
-      localStorage.setItem('newGroup-activeUser', activeUser)
+    } catch {
+      // Storage unavailable: the active user is only a convenience.
     }
   }
 
@@ -136,11 +183,7 @@ export function GroupForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(async (values) => {
-          await onSubmit(
-            values,
-            group?.participants.find((p) => p.name === activeUser)?.id ??
-              undefined,
-          )
+          await onSubmit(values, activeUserId)
         })}
       >
         <Card className="mb-4">
@@ -445,7 +488,7 @@ export function GroupForm({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="sr-only">
-                                Participant #{index + 1}
+                                {t('Participants.label', { index: index + 1 })}
                               </FormLabel>
                               <FormControl>
                                 <div className="flex gap-2 !mt-0">
@@ -464,6 +507,9 @@ export function GroupForm({
                                           type="button"
                                           size="icon"
                                           disabled
+                                          aria-label={t('Participants.remove', {
+                                            name: field.value || index + 1,
+                                          })}
                                         >
                                           <Trash2 className="w-4 h-4 text-destructive opacity-50" />
                                         </Button>
@@ -482,6 +528,9 @@ export function GroupForm({
                                       onClick={() => remove(index)}
                                       type="button"
                                       size="icon"
+                                      aria-label={t('Participants.remove', {
+                                        name: field.value || index + 1,
+                                      })}
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </Button>
@@ -527,7 +576,7 @@ export function GroupForm({
                       onValueChange={(value) => {
                         setActiveUser(value)
                       }}
-                      defaultValue={activeUser}
+                      value={activeUser}
                     >
                       <SelectTrigger>
                         <SelectValue
@@ -537,16 +586,11 @@ export function GroupForm({
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {[
-                          { name: t('Settings.ActiveUserField.none') },
-                          ...form.watch('participants'),
-                        ]
-                          .filter((item) => item.name.length > 0)
-                          .map(({ name }) => (
-                            <SelectItem key={name} value={name}>
-                              {name}
-                            </SelectItem>
-                          ))}
+                        {activeUserOptions.map(({ value, label }) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FormControl>

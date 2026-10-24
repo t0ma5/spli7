@@ -24,7 +24,7 @@ import {
 import { useMediaQuery } from '@/lib/hooks'
 import { Category } from '@/lib/kv/types'
 import { useTranslations } from 'next-intl'
-import { forwardRef, useEffect, useState } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 
 type Props = {
   categories: Category[]
@@ -45,10 +45,17 @@ export function CategorySelector({
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const t = useTranslations('Categories')
 
+  // The parent passes a new callback on every render. Keep the latest in a
+  // ref so the effect below runs only when `defaultValue` changes.
+  const onValueChangeRef = useRef(onValueChange)
+  useEffect(() => {
+    onValueChangeRef.current = onValueChange
+  }, [onValueChange])
+
   // allow overwriting currently selected category from outside
   useEffect(() => {
     setValue(defaultValue)
-    onValueChange(defaultValue)
+    onValueChangeRef.current(defaultValue)
   }, [defaultValue])
 
   const selectedCategory =

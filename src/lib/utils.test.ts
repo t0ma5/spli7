@@ -1,5 +1,6 @@
 import { Currency } from './currency'
 import {
+  amountAsMinorUnits,
   dateOnlyToLocalDate,
   formatCurrency,
   formatDateOnly,
@@ -136,5 +137,35 @@ describe('formatDateOnly', () => {
     )
 
     expect(formatted).toBe('Aug 1, 2024')
+  })
+})
+
+describe('amountAsMinorUnits', () => {
+  const currency = (decimal_digits: number) =>
+    ({ decimal_digits }) as unknown as Currency
+
+  it('is not thrown off by float error', () => {
+    expect(Math.round(1.005 * 100)).toBe(100)
+    expect(amountAsMinorUnits(1.005, currency(2))).toBe(101)
+    expect(amountAsMinorUnits(8.345, currency(2))).toBe(835)
+    expect(amountAsMinorUnits(0.1 + 0.2, currency(2))).toBe(30)
+  })
+
+  it('handles 0 and 3 decimal currencies', () => {
+    expect(amountAsMinorUnits(1000, currency(0))).toBe(1000)
+    expect(amountAsMinorUnits(1.5, currency(0))).toBe(2)
+    expect(amountAsMinorUnits(1.2345, currency(3))).toBe(1235)
+  })
+
+  it('rounds half up like Math.round for negative amounts', () => {
+    expect(amountAsMinorUnits(-1.005, currency(2))).toBe(-100)
+    expect(amountAsMinorUnits(-12.34, currency(2))).toBe(-1234)
+  })
+
+  it('reads empty form strings as zero', () => {
+    expect(amountAsMinorUnits('' as unknown as number, currency(2))).toBe(0)
+    expect(amountAsMinorUnits('12.5' as unknown as number, currency(2))).toBe(
+      1250,
+    )
   })
 })

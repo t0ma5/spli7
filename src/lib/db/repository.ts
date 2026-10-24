@@ -27,6 +27,14 @@ export type GroupSummary = {
   pinHash: string | null
 }
 
+export type GroupLifecycleRow = {
+  id: string
+  createdAt: string
+  lastActivityAt: string | null
+  lastSeenAt: string | null
+  deletedAt: string | null
+}
+
 /** Group row + participants; no expenses or activities. */
 export type GroupMeta = Omit<GroupDocument, 'expenses' | 'activities'>
 
@@ -45,6 +53,8 @@ export type ActivityListOptions = {
 }
 
 export type GroupExpenseMutation = {
+  /** New rows. The insert fails if the id exists anywhere, even in another group. */
+  insertExpenses?: Expense[]
   upsertExpenses?: Expense[]
   deleteExpenseIds?: string[]
   insertActivities?: Activity[]
@@ -100,6 +110,21 @@ export interface GroupRepository {
   ): Promise<WriteResult>
   delete(id: string): Promise<void>
   listIds(): Promise<string[]>
+  /** Timestamps only, one row per group. Drives the cleanup cron. */
+  listLifecycle(): Promise<GroupLifecycleRow[]>
+  /**
+   * Soft-delete a group only if it is still live and was last touched before
+   * `inactiveBeforeIso`. Returns false when it changed since it was listed.
+   */
+  softDeleteIfInactive(
+    id: string,
+    deletedAt: string,
+    inactiveBeforeIso: string,
+  ): Promise<boolean>
+  /** Live groups that have at least one recurring link due by `nowIso`. */
+  listGroupIdsWithDueRecurring(nowIso: string): Promise<string[]>
+  /** Drop rate-limit rows whose window and lock both ended before `beforeMs`. */
+  prunePinAttempts(beforeMs: number): Promise<number>
   bumpLastSeen(
     id: string,
     seenAt: string,

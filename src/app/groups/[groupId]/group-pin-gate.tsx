@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { trpc } from '@/trpc/client'
+import { TRPCClientError } from '@trpc/client'
 import { Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { PropsWithChildren, useState } from 'react'
@@ -48,13 +49,30 @@ export function GroupPinGate({ groupId, hasPin, locked, children }: Props) {
             try {
               await mutateAsync({ groupId, pin })
               await utils.groups.get.invalidate({ groupId })
-            } catch {
-              setError(t('incorrect'))
+            } catch (err) {
+              // Only a rejected PIN is "incorrect". A rate limit or a network
+              // or server failure says so, so the user does not retry blindly.
+              const code =
+                err instanceof TRPCClientError
+                  ? (err.data as { code?: string } | undefined)?.code
+                  : undefined
+              setError(
+                code === 'UNAUTHORIZED'
+                  ? t('incorrect')
+                  : code === 'TOO_MANY_REQUESTS'
+                    ? t('tooManyAttempts')
+                    : code === 'BAD_REQUEST'
+                      ? t('invalidFormat')
+                      : t('unexpectedError'),
+              )
             }
           }}
         >
           <Input
             type="password"
+            aria-label={t('placeholder')}
+            aria-invalid={error !== null}
+            aria-describedby={error ? 'group-pin-error' : undefined}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t('placeholder')}
@@ -65,7 +83,15 @@ export function GroupPinGate({ groupId, hasPin, locked, children }: Props) {
             maxLength={8}
             pattern="\d{4,8}"
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p
+              id="group-pin-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {error}
+            </p>
+          )}
           <Button type="submit" disabled={isPending || pin.length < 4}>
             {isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />

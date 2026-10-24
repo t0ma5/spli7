@@ -115,7 +115,10 @@
       "restore": "Restore group",
       "restored": "Group restored",
       "back": "Back to groups"
-    }
+    },
+    "star": "Star group",
+    "unstar": "Unstar group",
+    "moreOptions": "More options"
   },
   "GroupForm": {
     "title": "Group information",
@@ -166,7 +169,9 @@
       "sort": "Sort A–Z",
       "John": "John",
       "Jane": "Jane",
-      "Jack": "Jack"
+      "Jack": "Jack",
+      "label": "Participant {index}",
+      "remove": "Remove {name}"
     },
     "Settings": {
       "title": "Local settings",
@@ -317,6 +322,7 @@
     },
     "DeletePopup": {
       "label": "Delete",
+      "deleting": "Deleting…",
       "title": "Delete this expense?",
       "description": "Do you really want to delete this expense? This action is irreversible.",
       "yes": "Yes",
@@ -329,7 +335,9 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "copy": "Copy",
-    "reimbursement": "Reimbursement"
+    "reimbursement": "Reimbursement",
+    "saveFailed": "Could not save the expense. Check your connection and try again.",
+    "deleteFailed": "Could not delete the expense. Check your connection and try again."
   },
   "ExpenseDocumentsInput": {
     "TooBigToast": {
@@ -533,7 +541,10 @@
     "description": "This group is protected with a PIN. Enter it to continue on this device. The unlock lasts 12 hours in this browser.",
     "placeholder": "PIN",
     "unlock": "Unlock",
-    "incorrect": "Incorrect PIN. Try again."
+    "incorrect": "Incorrect PIN. Try again.",
+    "tooManyAttempts": "Too many attempts. Wait a few minutes and try again.",
+    "invalidFormat": "The PIN must be 4 to 8 digits.",
+    "unexpectedError": "Could not check the PIN. Check your connection and try again."
   },
   "SchemaErrors": {
     "min1": "Enter at least one character.",
@@ -555,6 +566,8 @@
     "paidByRequired": "You must select at least one participant who paid.",
     "paidForMin1": "The expense must be paid for at least one participant.",
     "noZeroShares": "All shares must be higher than 0.",
+    "invalidDate": "Enter a valid date.",
+    "duplicateParticipant": "Each participant can only appear once.",
     "amountSum": "The amounts add up to {sum}, {difference} {direction, select, over {more} other {less}} than the expense amount ({amount}).",
     "percentageSum": "The percentages add up to {sum}%, {difference}% {direction, select, over {more} other {less}} than 100%.",
     "pinFormat": "PIN must be 6 to 8 digits.",

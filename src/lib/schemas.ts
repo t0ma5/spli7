@@ -87,10 +87,34 @@ const paidByAmountSchema = z
   .refine((amount) => amount != 0, 'amountNotZero')
   .refine((amount) => amount <= 10_000_000_00, 'amountTenMillion')
 
+function rejectDuplicateParticipants(
+  rows: { participant: string }[],
+  ctx: z.RefinementCtx,
+) {
+  const seen = new Set<string>()
+  rows.forEach(({ participant }, index) => {
+    if (seen.has(participant)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'duplicateParticipant',
+        path: [index, 'participant'],
+      })
+    }
+    seen.add(participant)
+  })
+}
+
 export const expenseFormSchema = z
   .object({
     expenseDate: z.coerce
-      .date()
+      .date({
+        // A cleared date field coerces to Invalid Date; zod's own text is
+        // English only.
+        errorMap: (issue, ctx) => ({
+          message:
+            issue.code === 'invalid_date' ? 'invalidDate' : ctx.defaultError,
+        }),
+      })
       .refine((date) => {
         const max = new Date()
         max.setUTCFullYear(max.getUTCFullYear() + 1)
@@ -105,7 +129,7 @@ export const expenseFormSchema = z
       .string({ required_error: 'titleRequired' })
       .min(2, 'min2')
       .max(200, 'max200'),
-    category: z.coerce.number().default(0),
+    category: z.coerce.number().int().min(0).max(1000).default(0),
     /** Synced from sum of paidBy in the form; overwritten by transform. */
     amount: z
       .union([
@@ -143,7 +167,9 @@ export const expenseFormSchema = z
           amount: paidByAmountSchema,
         }),
       )
-      .min(1, 'paidByRequired'),
+      .min(1, 'paidByRequired')
+      .max(100)
+      .superRefine(rejectDuplicateParticipants),
     paidFor: z
       .array(
         z.object({
@@ -166,10 +192,11 @@ export const expenseFormSchema = z
       )
       .min(1, 'paidForMin1')
       .max(500)
+      .superRefine(rejectDuplicateParticipants)
       .superRefine((paidFor, ctx) => {
         for (const { shares } of paidFor) {
-          const shareNumber = Number(shares)
-          if (shareNumber <= 0) {
+          const shareNumber = Number(String(shares).replace(/,/g, '.'))
+          if (!Number.isFinite(shareNumber) || shareNumber <= 0) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message: 'noZeroShares',
@@ -233,7 +260,14 @@ export const expenseFormSchema = z
             ? sum
             : sum.add(value)
         }, new Decimal(0))
-        if (!sum.equals(new Decimal(totalAmount))) {
+        // Sum the payers exactly too: as floats 10.10 + 20.20 is
+        // 30.299999999999997, which no share total can ever equal.
+        const paidTotal = expense.paidBy.reduce(
+          (total, { amount }) =>
+            Number.isFinite(Number(amount)) ? total.add(String(amount)) : total,
+          new Decimal(0),
+        )
+        if (!sum.equals(paidTotal)) {
           // The message names the sum and how far off it is. Issue params do
           // not survive the form resolver, so the expense form computes those
           // values itself and hands them to the message.
@@ -297,9 +331,17 @@ export type SplittingOptions = {
   paidFor: ExpenseFormValues['paidFor'] | null
 }
 
+/** Same bound as the expense form, in minor units, either sign. */
+const IMPORT_AMOUNT_MAX = 10_000_000_00
+const importAmountSchema = z
+  .number()
+  .int()
+  .min(-IMPORT_AMOUNT_MAX, 'amountTenMillion')
+  .max(IMPORT_AMOUNT_MAX, 'amountTenMillion')
+
 const importPaidByEntrySchema = z.object({
   participantId: z.string().min(1),
-  amount: z.number().int(),
+  amount: importAmountSchema,
 })
 
 /** Matches the JSON shape produced by getGroupForExport /expenses/export/json */
@@ -337,7 +379,7 @@ export const groupImportSchema = z
               name: z.string().optional(),
             })
             .nullish(),
-          amount: z.number().int(),
+          amount: importAmountSchema,
           originalAmount: z.number().int().nullish(),
           originalCurrency: z.string().nullish(),
           conversionRate: z.number().nullish(),
@@ -347,7 +389,7 @@ export const groupImportSchema = z
             .array(
               z.object({
                 participantId: z.string().min(1),
-                shares: z.number(),
+                shares: z.number().int(),
               }),
             )
             .min(1),
@@ -398,6 +440,47 @@ export const groupImportSchema = z
   })
   .superRefine((data, ctx) => {
     const participantIds = new Set(data.participants.map((p) => p.id))
+    const seenIds = new Set<string>()
+    const seenNames = new Set<string>()
+    data.participants.forEach((participant, index) => {
+      if (seenIds.has(participant.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'duplicateParticipantId',
+          path: ['participants', index, 'id'],
+        })
+      }
+      seenIds.add(participant.id)
+      if (seenNames.has(participant.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'duplicateParticipantName',
+          path: ['participants', index, 'name'],
+        })
+      }
+      seenNames.add(participant.name)
+    })
+
+    /** Flags a participant listed twice in one expense's paidBy or paidFor. */
+    const checkUnique = (
+      entries: { participantId: string }[],
+      expenseIndex: number,
+      field: 'paidBy' | 'paidFor',
+    ) => {
+      const seen = new Set<string>()
+      entries.forEach((entry, index) => {
+        if (seen.has(entry.participantId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              field === 'paidBy' ? 'duplicatePaidBy' : 'duplicatePaidFor',
+            path: ['expenses', expenseIndex, field, index, 'participantId'],
+          })
+        }
+        seen.add(entry.participantId)
+      })
+    }
+
     data.expenses.forEach((expense, expenseIndex) => {
       const paidByEntries =
         expense.paidBy && expense.paidBy.length > 0
@@ -405,6 +488,37 @@ export const groupImportSchema = z
           : expense.paidById
             ? [{ participantId: expense.paidById, amount: expense.amount }]
             : []
+
+      checkUnique(paidByEntries, expenseIndex, 'paidBy')
+      checkUnique(expense.paidFor, expenseIndex, 'paidFor')
+
+      const paidTotal = paidByEntries.reduce(
+        (sum, entry) => sum + entry.amount,
+        0,
+      )
+      if (paidByEntries.length > 0 && paidTotal !== expense.amount) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'paidBySum',
+          path: ['expenses', expenseIndex, 'paidBy'],
+        })
+      }
+
+      // Shares are weights, so they must all be positive. A BY_AMOUNT income
+      // (negative amount) may instead carry all-negative shares, as earlier
+      // imports stored refunds that way; mixed signs are always rejected.
+      const sharesValid =
+        expense.paidFor.every(({ shares }) => shares > 0) ||
+        (expense.splitMode === 'BY_AMOUNT' &&
+          expense.amount < 0 &&
+          expense.paidFor.every(({ shares }) => shares < 0))
+      if (!sharesValid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'noZeroShares',
+          path: ['expenses', expenseIndex, 'paidFor'],
+        })
+      }
 
       if (paidByEntries.length === 0) {
         ctx.addIssue({

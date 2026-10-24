@@ -1,7 +1,9 @@
 'use client'
+import { useToast } from '@/components/ui/use-toast'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
 import { randomId } from '@/lib/randomId'
 import { trpc } from '@/trpc/client'
+import { useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { ExpenseForm } from './expense-form'
@@ -38,6 +40,8 @@ export function CreateExpenseForm({
 
   const utils = trpc.useUtils()
   const router = useRouter()
+  const { toast } = useToast()
+  const t = useTranslations('ExpenseForm')
 
   if (!group || !categories) return null
   if (fromExpenseId && fromExpenseLoading) return null
@@ -57,14 +61,18 @@ export function CreateExpenseForm({
             participantId,
             expenseId,
           })
-        } catch (error) {
+        } catch {
           // The server may have saved the expense and only the response was
           // lost. Reusing this id would upsert over that row.
           setExpenseId(randomId())
-          throw error
+          // Not rethrown: the form stays as typed so the user can retry.
+          toast({ title: t('saveFailed'), variant: 'destructive' })
+          return
         }
         utils.groups.expenses.invalidate()
         utils.groups.stats.invalidate()
+        utils.groups.balances.invalidate()
+        utils.groups.activities.invalidate()
         router.push(`/groups/${group.id}`)
       }}
       runtimeFeatureFlags={runtimeFeatureFlags}

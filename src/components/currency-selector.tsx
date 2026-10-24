@@ -25,7 +25,7 @@ import { Currency } from '@/lib/currency'
 import { useMediaQuery } from '@/lib/hooks'
 import flagIconsCountries from 'flag-icons/country.json'
 import { useTranslations } from 'next-intl'
-import { forwardRef, useEffect, useState } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 
 type Props = {
   currencies: Currency[]
@@ -46,10 +46,17 @@ export function CurrencySelector({
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const t = useTranslations('Currencies')
 
+  // The parent passes a new callback on every render. Keep the latest in a
+  // ref so the effect below runs only when `defaultValue` changes.
+  const onValueChangeRef = useRef(onValueChange)
+  useEffect(() => {
+    onValueChangeRef.current = onValueChange
+  }, [onValueChange])
+
   // allow overwriting currently selected currency from outside
   useEffect(() => {
     setValue(defaultValue)
-    onValueChange(defaultValue)
+    onValueChangeRef.current(defaultValue)
   }, [defaultValue])
 
   const selectedCurrency =

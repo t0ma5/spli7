@@ -83,22 +83,64 @@ export async function clientKeyFromRequest(): Promise<string> {
     .join('')
 }
 
+// Across all addresses. The per-address limit alone does not stop an attacker
+// who rotates IPs (an IPv6 /64 is plenty). 200 guesses a day keeps a 6-digit
+// PIN out of reach; the cost is that a flood can block new unlocks of one
+// group for a day. Devices already unlocked keep their cookie.
+const PIN_GROUP_KEY = '*'
+const PIN_GROUP_WINDOW_MS = 24 * 60 * 60 * 1000
+const PIN_GROUP_MAX_ATTEMPTS = 200
+const PIN_GROUP_LOCK_MS = 24 * 60 * 60 * 1000
+
 export async function beginPinAttempt(groupId: string) {
   const clientKey = await clientKeyFromRequest()
-  const state = await getRepository().reservePinAttempt(
-    groupId,
-    clientKey,
-    Date.now(),
-    {
+  const now = Date.now()
+  const [state, groupState] = await Promise.all([
+    getRepository().reservePinAttempt(groupId, clientKey, now, {
       windowMs: PIN_WINDOW_MS,
       maxFailures: PIN_MAX_FAILURES,
       lockMs: PIN_LOCK_MS,
-    },
-  )
-  if (state.failCount > PIN_MAX_FAILURES) {
+    }),
+    getRepository().reservePinAttempt(groupId, PIN_GROUP_KEY, now, {
+      windowMs: PIN_GROUP_WINDOW_MS,
+      maxFailures: PIN_GROUP_MAX_ATTEMPTS,
+      lockMs: PIN_GROUP_LOCK_MS,
+    }),
+  ])
+  if (
+    state.failCount > PIN_MAX_FAILURES ||
+    groupState.failCount > PIN_GROUP_MAX_ATTEMPTS
+  ) {
     throw new TRPCError({
       code: 'TOO_MANY_REQUESTS',
       message: 'Too many PIN attempts. Try again later.',
+    })
+  }
+}
+
+/**
+ * Per-address limit for anonymous writes that need no group (create, import).
+ * Reuses the PIN attempt table with a scope name in place of a group id.
+ */
+export async function assertRateLimit(
+  scope: 'create-group' | 'import-group',
+  limits: { windowMs: number; maxRequests: number },
+) {
+  const clientKey = await clientKeyFromRequest()
+  const state = await getRepository().reservePinAttempt(
+    `rate-limit-${scope}`,
+    clientKey,
+    Date.now(),
+    {
+      windowMs: limits.windowMs,
+      maxFailures: limits.maxRequests,
+      lockMs: limits.windowMs,
+    },
+  )
+  if (state.failCount > limits.maxRequests) {
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many requests. Try again later.',
     })
   }
 }

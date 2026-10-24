@@ -61,3 +61,6 @@ tmp396/
 !.cursor/skills/**
 
 tmp-pages-bind/
+
+# Local database dumps (scripts/backup-db.mjs)
+/backups/

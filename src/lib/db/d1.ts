@@ -10,6 +10,7 @@ import type {
   PinAttemptState,
   WriteResult,
 } from '@/lib/db/repository'
+import { PENDING_CREATE_DELETED_AT } from '@/lib/group-lifecycle'
 import {
   type Activity,
   ActivityType,
@@ -155,21 +156,24 @@ function participantUpsert(
     .bind(participant.id, groupId, participant.name, index)
 }
 
+/** Lowercased in JS: SQLite LOWER() only folds ASCII, so Ä would never match ä. */
+export function expenseSearchText(title: string, notes: string | null): string {
+  return `${title}
+${notes ?? ''}`.toLowerCase()
+}
+
 function expenseInserts(
   db: SqlDatabase,
   groupId: string,
   expense: GroupDocument['expenses'][number],
+  mode: 'insert' | 'upsert' = 'upsert',
 ): SqlStatement[] {
-  const stmts: SqlStatement[] = [
-    db
-      .prepare(
-        `INSERT INTO expenses (
-          id, group_id, expense_date, title, category_id, amount,
-          original_amount, original_currency, conversion_rate, is_reimbursement,
-          split_mode, created_at, notes, recurrence_rule
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-          group_id = excluded.group_id,
+  // A plain insert lets the primary key reject an id that already exists in
+  // any group. Upserts never move a row to another group.
+  const onConflict =
+    mode === 'insert'
+      ? ''
+      : `ON CONFLICT(id) DO UPDATE SET
           expense_date = excluded.expense_date,
           title = excluded.title,
           category_id = excluded.category_id,
@@ -181,7 +185,18 @@ function expenseInserts(
           split_mode = excluded.split_mode,
           created_at = excluded.created_at,
           notes = excluded.notes,
-          recurrence_rule = excluded.recurrence_rule`,
+          recurrence_rule = excluded.recurrence_rule,
+          search_text = excluded.search_text
+         WHERE expenses.group_id = excluded.group_id`
+  const stmts: SqlStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO expenses (
+          id, group_id, expense_date, title, category_id, amount,
+          original_amount, original_currency, conversion_rate, is_reimbursement,
+          split_mode, created_at, notes, recurrence_rule, search_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ${onConflict}`,
       )
       .bind(
         expense.id,
@@ -198,6 +213,7 @@ function expenseInserts(
         expense.createdAt,
         expense.notes,
         expense.recurrenceRule,
+        expenseSearchText(expense.title, expense.notes),
       ),
   ]
   for (const paidBy of getExpensePaidBy(expense)) {
@@ -325,7 +341,7 @@ function childInserts(db: SqlDatabase, group: GroupDocument): SqlStatement[] {
     stmts.push(participantUpsert(db, group.id, participant, index))
   })
   for (const expense of group.expenses) {
-    stmts.push(...expenseInserts(db, group.id, expense))
+    stmts.push(...expenseInserts(db, group.id, expense, 'insert'))
   }
   for (const activity of group.activities) {
     stmts.push(activityInsert(db, activity))
@@ -440,6 +456,9 @@ function expenseMutationStatements(
       ...inDeletes(db, 'DELETE FROM expenses WHERE id IN', deleteExpenseIds),
     )
   }
+  for (const expense of mutation.insertExpenses ?? []) {
+    stmts.push(...expenseInserts(db, groupId, expense, 'insert'))
+  }
   for (const expense of mutation.upsertExpenses ?? []) {
     stmts.push(...expenseChildDeletes(db, expense.id))
     stmts.push(...expenseInserts(db, groupId, expense))
@@ -476,8 +495,10 @@ function childDeletes(db: SqlDatabase, groupId: string): SqlStatement[] {
   ]
 }
 
+const CREATE_BATCH_SIZE = 40
+
 async function runChunks(db: SqlDatabase, stmts: SqlStatement[]) {
-  const size = 40
+  const size = CREATE_BATCH_SIZE
   for (let i = 0; i < stmts.length; i += size) {
     await db.batch(stmts.slice(i, i + size))
   }
@@ -743,7 +764,9 @@ function expenseSearchPattern(filter: string): string {
   return `%${filter.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`
 }
 
-const EXPENSE_SEARCH_SQL = `(LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(IFNULL(notes, '')) LIKE ? ESCAPE '\\')`
+// Rows written before migration 0004 have no search_text; LOWER() still
+// covers their ASCII letters until scripts/backfill-search-text.mjs runs.
+const EXPENSE_SEARCH_SQL = `(IFNULL(search_text, LOWER(title) || char(10) || LOWER(IFNULL(notes, ''))) LIKE ? ESCAPE '\\')`
 
 async function selectExpenseRows(
   db: SqlDatabase,
@@ -755,8 +778,7 @@ async function selectExpenseRows(
   const binds: unknown[] = [groupId]
   if (filter) {
     clauses.push(EXPENSE_SEARCH_SQL)
-    const pattern = expenseSearchPattern(filter)
-    binds.push(pattern, pattern)
+    binds.push(expenseSearchPattern(filter))
   }
   if (options?.after) {
     clauses.push(
@@ -870,7 +892,7 @@ export const d1Repository: GroupRepository = {
           `SELECT COUNT(*) AS n FROM expenses
            WHERE group_id = ? AND ${EXPENSE_SEARCH_SQL}`,
         )
-        .bind(groupId, pattern, pattern)
+        .bind(groupId, pattern)
         .first<{ n: number }>()
       return row?.n ?? 0
     }
@@ -883,11 +905,7 @@ export const d1Repository: GroupRepository = {
 
   async listActivities(groupId, options) {
     const db = await getD1()
-    const meta = await db
-      .prepare('SELECT id FROM groups WHERE id = ?')
-      .bind(groupId)
-      .first<{ id: string }>()
-    if (!meta) return []
+    if (!(await activeGroupId(db, groupId))) return []
     return listActivityRows(db, groupId, options)
   },
 
@@ -998,8 +1016,26 @@ export const d1Repository: GroupRepository = {
         group.lastSeenAt ?? null,
         group.deletedAt ?? null,
       )
+    const children = childInserts(db, group)
+    // One batch is one transaction.
+    if (children.length < CREATE_BATCH_SIZE) {
+      await db.batch([insertGroup, ...children])
+      return
+    }
+    // A large import does not fit one batch, and holding a write transaction
+    // across thousands of round trips would block every other writer. Insert
+    // the group as long-deleted so it stays invisible, then publish it last.
+    // If the function dies half way, the next cleanup run purges it.
+    const pending = db
+      .prepare('UPDATE groups SET deleted_at = ? WHERE id = ?')
+      .bind(PENDING_CREATE_DELETED_AT, group.id)
+    const publish = db
+      .prepare('UPDATE groups SET deleted_at = ? WHERE id = ?')
+      .bind(group.deletedAt ?? null, group.id)
     try {
-      await runChunks(db, [insertGroup, ...childInserts(db, group)])
+      await db.batch([insertGroup, pending])
+      await runChunks(db, children)
+      await publish.run()
     } catch (error) {
       await db.prepare('DELETE FROM groups WHERE id = ?').bind(group.id).run()
       throw error
@@ -1063,7 +1099,11 @@ export const d1Repository: GroupRepository = {
 
   async delete(id) {
     const db = await getD1()
-    await db.prepare('DELETE FROM groups WHERE id = ?').bind(id).run()
+    // Child rows go by ON DELETE CASCADE; pin_attempts has no foreign key.
+    await db.batch([
+      db.prepare('DELETE FROM pin_attempts WHERE group_id = ?').bind(id),
+      db.prepare('DELETE FROM groups WHERE id = ?').bind(id),
+    ])
   },
 
   async listIds() {
@@ -1072,6 +1112,71 @@ export const d1Repository: GroupRepository = {
       .prepare('SELECT id FROM groups')
       .all<{ id: string }>()
     return results.map((row) => row.id)
+  },
+
+  async listLifecycle() {
+    const db = await getD1()
+    const { results } = await db
+      .prepare(
+        'SELECT id, created_at, last_activity_at, last_seen_at, deleted_at FROM groups',
+      )
+      .all<{
+        id: string
+        created_at: string
+        last_activity_at: string | null
+        last_seen_at: string | null
+        deleted_at: string | null
+      }>()
+    return results.map((row) => ({
+      id: row.id,
+      createdAt: row.created_at,
+      lastActivityAt: row.last_activity_at,
+      lastSeenAt: row.last_seen_at,
+      deletedAt: row.deleted_at,
+    }))
+  },
+
+  async softDeleteIfInactive(id, deletedAt, inactiveBeforeIso) {
+    const db = await getD1()
+    // SQLite's multi-argument MAX() is NULL if any argument is NULL.
+    const result = await db
+      .prepare(
+        `UPDATE groups SET deleted_at = ?, version = version + 1
+         WHERE id = ? AND deleted_at IS NULL
+           AND MAX(created_at,
+                   IFNULL(last_activity_at, created_at),
+                   IFNULL(last_seen_at, created_at)) < ?`,
+      )
+      .bind(deletedAt, id, inactiveBeforeIso)
+      .run()
+    return (result.meta.changes ?? 0) === 1
+  },
+
+  async listGroupIdsWithDueRecurring(nowIso) {
+    const db = await getD1()
+    const { results } = await db
+      .prepare(
+        `SELECT DISTINCT r.group_id FROM recurring_expense_links r
+         INNER JOIN groups g ON g.id = r.group_id
+         WHERE g.deleted_at IS NULL
+           AND r.next_expense_created_at IS NULL
+           AND r.next_expense_date <= ?`,
+      )
+      .bind(nowIso)
+      .all<{ group_id: string }>()
+    return results.map((row) => row.group_id)
+  },
+
+  async prunePinAttempts(beforeMs) {
+    const db = await getD1()
+    const result = await db
+      .prepare(
+        `DELETE FROM pin_attempts
+         WHERE window_start < ? AND (locked_until IS NULL OR locked_until < ?)`,
+      )
+      .bind(beforeMs, beforeMs)
+      .run()
+    return result.meta.changes ?? 0
   },
 
   async bumpLastSeen(id, seenAt, minIntervalMs = 60 * 60 * 1000) {

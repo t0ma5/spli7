@@ -9,7 +9,7 @@ export const createGroupExpenseProcedure = baseProcedure
     z.object({
       groupId: z.string().min(1).max(64),
       expenseFormValues: expenseFormSchema,
-      participantId: z.string().optional(),
+      participantId: z.string().max(64).optional(),
       // Minted by the form with randomId() (21-char nanoid) so the split
       // preview matches the saved expense. Optional: other callers stay
       // server-minted.

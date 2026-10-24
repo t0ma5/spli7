@@ -10,6 +10,7 @@ import type {
   PinAttemptState,
   WriteResult,
 } from '@/lib/db/repository'
+import { getLastActivityAt } from '@/lib/group-lifecycle'
 import {
   RecurrenceRule,
   type Activity,
@@ -147,7 +148,7 @@ export function createMemoryRepository(
     },
     async listActivities(groupId, options) {
       const group = groups.get(groupId)
-      if (!group) return []
+      if (!group || group.deletedAt) return []
       return clone(applyActivityOptions(group.activities, options))
     },
     async getExpense(groupId, expenseId) {
@@ -217,8 +218,10 @@ export function createMemoryRepository(
       if ((existing.version ?? 0) !== expectedVersion) return 'conflict'
       const version = expectedVersion + 1
       if (previous) {
+        // Patch the stored rows, like D1 does: `previous` may be a meta-only
+        // snapshot with empty expense and activity lists.
         const patched = applyGroupChildPatch(
-          clone(previous),
+          clone(existing),
           diffGroupChildren(previous, group),
         )
         groups.set(group.id, {
@@ -237,12 +240,22 @@ export function createMemoryRepository(
       const existing = groups.get(groupId)
       if (!existing || existing.deletedAt) return 'conflict'
       if ((existing.version ?? 0) !== expectedVersion) return 'conflict'
+      for (const expense of mutation.insertExpenses ?? []) {
+        for (const group of Array.from(groups.values())) {
+          if (group.expenses.some((item) => item.id === expense.id)) {
+            throw new Error(`UNIQUE constraint failed: expenses.id`)
+          }
+        }
+      }
       const patched = applyGroupChildPatch(clone(existing), {
         replaceParticipants: false,
         participants: [],
         deleteParticipantIds: [],
         deleteExpenseIds: mutation.deleteExpenseIds ?? [],
-        upsertExpenses: mutation.upsertExpenses ?? [],
+        upsertExpenses: [
+          ...(mutation.insertExpenses ?? []),
+          ...(mutation.upsertExpenses ?? []),
+        ],
         deleteActivityIds: [],
         insertActivities: mutation.insertActivities ?? [],
       })
@@ -255,9 +268,59 @@ export function createMemoryRepository(
     },
     async delete(id) {
       groups.delete(id)
+      for (const key of Array.from(pinAttempts.keys())) {
+        if (key.startsWith(`${id}:`)) pinAttempts.delete(key)
+      }
     },
     async listIds() {
       return Array.from(groups.keys())
+    },
+    async listLifecycle() {
+      return Array.from(groups.values()).map((group) => ({
+        id: group.id,
+        createdAt: group.createdAt,
+        lastActivityAt: group.lastActivityAt ?? null,
+        lastSeenAt: group.lastSeenAt ?? null,
+        deletedAt: group.deletedAt ?? null,
+      }))
+    },
+    async softDeleteIfInactive(id, deletedAt, inactiveBeforeIso) {
+      const group = groups.get(id)
+      if (!group || group.deletedAt) return false
+      const last = getLastActivityAt(group)
+      if (last >= new Date(inactiveBeforeIso)) return false
+      group.deletedAt = deletedAt
+      group.version = (group.version ?? 0) + 1
+      return true
+    },
+    async listGroupIdsWithDueRecurring(nowIso) {
+      const now = new Date(nowIso).getTime()
+      return Array.from(groups.values())
+        .filter(
+          (group) =>
+            !group.deletedAt &&
+            group.expenses.some(
+              (expense) =>
+                expense.recurringExpenseLink?.nextExpenseCreatedAt === null &&
+                new Date(
+                  expense.recurringExpenseLink.nextExpenseDate,
+                ).getTime() <= now,
+            ),
+        )
+        .map((group) => group.id)
+    },
+    async prunePinAttempts(beforeMs) {
+      let removed = 0
+      for (const [key, state] of Array.from(pinAttempts.entries())) {
+        if (
+          state.windowStart < beforeMs &&
+          (state.lockedUntil === null || state.lockedUntil < beforeMs)
+        ) {
+          pinAttempts.delete(key)
+          removed += 1
+        }
+      }
+      return removed
     },
     async bumpLastSeen(id, seenAt, minIntervalMs = 60 * 60 * 1000) {
       const group = groups.get(id)

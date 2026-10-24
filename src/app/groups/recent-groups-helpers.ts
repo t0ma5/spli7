@@ -17,11 +17,22 @@ const STORAGE_KEY = 'recentGroups'
 const STARRED_GROUPS_STORAGE_KEY = 'starredGroups'
 const ARCHIVED_GROUPS_STORAGE_KEY = 'archivedGroups'
 
+/**
+ * Reads a JSON value from localStorage. Corrupt JSON (edited by hand, cut
+ * short by a full disk) or unavailable storage reads as an empty list rather
+ * than throwing on every page that lists groups.
+ */
+function readStoredJson(key: string): unknown {
+  try {
+    const json = localStorage.getItem(key)
+    return json ? JSON.parse(json) : []
+  } catch {
+    return []
+  }
+}
+
 export function getRecentGroups() {
-  const groupsInStorageJson = localStorage.getItem(STORAGE_KEY)
-  const groupsInStorageRaw = groupsInStorageJson
-    ? JSON.parse(groupsInStorageJson)
-    : []
+  const groupsInStorageRaw = readStoredJson(STORAGE_KEY)
   const parseResult = recentGroupsSchema.safeParse(groupsInStorageRaw)
   return parseResult.success ? parseResult.data : []
 }
@@ -43,10 +54,7 @@ export function deleteRecentGroup(group: RecentGroup) {
 }
 
 export function getStarredGroups() {
-  const starredGroupsJson = localStorage.getItem(STARRED_GROUPS_STORAGE_KEY)
-  const starredGroupsRaw = starredGroupsJson
-    ? JSON.parse(starredGroupsJson)
-    : []
+  const starredGroupsRaw = readStoredJson(STARRED_GROUPS_STORAGE_KEY)
   const parseResult = starredGroupsSchema.safeParse(starredGroupsRaw)
   return parseResult.success ? parseResult.data : []
 }
@@ -68,10 +76,7 @@ export function unstarGroup(groupId: string) {
 }
 
 export function getArchivedGroups() {
-  const archivedGroupsJson = localStorage.getItem(ARCHIVED_GROUPS_STORAGE_KEY)
-  const archivedGroupsRaw = archivedGroupsJson
-    ? JSON.parse(archivedGroupsJson)
-    : []
+  const archivedGroupsRaw = readStoredJson(ARCHIVED_GROUPS_STORAGE_KEY)
   const parseResult = archivedGroupsSchema.safeParse(archivedGroupsRaw)
   return parseResult.success ? parseResult.data : []
 }

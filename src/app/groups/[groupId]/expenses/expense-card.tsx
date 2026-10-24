@@ -90,7 +90,15 @@ export function ExpenseCard({
       />
       <div className="flex-1">
         <div className={cn('mb-1', expense.isReimbursement && 'italic')}>
-          {expense.title}
+          {/* The row is clickable for pointers; this link is what keyboard and
+              screen reader users reach (the edit button is desktop only). */}
+          <Link
+            href={`/groups/${groupId}/expenses/${expense.id}/edit`}
+            onClick={(event) => event.stopPropagation()}
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            {expense.title}
+          </Link>
         </div>
         <div className="text-xs text-muted-foreground">
           <Participants expense={expense} participantCount={participantCount} />
@@ -126,6 +134,7 @@ export function ExpenseCard({
           variant="ghost"
           className="h-8 w-8"
           title={t('copy')}
+          aria-label={t('copy')}
           onClick={(event) => {
             event.stopPropagation()
             router.push(
@@ -136,7 +145,11 @@ export function ExpenseCard({
           <Copy className="w-4 h-4" />
         </Button>
         <Button size="icon" variant="link" asChild>
-          <Link href={`/groups/${groupId}/expenses/${expense.id}/edit`}>
+          <Link
+            href={`/groups/${groupId}/expenses/${expense.id}/edit`}
+            aria-label={expense.title}
+            tabIndex={-1}
+          >
             <ChevronRight className="w-4 h-4" />
           </Link>
         </Button>

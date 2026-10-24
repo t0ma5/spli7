@@ -17,7 +17,7 @@ export const updateGroupProcedure = baseProcedure
     z.object({
       groupId: z.string().min(1).max(64),
       groupFormValues: groupFormSchema,
-      participantId: z.string().optional(),
+      participantId: z.string().max(64).optional(),
     }),
   )
   .mutation(async ({ input: { groupId, groupFormValues, participantId } }) => {

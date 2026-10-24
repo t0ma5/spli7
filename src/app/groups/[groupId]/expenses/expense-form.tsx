@@ -71,8 +71,8 @@ import { ChevronRight, Copy, Save, UserMinus, UserPlus } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Fragment, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { match } from 'ts-pattern'
 import { DeletePopup } from '../../../../components/delete-popup'
 import { extractCategoryFromTitle } from '../../../../components/expense-form-actions'
@@ -91,29 +91,104 @@ const limitAmountDecimals = (value: string, currency: Currency) => {
   return `${integer}.${fraction.slice(0, currency.decimal_digits)}`
 }
 
+type SplitMode = 'EVENLY' | 'BY_SHARES' | 'BY_PERCENTAGE' | 'BY_AMOUNT'
+
+/**
+ * Shares that add up for the split mode, as the form holds them (strings):
+ * one share each, an even split of 100 %, or an even split of the amount.
+ * A plain '1' each would start a BY_PERCENTAGE expense at 1 % per person.
+ */
+const evenSharesFor = (
+  splitMode: SplitMode,
+  participantCount: number,
+  amountMinor: number,
+  currency: Currency,
+): string[] => {
+  if (participantCount === 0) return []
+  switch (splitMode) {
+    case 'BY_PERCENTAGE':
+      // In basis points, so the parts add up to exactly 100 %.
+      return distributeAmount(10000, participantCount).map((basisPoints) =>
+        (basisPoints / 100).toString(),
+      )
+    case 'BY_AMOUNT':
+      return distributeAmount(amountMinor, participantCount).map((minor) =>
+        formatAmountAsDecimal(minor, currency),
+      )
+    default:
+      return Array.from({ length: participantCount }, () => '1')
+  }
+}
+
+const SPLIT_MODES: SplitMode[] = [
+  'EVENLY',
+  'BY_SHARES',
+  'BY_PERCENTAGE',
+  'BY_AMOUNT',
+]
+
+const readSavedSplittingOptions = (
+  groupId: string,
+): SplittingOptions | null => {
+  const key = `${groupId}-defaultSplittingOptions`
+  let parsed: unknown
+  try {
+    const raw = localStorage.getItem(key)
+    if (raw === null) return null
+    parsed = JSON.parse(raw)
+  } catch {
+    parsed = undefined
+  }
+  const options = parsed as Partial<SplittingOptions> | null | undefined
+  if (
+    !options ||
+    typeof options !== 'object' ||
+    !SPLIT_MODES.includes(options.splitMode as SplitMode) ||
+    (options.paidFor !== null && !Array.isArray(options.paidFor))
+  ) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      // Storage may be unavailable (private mode); the defaults still work.
+    }
+    return null
+  }
+  return options as SplittingOptions
+}
+
 const getDefaultSplittingOptions = (
   group: NonNullable<AppRouterOutput['groups']['get']['group']>,
+  amountMinor: number,
 ) => {
-  const defaultValue = {
-    splitMode: (group.defaultSplitMode ?? 'EVENLY') as
-      'EVENLY' | 'BY_SHARES' | 'BY_PERCENTAGE' | 'BY_AMOUNT',
-    paidFor: group.participants.map(({ id }) => ({
+  const currency = getCurrencyFromGroup(group)
+  const evenPaidFor = (splitMode: SplitMode) => {
+    const shares = evenSharesFor(
+      splitMode,
+      group.participants.length,
+      amountMinor,
+      currency,
+    )
+    return group.participants.map(({ id }, index) => ({
       participant: id,
-      shares: '1' as any, // Use string to ensure consistent schema handling
-    })),
+      shares: shares[index] as any, // Use string to ensure consistent schema handling
+    }))
+  }
+  const groupSplitMode = (group.defaultSplitMode ?? 'EVENLY') as SplitMode
+  const defaultValue = {
+    splitMode: groupSplitMode,
+    paidFor: evenPaidFor(groupSplitMode),
   }
 
   if (typeof localStorage === 'undefined') return defaultValue
-  const defaultSplitMode = localStorage.getItem(
-    `${group.id}-defaultSplittingOptions`,
-  )
-  if (defaultSplitMode === null) return defaultValue
-  const parsedDefaultSplitMode = JSON.parse(
-    defaultSplitMode,
-  ) as SplittingOptions
+  const parsedDefaultSplitMode = readSavedSplittingOptions(group.id)
+  if (parsedDefaultSplitMode === null) return defaultValue
 
   if (parsedDefaultSplitMode.paidFor === null) {
-    parsedDefaultSplitMode.paidFor = defaultValue.paidFor
+    // BY_AMOUNT is saved without amounts: split this expense's evenly.
+    return {
+      splitMode: parsedDefaultSplitMode.splitMode,
+      paidFor: evenPaidFor(parsedDefaultSplitMode.splitMode),
+    }
   }
 
   // if there is a participant in the default options that does not exist anymore,
@@ -122,7 +197,11 @@ const getDefaultSplittingOptions = (
     if (
       !group.participants.some(({ id }) => id === parsedPaidFor.participant)
     ) {
-      localStorage.removeItem(`${group.id}-defaultSplittingOptions`)
+      try {
+        localStorage.removeItem(`${group.id}-defaultSplittingOptions`)
+      } catch {
+        // ignore: the defaults are used either way
+      }
       return defaultValue
     }
   }
@@ -260,8 +339,12 @@ export function ExpenseForm({
   const getSelectedRecurrenceRule = (field?: { value: string }) => {
     return field?.value as RecurrenceRule
   }
-  const defaultSplittingOptions = getDefaultSplittingOptions(group)
   const groupCurrency = getCurrencyFromGroup(group)
+  const defaultSplittingOptions = getDefaultSplittingOptions(
+    group,
+    amountAsMinorUnits(Number(searchParams.get('amount')) || 0, groupCurrency),
+  )
+  const reimbursementTo = searchParams.get('to')
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: expense
@@ -294,16 +377,20 @@ export function ExpenseForm({
                   ) as any,
                 },
               ],
-              paidFor: [
-                searchParams.get('to')
-                  ? {
-                      participant: searchParams.get('to')!,
+              // Without `to` the user picks who was repaid.
+              paidFor: reimbursementTo
+                ? [
+                    {
+                      participant: reimbursementTo,
                       shares: '1' as any, // String for consistent form handling
-                    }
-                  : undefined,
-              ],
+                    },
+                  ]
+                : [],
               isReimbursement: true,
-              splitMode: defaultSplittingOptions.splitMode,
+              // A repayment goes to one person in full. The group's default
+              // mode could be BY_PERCENTAGE or BY_AMOUNT, where a share of '1'
+              // is invalid, and the split options are collapsed here.
+              splitMode: 'EVENLY',
               saveDefaultSplittingOptions: false,
               documents: [],
               notes: '',
@@ -347,12 +434,18 @@ export function ExpenseForm({
             },
   })
   const [isCategoryLoading, setCategoryLoading] = useState(false)
+  const categoryGuessRequest = useRef(0)
   const activeUserId = useActiveUser(group.id)
 
+  // Amounts may still be formulas like `10+5`; read them the way submit will.
   const calcTotalAmountMajor = (
     paidBys: { amount: number | string }[] | undefined,
   ) =>
-    (paidBys ?? []).reduce((sum, { amount }) => sum + (Number(amount) || 0), 0)
+    (paidBys ?? []).reduce(
+      (sum, { amount }) =>
+        sum + (evaluateAmountExpression(String(amount ?? '')) ?? 0),
+      0,
+    )
 
   const submit = async (values: ExpenseFormValues) => {
     await persistDefaultSplittingOptions(group.id, values)
@@ -398,7 +491,15 @@ export function ExpenseForm({
     return onSubmit(values, activeUserId ?? undefined)
   }
 
-  const watchedPaidBy = form.watch('paidBy')
+  // react-hook-form edits the paidBy array in place, so the array itself is not
+  // a usable effect dependency: typing an amount would not re-run anything
+  // keyed on it. Effects depend on this serialized copy instead.
+  const watchedPaidBy = useWatch({ control: form.control, name: 'paidBy' })
+  const paidByKey = JSON.stringify(watchedPaidBy ?? [])
+  const watchedSplitMode = useWatch({
+    control: form.control,
+    name: 'splitMode',
+  })
   const totalAmountMajor = calcTotalAmountMajor(watchedPaidBy as any)
   const totalAmountMinor = amountAsMinorUnits(totalAmountMajor, groupCurrency)
   const [isIncome, setIsIncome] = useState(totalAmountMajor < 0)
@@ -455,7 +556,7 @@ export function ExpenseForm({
 
   useEffect(() => {
     setShareEdits(new Map())
-  }, [form.watch('splitMode'), form.watch('paidBy')])
+  }, [watchedSplitMode, paidByKey])
 
   useEffect(() => {
     const sum = calcTotalAmountMajor(form.getValues('paidBy') as any)
@@ -463,7 +564,7 @@ export function ExpenseForm({
     const income = sum < 0
     setIsIncome(income)
     if (income) form.setValue('isReimbursement', false)
-  }, [form.watch('paidBy')])
+  }, [paidByKey])
 
   useEffect(() => {
     const splitMode = form.getValues().splitMode
@@ -521,7 +622,7 @@ export function ExpenseForm({
       }
       form.setValue('paidFor', newPaidFor, { shouldValidate: true })
     }
-  }, [shareEdits, form.watch('paidBy'), form.watch('splitMode')])
+  }, [shareEdits, paidByKey, watchedSplitMode])
 
   const [usingCustomConversionRate, setUsingCustomConversionRate] = useState(
     !!form.formState.defaultValues?.conversionRate,
@@ -610,7 +711,7 @@ export function ExpenseForm({
       )
     }
   }, [
-    form.watch('paidBy'),
+    paidByKey,
     form.watch('conversionRate'),
     convertFromGroupCurrency,
     conversionRequired,
@@ -735,12 +836,27 @@ export function ExpenseForm({
                       onBlur={async () => {
                         field.onBlur() // avoid skipping other blur event listeners since we overwrite `field`
                         if (runtimeFeatureFlags.enableCategoryExtract) {
+                          // Only the latest guess may apply, and only if the
+                          // user has not picked a category in the meantime.
+                          const request = ++categoryGuessRequest.current
+                          const categoryBefore = form.getValues('category')
                           setCategoryLoading(true)
-                          const { categoryId } = await extractCategoryFromTitle(
-                            field.value,
-                          )
-                          form.setValue('category', categoryId)
-                          setCategoryLoading(false)
+                          try {
+                            const { categoryId } =
+                              await extractCategoryFromTitle(field.value)
+                            if (
+                              request === categoryGuessRequest.current &&
+                              form.getValues('category') === categoryBefore
+                            ) {
+                              form.setValue('category', categoryId)
+                            }
+                          } catch {
+                            // A failed guess leaves the category as it is.
+                          } finally {
+                            if (request === categoryGuessRequest.current) {
+                              setCategoryLoading(false)
+                            }
+                          }
                         }
                       }}
                     />
@@ -835,8 +951,14 @@ export function ExpenseForm({
                               'bg-muted text-muted-foreground',
                           )}
                           type="text"
-                          inputMode="decimal"
-                          placeholder="0.00"
+                          inputMode={
+                            originalCurrency.decimal_digits > 0
+                              ? 'decimal'
+                              : 'numeric'
+                          }
+                          placeholder={zeroPlaceholder(
+                            originalCurrency.decimal_digits,
+                          )}
                           readOnly={convertFromGroupCurrency}
                           onChange={(event) => {
                             const v = normalizeNumberInput(event.target.value)
@@ -1010,19 +1132,29 @@ export function ExpenseForm({
                                   <AmountInput
                                     className="text-base max-w-[120px]"
                                     prefix={group.currency}
+                                    step={10 ** -groupCurrency.decimal_digits}
                                     value={aField.value ?? ''}
                                     onChange={(amount) => {
                                       aField.onChange(amount)
                                     }}
                                     onBlur={(event) => {
                                       aField.onBlur()
+                                      const raw = event.target.value.trim()
+                                      // A plain number stays as typed.
+                                      if (/^-?\d*(\.\d*)?$/.test(raw)) return
                                       const evaluated =
-                                        evaluateAmountExpression(
-                                          event.target.value,
-                                        )
+                                        evaluateAmountExpression(raw)
                                       if (evaluated === null) return
+                                      // A formula like 10/3 is rounded to
+                                      // the currency's decimals.
                                       aField.onChange(
-                                        normalizeNumberInput(String(evaluated)),
+                                        formatAmountAsDecimal(
+                                          amountAsMinorUnits(
+                                            evaluated,
+                                            groupCurrency,
+                                          ),
+                                          groupCurrency,
+                                        ),
                                       )
                                     }}
                                   />
@@ -1145,7 +1277,9 @@ export function ExpenseForm({
                     defaultValue={getSelectedRecurrenceRule(field)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="NONE" />
+                      <SelectValue
+                        placeholder={t(`${sExpense}.recurrenceRule.none`)}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="NONE">
@@ -1200,7 +1334,11 @@ export function ExpenseForm({
                     shouldTouch: true,
                     shouldValidate: true,
                   })
-                  if (allSelected) setShareEdits(new Map())
+                  // A new Map either way, so BY_AMOUNT rebalances the amounts
+                  // over the new selection (and keeps typed ones when adding).
+                  setShareEdits((prev) =>
+                    allSelected ? new Map() : new Map(prev),
+                  )
                 }}
               >
                 {form.getValues().paidFor.length ===
@@ -1272,7 +1410,14 @@ export function ExpenseForm({
                                             ...field.value,
                                             {
                                               participant: id,
-                                              shares: '1', // Use string to ensure consistent schema handling
+                                              // String for consistent schema
+                                              // handling. BY_AMOUNT replaces
+                                              // it when it rebalances below.
+                                              shares:
+                                                form.getValues().splitMode ===
+                                                'BY_AMOUNT'
+                                                  ? '0'
+                                                  : '1',
                                             },
                                           ] as any,
                                           options,
@@ -1284,7 +1429,9 @@ export function ExpenseForm({
                                           ),
                                           options,
                                         )
-                                    if (!checked) forgetShareEdit(id)
+                                    // Always a new Map, so BY_AMOUNT
+                                    // rebalances on ticking as on unticking.
+                                    forgetShareEdit(id)
                                   }}
                                 />
                               </FormControl>
@@ -1642,6 +1789,11 @@ export function ExpenseForm({
       </form>
     </Form>
   )
+}
+
+/** "0", "0.00" or "0.000", for an input of a currency with that many decimals. */
+function zeroPlaceholder(decimalDigits: number) {
+  return decimalDigits > 0 ? `0.${'0'.repeat(decimalDigits)}` : '0'
 }
 
 function formatDate(date?: Date) {

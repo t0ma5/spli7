@@ -174,3 +174,67 @@ describe('expenseFormSchema, split by amount', () => {
     ])
   })
 })
+
+describe('expenseFormSchema, payers and shares', () => {
+  it('matches split amounts against payer totals that are not exact floats', () => {
+    const result = expenseFormSchema.safeParse(
+      expenseForm({
+        splitMode: 'BY_AMOUNT',
+        paidBy: [
+          { participant: 'ada', amount: '10.10' },
+          { participant: 'bob', amount: '20.20' },
+        ],
+        paidFor: [{ participant: 'ada', shares: '30.30' }],
+      }),
+    )
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects a participant listed twice as payer or as sharer', () => {
+    const twicePaid = expenseFormSchema.safeParse(
+      expenseForm({
+        paidBy: [
+          { participant: 'ada', amount: 500 },
+          { participant: 'ada', amount: 500 },
+        ],
+      }),
+    )
+    const twiceShared = expenseFormSchema.safeParse(
+      expenseForm({
+        paidFor: [
+          { participant: 'ada', shares: 1 },
+          { participant: 'ada', shares: 1 },
+        ],
+      }),
+    )
+    for (const result of [twicePaid, twiceShared]) {
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.map((issue) => issue.message)).toContain(
+          'duplicateParticipant',
+        )
+      }
+    }
+  })
+
+  it('rejects a category id that is not a whole number from 0 up', () => {
+    expect(
+      expenseFormSchema.safeParse(expenseForm({ category: 1.5 })).success,
+    ).toBe(false)
+    expect(
+      expenseFormSchema.safeParse(expenseForm({ category: -1 })).success,
+    ).toBe(false)
+  })
+})
+
+describe('expenseFormSchema, date', () => {
+  it('reports a cleared date with a translatable key', () => {
+    const result = expenseFormSchema.safeParse(
+      expenseForm({ expenseDate: 'not a date' }),
+    )
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('invalidDate')
+    }
+  })
+})

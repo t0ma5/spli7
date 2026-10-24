@@ -8,6 +8,13 @@ export const INACTIVITY_MONTHS = 24
 
 export const MAX_RECURRING_GENERATIONS_PER_RUN = 100
 
+/**
+ * `deleted_at` of a group whose rows are still being written by a large
+ * import. Far past the grace period, so a half-written group is purged by the
+ * next cleanup, and never offered for restore.
+ */
+export const PENDING_CREATE_DELETED_AT = '1970-01-01T00:00:00.000Z'
+
 export function monthsAgo(months: number, from = new Date()): Date {
   const d = new Date(from)
   d.setUTCMonth(d.getUTCMonth() - months)

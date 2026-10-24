@@ -85,7 +85,10 @@
     },
     "ImportJSON": {
       "description": "Lataa Spliit- tai Tricount-JSON-vienti luodaksesi uuden ryhmän osallistujineen, kuluineen, muistiinpanoineen ja historioineen."
-    }
+    },
+    "star": "Merkitse ryhmä tähdellä",
+    "unstar": "Poista tähti ryhmältä",
+    "moreOptions": "Lisää vaihtoehtoja"
   },
   "GroupForm": {
     "title": "Ryhmän tiedot",
@@ -111,7 +114,9 @@
       "new": "Uusi",
       "John": "Antti",
       "Jane": "Laura",
-      "Jack": "Jussi"
+      "Jack": "Jussi",
+      "label": "Osallistuja {index}",
+      "remove": "Poista {name}"
     },
     "Settings": {
       "title": "Paikalliset asetukset",
@@ -212,6 +217,7 @@
     },
     "DeletePopup": {
       "label": "Poista",
+      "deleting": "Poistetaan…",
       "title": "Poistetaanko tämä kulu?",
       "description": "Haluatko varmasti poistaa tämän kulun? Poistoa ei voi peruuttaa.",
       "yes": "Kyllä",
@@ -223,7 +229,9 @@
     "save": "Tallenna",
     "saving": "Tallennetaan…",
     "cancel": "Peruuta",
-    "reimbursement": "Velanmaksu"
+    "reimbursement": "Velanmaksu",
+    "saveFailed": "Kulun tallentaminen epäonnistui. Tarkista yhteys ja yritä uudelleen.",
+    "deleteFailed": "Kulun poistaminen epäonnistui. Tarkista yhteys ja yritä uudelleen."
   },
   "ExpenseDocumentsInput": {
     "TooBigToast": {
@@ -323,6 +331,8 @@
     "paidByRequired": "Osallistuja puuttuu.",
     "paidForMin1": "Valitse vähintään yksi osallistuja.",
     "noZeroShares": "Jokaisen osuuden täytyy olla suurempi kuin 0.",
+    "invalidDate": "Anna kelvollinen päivämäärä.",
+    "duplicateParticipant": "Sama osallistuja voi olla mukana vain kerran.",
     "amountSum": "Osuuksien summan täytyy vastata kulun summaa.",
     "percentageSum": "Prosenttiosuuksien summan täytyy olla 100."
   },
@@ -393,5 +403,10 @@
       "TV/Phone/Internet": "TV/Puhelin/Internet",
       "Water": "Vesi"
     }
+  },
+  "GroupPin": {
+    "tooManyAttempts": "Liian monta yritystä. Odota muutama minuutti ja yritä uudelleen.",
+    "invalidFormat": "PIN-koodissa on oltava 4–8 numeroa.",
+    "unexpectedError": "PIN-koodin tarkistaminen epäonnistui. Tarkista yhteys ja yritä uudelleen."
   }
 }

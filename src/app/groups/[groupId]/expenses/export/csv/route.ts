@@ -19,6 +19,10 @@ const splitModeLabel = {
   BY_AMOUNT: 'Unevenly – By amount',
 }
 
+function participantColumn(participantId: string) {
+  return `participant:${participantId}`
+}
+
 function formatDate(dateOnly: Date): string {
   const date = dateOnlyToLocalDate(dateOnly)
   const year = date.getFullYear()
@@ -52,9 +56,11 @@ export async function GET(
     { label: 'Conversion rate', value: 'conversionRate' },
     { label: 'Split mode', value: 'splitMode' },
     { label: 'Paid By', value: 'paidBy' },
+    // Keyed by id: a participant named "amount" or "date" (or two with the
+    // same name in an old group) must not overwrite another column.
     ...group.participants.map((participant) => ({
       label: escapeCsvCell(participant.name),
-      value: participant.name,
+      value: participantColumn(participant.id),
     })),
   ]
 
@@ -109,7 +115,7 @@ export async function GET(
       const paidAmount =
         expense.paidBy.find((pb) => pb.participantId === participant.id)
           ?.amount ?? 0
-      row[participant.name] = +formatAmountAsDecimal(
+      row[participantColumn(participant.id)] = +formatAmountAsDecimal(
         paidAmount - shareMinor,
         currency,
       )

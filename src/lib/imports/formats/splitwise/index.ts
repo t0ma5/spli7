@@ -1,5 +1,5 @@
 import { getCurrency } from '@/lib/currency'
-import dayjs from 'dayjs'
+import { parseImportDateOnly } from '@/lib/imports/date'
 
 import { mapSplitwiseCategoryLabel } from './category-mapping'
 import { parseSplitwiseExportCsv } from './csv-parser'
@@ -30,7 +30,6 @@ export type SplitwiseInternalExpense = {
   paidFor: { participant: string; shares: number }[]
   splitMode: 'BY_AMOUNT'
   isReimbursement: boolean
-  originalCurrency?: string
 }
 
 export type SplitwiseParseResult = {
@@ -76,15 +75,31 @@ export function parseSplitwiseToInternal(
     ...parsed.headerErrors.map((message) => ({ row: 1, message })),
   ]
   const expenses: SplitwiseInternalExpense[] = []
-  let groupCurrency = ''
+
+  // Amounts are stored in the group currency without conversion, so every row
+  // has to be in that one currency. Converting would need historical rates.
+  const currencies: string[] = []
+  let firstForeignRow: number | null = null
+  for (const row of parsed.rows) {
+    const code = row.currency.toUpperCase()
+    if (!code || currencies.includes(code)) continue
+    if (currencies.length > 0 && firstForeignRow === null) {
+      firstForeignRow = row.rowNumber
+    }
+    currencies.push(code)
+  }
+  if (firstForeignRow !== null) {
+    // First, so the import reports it rather than a row-level problem.
+    errors.unshift({
+      row: firstForeignRow,
+      message: `The export mixes several currencies (${currencies.join(', ')}). Only single-currency exports can be imported; convert the expenses to one currency in Splitwise first.`,
+    })
+  }
+  const groupCurrency = currencies[0] ?? ''
 
   for (const row of parsed.rows) {
-    if (!groupCurrency && row.currency) {
-      groupCurrency = row.currency
-    }
-
-    const expenseDate = dayjs(row.date)
-    if (!expenseDate.isValid()) {
+    const expenseDate = parseImportDateOnly(row.date)
+    if (!expenseDate) {
       errors.push({
         row: row.rowNumber,
         message: `Invalid expense date: ${row.date}`,
@@ -92,7 +107,9 @@ export function parseSplitwiseToInternal(
       continue
     }
 
-    const scale = 10 ** (getCurrency(row.currency || 'EUR').decimal_digits ?? 2)
+    const scale =
+      10 **
+      (getCurrency(row.currency || groupCurrency || 'EUR').decimal_digits ?? 2)
     let totalC = Math.round(row.amount * scale)
     const income = totalC < 0
     if (income) totalC = -totalC
@@ -131,11 +148,10 @@ export function parseSplitwiseToInternal(
 
     for (const ge of parsedRow.groupExpenses) {
       expenses.push({
-        expenseDate: expenseDate.toDate(),
+        expenseDate,
         title: ge.description,
         category: mappedCategory?.id ?? 0,
         amount: income ? -ge.totalC : ge.totalC,
-        originalCurrency: row.currency || undefined,
         paidBy: ge.payer,
         paidFor: Object.entries(ge.sharesC).map(([participant, share]) => ({
           participant,
@@ -155,11 +171,10 @@ export function parseSplitwiseToInternal(
         parsed.language,
       )
       expenses.push({
-        expenseDate: expenseDate.toDate(),
+        expenseDate,
         title: reimbursementTitle,
         category: mappedCategory?.id ?? 0,
         amount: income ? -r.amountC : r.amountC,
-        originalCurrency: row.currency || undefined,
         paidBy: r.payer,
         paidFor: [
           {

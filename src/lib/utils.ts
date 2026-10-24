@@ -1,5 +1,6 @@
 import { Category, Group } from '@/lib/kv/types'
 import { clsx, type ClassValue } from 'clsx'
+import Decimal from 'decimal.js'
 import { twMerge } from 'tailwind-merge'
 import { Currency, getCurrency } from './currency'
 
@@ -146,7 +147,18 @@ export function amountAsDecimal(
  * @param amount The amount in decimal major units (always an integer)
  */
 export function amountAsMinorUnits(amount: number, currency: Currency) {
-  return Math.round(amount * 10 ** currency.decimal_digits)
+  // Callers pass form values, which may still be strings ('' reads as 0).
+  const value = Number(amount)
+  if (!Number.isFinite(value)) {
+    return Math.round(value * 10 ** currency.decimal_digits)
+  }
+  // Scale the shortest decimal form of the number rather than the binary
+  // float, so 1.005 becomes 101 cents and not 100 (1.005 * 100 is
+  // 100.49999…). Half rounds up, like Math.round.
+  return new Decimal(value)
+    .times(new Decimal(10).pow(currency.decimal_digits))
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_CEIL)
+    .toNumber()
 }
 
 /**

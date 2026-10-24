@@ -70,6 +70,16 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - Optional group PIN is hashed with PBKDF2, never returned to clients, and enforced on tRPC + export routes via an HTTP-only cookie (`PIN_SECRET`).
 - Groups track `lastActivityAt` on mutations and `lastSeenAt` on reads. After **24 months** without either, cleanup soft-deletes them; soft-deleted groups can be restored for **30 days**, then are hard-deleted.
 - Cron (Bearer `CRON_SECRET`): `GET/POST /api/cron/cleanup-groups`, `/api/cron/recurring`, `/api/cron/backup`. Vercel Cron runs cleanup + recurring daily. Legacy KV import (`/api/cron/migrate-kv`) returns 410.
+- Generated recurring copies do not count as activity, so an abandoned group with a recurring expense still expires.
+- Expense search uses a `search_text` column lowercased in JavaScript (SQLite `LOWER()` only folds ASCII). After migration `0004`, run `node --env-file=.env.local scripts/backfill-search-text.mjs` once.
+- Rate limits: PIN guesses per address and per group, group creation 30/hour and imports 10/hour per address.
+
+## Backups
+
+- `node --env-file=.env.local scripts/backup-db.mjs` writes every table to `backups/spli7-backup-<date>.json` (gitignored).
+- `/api/cron/backup` returns the same dump over HTTP (Bearer `CRON_SECRET`).
+- `scripts/restore-db.mjs <file>` loads a dump into an **empty** database that already has the migrations; it refuses to run if the target has groups.
+- Turso's own point-in-time restore depends on your plan; check it before relying on it alone.
 
 ## Extra UX (this fork)
 

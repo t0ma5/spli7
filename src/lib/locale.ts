@@ -7,6 +7,10 @@ import { cookies, headers } from 'next/headers'
 
 const COOKIE_NAME = 'NEXT_LOCALE'
 
+function isLocale(value: string | undefined): value is Locale {
+  return value !== undefined && (locales as string[]).includes(value)
+}
+
 function getAcceptLanguageLocale(requestHeaders: Headers, locales: Locales) {
   let locale
   const languages = new Negotiator({
@@ -20,24 +24,26 @@ function getAcceptLanguageLocale(requestHeaders: Headers, locales: Locales) {
     // invalid language - fallback to default
     locale = defaultLocale
   }
-  return locale
+  return isLocale(locale) ? locale : defaultLocale
 }
 
-export async function getUserLocale() {
-  let locale
-
-  // Prio 1: use existing cookie
-  locale = (await cookies()).get(COOKIE_NAME)?.value
+export async function getUserLocale(): Promise<Locale> {
+  // Prio 1: use existing cookie. It is user-controlled and also outlives
+  // removed locales, so only trust a value we still ship messages for.
+  const cookieLocale = (await cookies()).get(COOKIE_NAME)?.value
+  if (isLocale(cookieLocale)) return cookieLocale
 
   // Prio 2: use `accept-language` header
   // Prio 3: use default locale
-  if (!locale) {
-    locale = getAcceptLanguageLocale(await headers(), locales)
-  }
-
-  return locale
+  return getAcceptLanguageLocale(await headers(), locales)
 }
 
 export async function setUserLocale(locale: Locale) {
-  ;(await cookies()).set(COOKIE_NAME, locale)
+  // Server actions take any string at runtime, not just the typed union.
+  if (!isLocale(locale)) return
+  ;(await cookies()).set(COOKIE_NAME, locale, {
+    path: '/',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 365,
+  })
 }

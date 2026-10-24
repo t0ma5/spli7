@@ -89,8 +89,12 @@ export function ImportGroupJsonButton({ reload }: Props) {
       reload()
       setOpen(false)
       router.push(`/groups/${groupId}`)
-    } catch {
-      setError(t('error'))
+    } catch (importError) {
+      // The import procedures answer BAD_REQUEST with a message naming the
+      // problem (row, currency, …); show it next to the generic text.
+      const detail =
+        importError instanceof Error ? importError.message.trim() : ''
+      setError(detail ? `${t('error')} (${detail})` : t('error'))
     } finally {
       setPending(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

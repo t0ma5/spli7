@@ -1,6 +1,8 @@
 'use client'
+import { useToast } from '@/components/ui/use-toast'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
 import { trpc } from '@/trpc/client'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { ExpenseForm } from './expense-form'
 
@@ -32,6 +34,15 @@ export function EditExpenseForm({
 
   const utils = trpc.useUtils()
   const router = useRouter()
+  const { toast } = useToast()
+  const t = useTranslations('ExpenseForm')
+
+  const invalidateAfterChange = () => {
+    utils.groups.expenses.invalidate()
+    utils.groups.stats.invalidate()
+    utils.groups.balances.invalidate()
+    utils.groups.activities.invalidate()
+  }
 
   if (!group || !categories || !expense) return null
 
@@ -41,24 +52,32 @@ export function EditExpenseForm({
       expense={expense}
       categories={categories}
       onSubmit={async (expenseFormValues, participantId) => {
-        await updateExpenseMutateAsync({
-          expenseId,
-          groupId,
-          expenseFormValues,
-          participantId,
-        })
-        utils.groups.expenses.invalidate()
-        utils.groups.stats.invalidate()
+        try {
+          await updateExpenseMutateAsync({
+            expenseId,
+            groupId,
+            expenseFormValues,
+            participantId,
+          })
+        } catch {
+          toast({ title: t('saveFailed'), variant: 'destructive' })
+          return
+        }
+        invalidateAfterChange()
         router.push(`/groups/${group.id}`)
       }}
       onDelete={async (participantId) => {
-        await deleteExpenseMutateAsync({
-          expenseId,
-          groupId,
-          participantId,
-        })
-        utils.groups.expenses.invalidate()
-        utils.groups.stats.invalidate()
+        try {
+          await deleteExpenseMutateAsync({
+            expenseId,
+            groupId,
+            participantId,
+          })
+        } catch {
+          toast({ title: t('deleteFailed'), variant: 'destructive' })
+          return
+        }
+        invalidateAfterChange()
         router.push(`/groups/${group.id}`)
       }}
       runtimeFeatureFlags={runtimeFeatureFlags}

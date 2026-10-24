@@ -64,6 +64,8 @@ export function RecentGroupListCard({
                   size="icon"
                   variant="ghost"
                   className="-my-3 -ml-3 -mr-1.5"
+                  aria-label={t(isStarred ? 'unstar' : 'star')}
+                  aria-pressed={isStarred}
                   onClick={(event) => {
                     event.stopPropagation()
                     if (isStarred) {
@@ -87,6 +89,7 @@ export function RecentGroupListCard({
                       size="icon"
                       variant="ghost"
                       className="-my-3 -mr-3 -ml-1.5"
+                      aria-label={t('moreOptions')}
                     >
                       <MoreHorizontal className="w-4 h-4" />
                     </Button>
