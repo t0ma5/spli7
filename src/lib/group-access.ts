@@ -123,7 +123,7 @@ export async function beginPinAttempt(groupId: string) {
  * Reuses the PIN attempt table with a scope name in place of a group id.
  */
 export async function assertRateLimit(
-  scope: 'create-group' | 'import-group',
+  scope: 'create-group' | 'import-group' | 'upload-document',
   limits: { windowMs: number; maxRequests: number },
 ) {
   const clientKey = await clientKeyFromRequest()

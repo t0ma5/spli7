@@ -17,7 +17,9 @@ export const EditGroup = () => {
   const { toast } = useToast()
   const t = useTranslations('GroupForm.Settings')
 
-  if (isLoading) return <></>
+  // Never render the form without the group: GroupForm falls back to
+  // new-group defaults, and saving those would overwrite the group.
+  if (isLoading || !data?.group) return <></>
 
   return (
     <GroupForm

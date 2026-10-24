@@ -34,7 +34,6 @@ yarn-error.log*
 # local env files
 .env*.local
 *.env
-!scripts/build.env
 
 # vercel
 .vercel
@@ -64,3 +63,6 @@ tmp-pages-bind/
 
 # Local database dumps (scripts/backup-db.mjs)
 /backups/
+
+.env*
+!.env.example

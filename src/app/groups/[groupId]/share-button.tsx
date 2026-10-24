@@ -8,11 +8,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useQrDataUrl } from '@/components/use-qr-data-url'
 import { useBaseUrl } from '@/lib/hooks'
 import { Group } from '@/lib/kv/types'
 import { Share } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
 
 type Props = {
   group: Group
@@ -22,23 +22,7 @@ export function ShareButton({ group }: Props) {
   const t = useTranslations('Share')
   const baseUrl = useBaseUrl()
   const url = baseUrl && `${baseUrl}/groups/${group.id}/expenses?ref=share`
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!url) {
-      setQrDataUrl(null)
-      return
-    }
-    let cancelled = false
-    void import('qrcode').then((QRCode) =>
-      QRCode.toDataURL(url, { width: 180, margin: 1 }).then((dataUrl) => {
-        if (!cancelled) setQrDataUrl(dataUrl)
-      }),
-    )
-    return () => {
-      cancelled = true
-    }
-  }, [url])
+  const qrDataUrl = useQrDataUrl(url)
 
   return (
     <Popover>

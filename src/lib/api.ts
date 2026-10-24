@@ -10,6 +10,12 @@ import {
   type GroupMeta,
 } from '@/lib/db/repository'
 import {
+  copyDocumentToGroup,
+  deleteDocumentBlobs,
+  deleteGroupDocuments,
+  isGroupDocumentUrl,
+} from '@/lib/documents'
+import {
   INACTIVITY_MONTHS,
   isInactive,
   isSoftDeleteExpired,
@@ -204,18 +210,23 @@ async function withExpenseWrite<T>(
  * be dropped once a serverless response is sent; `after` keeps the function
  * alive for it. Outside a request (tests, scripts) it just runs.
  */
-function touchLastSeen(groupId: string) {
-  const bump = () =>
-    getRepository()
-      .bumpLastSeen(groupId, new Date().toISOString())
-      .catch(() => {
-        // Best effort: a missed bump only delays expiry bookkeeping.
-      })
+function afterResponse(task: () => Promise<unknown>) {
+  const run = () =>
+    task().catch((error) => {
+      console.error('after-response task failed', error)
+    })
   try {
-    after(bump)
+    after(run)
   } catch {
-    void bump()
+    void run()
   }
+}
+
+function touchLastSeen(groupId: string) {
+  // Best effort: a missed bump only delays expiry bookkeeping.
+  afterResponse(() =>
+    getRepository().bumpLastSeen(groupId, new Date().toISOString()),
+  )
 }
 
 function makeActivity(
@@ -395,8 +406,21 @@ function buildExpenseFromForm(
       participantId: paidFor.participant,
       shares: Number(paidFor.shares),
     })),
-    // Documents / uploads are out of scope; SQLite is not used for binaries.
-    documents: [],
+    documents: expenseFormValues.documents.map((document) => {
+      // Only this group's own receipt routes: anything else would let a
+      // client attach (and later delete) another group's photo, or embed an
+      // outside URL.
+      if (!isGroupDocumentUrl(document.url, groupId)) {
+        throw new Error('Invalid document URL')
+      }
+      return {
+        id: document.id,
+        url: document.url,
+        width: document.width,
+        height: document.height,
+        expenseId,
+      }
+    }),
     recurringExpenseLink,
   }
 }
@@ -420,11 +444,14 @@ export async function createGroup(groupFormValues: GroupFormValues) {
     lastActivityAt: new Date().toISOString(),
     lastSeenAt: new Date().toISOString(),
     deletedAt: null,
-    participants: groupFormValues.participants.map(({ name }) => ({
-      id: randomId(),
-      name,
-      groupId: id,
-    })),
+    participants: groupFormValues.participants.map(
+      ({ name, paymentMethods }) => ({
+        id: randomId(),
+        name,
+        groupId: id,
+        paymentMethods: paymentMethods ?? [],
+      }),
+    ),
     expenses: [],
     activities: [],
   }
@@ -445,6 +472,7 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
       id: newId,
       name: participant.name,
       groupId,
+      paymentMethods: participant.paymentMethods ?? [],
     }
   })
 
@@ -503,16 +531,32 @@ export async function createGroupFromImport(importValues: GroupImportValues) {
           shares,
         }
       }),
-      documents: (expense.documents ?? []).map((document) => ({
-        id: randomId(),
-        url: document.url,
-        width: document.width,
-        height: document.height,
-        expenseId,
-      })),
+      // Filled in below: receipts are copied into the new group.
+      documents: [],
       recurringExpenseLink: null,
     }
   })
+
+  // Receipts from this app are copied into the new group's folder. Anything
+  // else (old S3 links from upstream exports) cannot be shown under the CSP
+  // and is dropped.
+  let documentBudget = MAX_IMPORTED_DOCUMENTS
+  for (let index = 0; index < importValues.expenses.length; index++) {
+    for (const document of importValues.expenses[index].documents ?? []) {
+      if (documentBudget <= 0) break
+      const id = randomId()
+      const url = await copyDocumentToGroup(document.url, groupId, id)
+      if (!url) continue
+      documentBudget -= 1
+      expenses[index].documents.push({
+        id,
+        url,
+        width: document.width,
+        height: document.height,
+        expenseId: expenses[index].id,
+      })
+    }
+  }
 
   const activities = (importValues.activities ?? []).map((activity) => {
     const mappedParticipantId = activity.participantId
@@ -635,6 +679,9 @@ export async function createGroupFromSplitwiseCsv(csvText: string) {
 
 const CLIENT_EXPENSE_ID = /^[A-Za-z0-9_-]{21}$/
 
+/** Receipt copies per JSON import, so one import cannot run for minutes. */
+const MAX_IMPORTED_DOCUMENTS = 200
+
 export async function createExpense(
   expenseFormValues: ExpenseFormValues,
   groupId: string,
@@ -677,10 +724,10 @@ export async function deleteExpense(
   expenseId: string,
   participantId?: string,
 ) {
-  await withExpenseWrite(groupId, async (meta) => {
+  const removed = await withExpenseWrite(groupId, async (meta) => {
     const existingExpense = await getRepository().getExpense(groupId, expenseId)
     return {
-      value: undefined,
+      value: existingExpense?.documents ?? [],
       mutation: {
         deleteExpenseIds: existingExpense ? [expenseId] : [],
         insertActivities: [
@@ -693,6 +740,9 @@ export async function deleteExpense(
       },
     }
   })
+  if (removed.length > 0) {
+    afterResponse(() => deleteDocumentBlobs(removed.map((d) => d.url)))
+  }
 }
 
 export async function getGroupExpensesParticipants(groupId: string) {
@@ -727,7 +777,8 @@ export async function updateExpense(
   expenseFormValues: ExpenseFormValues,
   participantId?: string,
 ) {
-  return withExpenseWrite(groupId, async (meta) => {
+  let droppedDocumentUrls: string[] = []
+  const result = await withExpenseWrite(groupId, async (meta) => {
     const existingExpense = await getRepository().getExpense(groupId, expenseId)
     if (!existingExpense) throw new Error(`Invalid expense ID: ${expenseId}`)
     assertParticipantsInGroup(meta.participants, expenseFormValues)
@@ -738,6 +789,10 @@ export async function updateExpense(
       expenseId,
       existingExpense,
     )
+    const keptUrls = new Set(updated.documents.map((d) => d.url))
+    droppedDocumentUrls = existingExpense.documents
+      .map((d) => d.url)
+      .filter((url) => !keptUrls.has(url))
     return {
       value: updated,
       mutation: {
@@ -752,6 +807,11 @@ export async function updateExpense(
       },
     }
   })
+  if (droppedDocumentUrls.length > 0) {
+    const urls = droppedDocumentUrls
+    afterResponse(() => deleteDocumentBlobs(urls))
+  }
+  return result
 }
 
 export async function updateGroup(
@@ -830,13 +890,20 @@ export async function updateGroup(
         if (participant.id) {
           const existing = existingById.get(participant.id)
           if (existing) {
-            return { ...existing, name: participant.name }
+            return {
+              ...existing,
+              name: participant.name,
+              // Omitted by older clients: keep what is stored.
+              paymentMethods:
+                participant.paymentMethods ?? existing.paymentMethods ?? [],
+            }
           }
         }
         return {
           id: randomId(),
           name: participant.name,
           groupId,
+          paymentMethods: participant.paymentMethods ?? [],
         }
       })
 
@@ -923,6 +990,9 @@ export async function cleanupExpiredGroups(now = new Date()) {
     if (group.deletedAt) {
       if (isSoftDeleteExpired(group.deletedAt, now)) {
         await getRepository().delete(group.id)
+        await deleteGroupDocuments(group.id).catch((error) => {
+          console.error('cleanup: receipt delete failed', group.id, error)
+        })
         hardDeleted += 1
       }
       continue
@@ -1286,7 +1356,7 @@ export async function getGroupForExport(groupId: string) {
   ])
 
   return {
-    exportVersion: 3 as const,
+    exportVersion: 4 as const,
     id: group.id,
     name: group.name,
     information: group.information,
@@ -1294,7 +1364,11 @@ export async function getGroupForExport(groupId: string) {
     currencyCode: group.currencyCode,
     defaultSplitMode: group.defaultSplitMode ?? SplitMode.EVENLY,
     fixedExpenseDateGroups: group.fixedExpenseDateGroups ?? false,
-    participants: group.participants.map((p) => ({ id: p.id, name: p.name })),
+    participants: group.participants.map((p) => ({
+      id: p.id,
+      name: p.name,
+      paymentMethods: p.paymentMethods ?? [],
+    })),
     expenses: expenses
       .slice()
       .sort((a, b) => {

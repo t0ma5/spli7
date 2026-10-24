@@ -1,45 +1,38 @@
+import { buildBackup, storeBackup } from '@/lib/backups'
 import { isCronAuthorized, unauthorized } from '@/lib/cron-auth'
-import { getD1 } from '@/lib/db/client'
+import { documentsConfigured } from '@/lib/documents'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
-// Every table the app writes, in an order that restores without breaking
-// foreign keys. Restore with scripts/restore-db.mjs.
-const BACKUP_TABLES = [
-  'groups',
-  'participants',
-  'expenses',
-  'expense_paid_by',
-  'expense_paid_for',
-  'expense_documents',
-  'recurring_expense_links',
-  'activities',
-] as const
-
 /**
- * Full dump of the database as JSON. Pull it with
- * `curl -H "Authorization: Bearer $CRON_SECRET" …/api/cron/backup > backup.json`
- * or run scripts/backup-db.mjs, which reads Turso directly.
+ * Daily (vercel.json): gzip every table into the private Blob store as
+ * backups/spli7-backup-<date>.json.gz, keeping 30 days plus 12 monthly copies.
+ * `?download=1` returns the dump instead, for a manual pull:
+ * `curl -H "Authorization: Bearer $CRON_SECRET" "…/api/cron/backup?download=1"`.
  */
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return unauthorized()
-  const db = await getD1()
-  const tables: Record<string, unknown[]> = {}
-  for (const table of BACKUP_TABLES) {
-    const { results } = await db.prepare(`SELECT * FROM ${table}`).all()
-    tables[table] = results
-  }
-  const exportedAt = new Date().toISOString()
-  return NextResponse.json(
-    { ok: true, format: 'spli7-backup-1', exportedAt, tables },
-    {
+
+  if (new URL(req.url).searchParams.get('download') === '1') {
+    const backup = await buildBackup()
+    return NextResponse.json(backup, {
       headers: {
         'Cache-Control': 'no-store',
-        'Content-Disposition': `attachment; filename="spli7-backup-${exportedAt.slice(0, 10)}.json"`,
+        'Content-Disposition': `attachment; filename="spli7-backup-${backup.exportedAt.slice(0, 10)}.json"`,
       },
-    },
-  )
+    })
+  }
+
+  // The Blob token doubles as the "backups are configured" switch.
+  if (!documentsConfigured()) {
+    return NextResponse.json(
+      { ok: false, error: 'BLOB_READ_WRITE_TOKEN is not set' },
+      { status: 503 },
+    )
+  }
+  const result = await storeBackup()
+  return NextResponse.json({ ok: true, ...result })
 }
 
 export async function POST(req: Request) {

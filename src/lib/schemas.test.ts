@@ -74,7 +74,7 @@ describe('form input caps', () => {
         documents: [
           {
             id: 'doc1',
-            url: 'https://example.com/pano.jpg',
+            url: '/api/groups/g1/documents/AAAAAAAAAAAAAAAAAAAAA',
             width: 16000,
             height: 4000,
           },
@@ -104,7 +104,7 @@ describe('form input caps', () => {
           notes: 'n'.repeat(EXPENSE_NOTES_MAX),
           documents: [
             {
-              url: 'https://example.com/pano.jpg',
+              url: '/api/groups/g1/documents/AAAAAAAAAAAAAAAAAAAAA',
               width: 16000,
               height: 4000,
             },

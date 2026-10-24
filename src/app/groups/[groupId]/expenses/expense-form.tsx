@@ -1763,6 +1763,7 @@ export function ExpenseForm({
                 name="documents"
                 render={({ field }) => (
                   <ExpenseDocumentsInput
+                    groupId={group.id}
                     documents={field.value}
                     updateDocuments={field.onChange}
                   />

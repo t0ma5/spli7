@@ -24,6 +24,7 @@ import {
   type RecurringExpenseLink,
   SplitMode,
 } from '@/lib/kv/types'
+import { parsePaymentMethods } from '@/lib/payment-methods'
 
 type GroupRow = {
   id: string
@@ -46,6 +47,16 @@ type ParticipantRow = {
   group_id: string
   name: string
   sort_order: number
+  payment_methods: string | null
+}
+
+function rowToParticipant(row: ParticipantRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    groupId: row.group_id,
+    paymentMethods: parsePaymentMethods(row.payment_methods),
+  }
 }
 
 type ExpenseRow = {
@@ -112,11 +123,7 @@ async function loadGroup(
     lastActivityAt: group.last_activity_at,
     lastSeenAt: group.last_seen_at,
     deletedAt: group.deleted_at,
-    participants: participantRows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      groupId: row.group_id,
-    })),
+    participants: participantRows.map(rowToParticipant),
     expenses,
     activities,
   }
@@ -147,13 +154,23 @@ function participantUpsert(
 ): SqlStatement {
   return db
     .prepare(
-      `INSERT INTO participants (id, group_id, name, sort_order) VALUES (?, ?, ?, ?)
+      `INSERT INTO participants (id, group_id, name, sort_order, payment_methods)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          sort_order = excluded.sort_order,
-         group_id = excluded.group_id`,
+         payment_methods = excluded.payment_methods
+       WHERE participants.group_id = excluded.group_id`,
     )
-    .bind(participant.id, groupId, participant.name, index)
+    .bind(
+      participant.id,
+      groupId,
+      participant.name,
+      index,
+      participant.paymentMethods?.length
+        ? JSON.stringify(participant.paymentMethods)
+        : null,
+    )
 }
 
 /** Lowercased in JS: SQLite LOWER() only folds ASCII, so Ä would never match ä. */
@@ -752,11 +769,7 @@ async function loadMeta(
     lastActivityAt: group.last_activity_at,
     lastSeenAt: group.last_seen_at,
     deletedAt: group.deleted_at,
-    participants: participantRows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      groupId: row.group_id,
-    })),
+    participants: participantRows.map(rowToParticipant),
   }
 }
 

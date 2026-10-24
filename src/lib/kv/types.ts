@@ -1,3 +1,4 @@
+import type { PaymentMethod } from '@/lib/payment-methods'
 export const SplitMode = {
   EVENLY: 'EVENLY',
   BY_SHARES: 'BY_SHARES',
@@ -28,6 +29,8 @@ export type Participant = {
   id: string
   name: string
   groupId: string
+  /** Ways to pay this participant back. Missing on rows written before 0005. */
+  paymentMethods?: PaymentMethod[]
 }
 
 export type Category = {

@@ -26,13 +26,6 @@ const envSchema = z
     ),
   })
   .superRefine((env, ctx) => {
-    if (env.NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        message:
-          'Expense documents are not supported on this deploy yet. Keep NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS unset/false.',
-      })
-    }
     if (
       env.NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT ||
       env.NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT

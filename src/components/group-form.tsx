@@ -1,4 +1,5 @@
 import { SortableParticipant } from '@/app/groups/[groupId]/edit/sortable-participants'
+import { PaymentMethodsEditor } from '@/components/payment-methods-editor'
 import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
 import {
@@ -539,6 +540,19 @@ export function GroupForm({
                               </FormControl>
                               <FormMessage />
                             </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`participants.${index}.paymentMethods`}
+                          render={({ field }) => (
+                            <PaymentMethodsEditor
+                              value={field.value}
+                              onChange={field.onChange}
+                              participantName={form.getValues(
+                                `participants.${index}.name`,
+                              )}
+                            />
                           )}
                         />
                       </li>

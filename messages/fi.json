@@ -234,6 +234,12 @@
     "deleteFailed": "Kulun poistaminen epäonnistui. Tarkista yhteys ja yritä uudelleen."
   },
   "ExpenseDocumentsInput": {
+    "add": "Lisää kuitin kuva",
+    "offline": "Kuvat vaativat yhteyden",
+    "open": "Näytä kuitin kuva",
+    "viewerTitle": "Kuittien kuvat",
+    "delete": "Poista kuva",
+    "close": "Sulje",
     "TooBigToast": {
       "title": "Tiedosto on liian suuri",
       "description": "Maksimikoko ladattavalle tiedostolle on {maxSize}. Tiedostosi on {size}."
@@ -310,6 +316,14 @@
   },
   "Settings": {
     "title": "Asetukset"
+  },
+  "Offline": {
+    "savedOffline": "Tallennettu offline-tilassa, synkronoidaan myöhemmin",
+    "synced": "{count, plural, one {Synkronoitiin # offline-kulu} other {Synkronoitiin # offline-kulua}}",
+    "waiting": "Odottaa synkronointia",
+    "unlock": "Avaa lukitus synkronoidaksesi",
+    "failed": "Synkronointi epäonnistui",
+    "discard": "Hylkää"
   },
   "Share": {
     "title": "Jaa",
@@ -408,5 +422,92 @@
     "tooManyAttempts": "Liian monta yritystä. Odota muutama minuutti ja yritä uudelleen.",
     "invalidFormat": "PIN-koodissa on oltava 4–8 numeroa.",
     "unexpectedError": "PIN-koodin tarkistaminen epäonnistui. Tarkista yhteys ja yritä uudelleen."
+  },
+  "PaymentMethods": {
+    "pay": "Maksa",
+    "payTitle": "Maksa {name}: {amount}",
+    "payDescription": "Skannaa koodi pankkisovelluksella, avaa maksusovellus tai kopioi tiedot.",
+    "afterPaying": "Kun raha on lähetetty, kirjaa maksu, niin saldot päivittyvät.",
+    "markAsPaid": "Kirjaa maksetuksi",
+    "openApp": "Avaa {method}",
+    "qrAlt": "{method}-maksun QR-koodi",
+    "checkDetails": "Tarkista summa ja saaja sovelluksessa ennen vahvistamista.",
+    "editorToggle": "Maksutiedot",
+    "editorToggleCount": "Maksutiedot ({count})",
+    "editorPrivacy": "Näkyy kaikille, jotka voivat avata tämän ryhmän, jotta muut voivat maksaa tälle henkilölle.",
+    "add": "Lisää maksutapa",
+    "edit": "Muokkaa: {method}",
+    "remove": "Poista: {method}",
+    "method": "Maksutapa",
+    "optional": "valinnainen",
+    "save": "Tallenna",
+    "cancel": "Peruuta",
+    "fields": {
+      "name": "Tilin omistaja",
+      "iban": "IBAN",
+      "bic": "BIC",
+      "phone": "Puhelinnumero",
+      "username": "Käyttäjänimi"
+    },
+    "errors": {
+      "invalid": "Tarkista arvo.",
+      "invalidIban": "IBAN ei kelpaa. Tarkista kirjoitusvirheet.",
+      "invalidBic": "BIC-koodissa on 8 tai 11 kirjainta ja numeroa.",
+      "invalidPhone": "Anna puhelinnumero, jossa on 6–15 numeroa.",
+      "invalidUsername": "Anna pelkkä käyttäjänimi ilman välilyöntejä.",
+      "min1": "Pakollinen.",
+      "max70": "Enintään 70 merkkiä."
+    },
+    "copy": {
+      "recipient": "Saaja",
+      "iban": "IBAN",
+      "bic": "BIC",
+      "phone": "Puhelin",
+      "username": "Käyttäjä",
+      "amount": "Summa",
+      "message": "Viesti"
+    },
+    "sepa": {
+      "label": "Tilisiirto (SEPA)",
+      "where": "euroalue",
+      "qrHelp": "Skannaa pankkisovelluksella. Summa ja viesti täyttyvät valmiiksi.",
+      "copyHelp": "Tee tilisiirto näillä tiedoilla."
+    },
+    "mobilepay": {
+      "label": "MobilePay",
+      "where": "Suomi, Tanska",
+      "qrHelp": "",
+      "copyHelp": "Avaa MobilePay ja lähetä tähän numeroon."
+    },
+    "swish": {
+      "label": "Swish",
+      "where": "Ruotsi",
+      "qrHelp": "Skannaa Swish-sovelluksella. Summa ja viesti täyttyvät valmiiksi.",
+      "copyHelp": "Avaa Swish ja lähetä tähän numeroon."
+    },
+    "bizum": {
+      "label": "Bizum",
+      "where": "Espanja",
+      "qrHelp": "",
+      "copyHelp": "Avaa pankkisovellus, valitse Bizum ja lähetä tähän numeroon."
+    },
+    "venmo": {
+      "label": "Venmo",
+      "where": "Yhdysvallat",
+      "qrHelp": "",
+      "copyHelp": "Avaa Venmo ja maksa tälle käyttäjälle."
+    },
+    "paypal": {
+      "label": "PayPal",
+      "where": "maailmanlaajuinen",
+      "qrHelp": "",
+      "copyHelp": "Avaa PayPal ja maksa tälle käyttäjälle."
+    },
+    "revolut": {
+      "label": "Revolut",
+      "where": "maailmanlaajuinen",
+      "qrHelp": "",
+      "copyHelp": "Avaa Revolut, etsi käyttäjä ja syötä summa."
+    }
   }
 }

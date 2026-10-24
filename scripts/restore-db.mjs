@@ -1,8 +1,10 @@
-// Load a backup written by scripts/backup-db.mjs or /api/cron/backup into an
+// Load a backup (scripts/backup-db.mjs, scripts/download-backup.mjs or
+// /api/cron/backup?download=1; .json or .json.gz) into an
 // EMPTY database that already has the migrations applied. It refuses to run
 // against a database that has groups, so it cannot clobber live data.
 // Usage: TURSO_DATABASE_URL=… TURSO_AUTH_TOKEN=… node scripts/restore-db.mjs <file>
 import { readFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
 import { createClient } from '@libsql/client/http'
 
 const TABLES = [
@@ -22,7 +24,11 @@ if (!file || !url) {
   console.error('Usage: TURSO_DATABASE_URL=… node scripts/restore-db.mjs <file>')
   process.exit(1)
 }
-const backup = JSON.parse(readFileSync(file, 'utf8'))
+const raw = readFileSync(file)
+// Daily backups from the Blob store are gzipped (.json.gz).
+const backup = JSON.parse(
+  (file.endsWith('.gz') ? gunzipSync(raw) : raw).toString('utf8'),
+)
 if (backup.format !== 'spli7-backup-1') {
   console.error(`Unknown backup format: ${backup.format}`)
   process.exit(1)

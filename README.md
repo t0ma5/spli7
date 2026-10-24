@@ -51,7 +51,11 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - [x] 🔴 Multiple payers per expense (legacy single paidById migrated on read)
 - [x] 🔴 Extra currencies: **ARS**, **TRY**, **COP**, **JOD**, **MKD**, **MOP**, **MYR**, **VND**
 - [x] 🔴 Large groups: keyset-paginated expense/activity lists, compact stats/balance reads, and create/update/delete that do not load the whole group
-- [ ] ❌ Upload and attach images to expenses (removed — see below)
+- [x] 🔴 **Pay button on reimbursements**: SEPA bank-transfer QR (EPC), MobilePay, Swish, Bizum, Venmo, PayPal.me and Revolut.me, from payment details each participant adds in group settings
+- [x] 🔴 **Receipt photos** on expenses, stored in a **private** Vercel Blob store and served only to people who can open the group (PIN respected)
+- [x] 🔴 **Daily automatic backups** of the whole database to private Blob storage (30 days + 12 monthly copies)
+- [x] 🔴 **Add expenses offline**: saved on the device and sent automatically when you are back online, without duplicates
+- [x] 🔴 **Test database**: one command copies live data into a Turso test DB for safe UI and migration checks
 - [ ] ❌ Create expense by scanning a receipt (removed — see below)
 
 ## Stack
@@ -72,14 +76,57 @@ Legend: 🟢 from original [Spliit](https://github.com/spliit-app/spliit) · �
 - Cron (Bearer `CRON_SECRET`): `GET/POST /api/cron/cleanup-groups`, `/api/cron/recurring`, `/api/cron/backup`. Vercel Cron runs cleanup + recurring daily. Legacy KV import (`/api/cron/migrate-kv`) returns 410.
 - Generated recurring copies do not count as activity, so an abandoned group with a recurring expense still expires.
 - Expense search uses a `search_text` column lowercased in JavaScript (SQLite `LOWER()` only folds ASCII). After migration `0004`, run `node --env-file=.env.local scripts/backfill-search-text.mjs` once.
-- Rate limits: PIN guesses per address and per group, group creation 30/hour and imports 10/hour per address.
+- Rate limits: PIN guesses per address and per group, group creation 30/hour and imports 10/hour per address, receipt uploads 60/hour.
+- Participants can hold **payment methods** (`participants.payment_methods`, JSON, migration `0005`). The registry in `src/lib/payment-methods/` validates them (IBAN checksum, phone and username formats) and builds the QR codes and links. JSON export is `exportVersion: 4`; version 3 files still import.
+- Receipt photos are stored at `receipts/{groupId}/{docId}` in a private Vercel Blob store. Expenses store the app route `/api/groups/{groupId}/documents/{docId}`, which checks group access before streaming. Removing a photo, deleting its expense or purging the group deletes the blob; a JSON import copies receipts into the new group.
 
 ## Backups
 
-- `node --env-file=.env.local scripts/backup-db.mjs` writes every table to `backups/spli7-backup-<date>.json` (gitignored).
-- `/api/cron/backup` returns the same dump over HTTP (Bearer `CRON_SECRET`).
-- `scripts/restore-db.mjs <file>` loads a dump into an **empty** database that already has the migrations; it refuses to run if the target has groups.
-- Turso's own point-in-time restore depends on your plan; check it before relying on it alone.
+- **Daily, automatic:** Vercel Cron calls `/api/cron/backup` at 05:00 UTC. It gzips every table into the private Blob store as `backups/spli7-backup-<date>.json.gz` and keeps the last 30 days plus the first backup of each of the last 12 months.
+- **List or fetch:** `node --env-file=.env.local scripts/download-backup.mjs` lists them; add `latest` or a date (`2026-10-24`) to download into `backups/` (gitignored).
+- **Manual dump:** `node --env-file=.env.local scripts/backup-db.mjs` reads Turso directly; `/api/cron/backup?download=1` (Bearer `CRON_SECRET`) returns the dump over HTTP.
+- **Restore:** `scripts/restore-db.mjs <file>` (`.json` or `.json.gz`) loads a dump into an **empty** database that already has the migrations; it refuses to run if the target has groups.
+- Turso Free point-in-time restore only covers 24 hours, so the daily copies are the real safety net.
+
+## Pay buttons (this fork)
+
+In **Settings → Participants**, open **Payment details** under a person and add how they want to be paid. On **Balances**, each suggested reimbursement to that person gets a **Pay** button with the amount and a message (`spli7 · <group>`) filled in, then **Record as paid**.
+
+| Method | Countries | What the payer gets | Currency |
+| --- | --- | --- | --- |
+| Bank transfer (SEPA) | euro area | EPC QR code most banking apps scan (IBAN, name, amount, message) | EUR |
+| MobilePay | Finland, Denmark | Phone, amount and message to copy | EUR, DKK |
+| Swish | Sweden | Prefilled Swish QR code | SEK |
+| Bizum | Spain | Phone, amount and message to copy | EUR |
+| Venmo | US | Link that opens Venmo with amount and note | USD |
+| PayPal.me | worldwide | Link with the amount and currency | any |
+| Revolut.me | worldwide | Profile link plus amount to copy | any |
+
+- Methods that cannot pay in the group's currency are hidden.
+- Payment details are visible to everyone who can open the group (and has its PIN, if set).
+- Bizum and MobilePay have no public "pay this amount" link for person-to-person payments, so they show copyable details. The Venmo link and Swish QR formats come from third-party descriptions; the dialog asks the payer to check the details in the app.
+- **Add a country's app:** write one file in `src/lib/payment-methods/methods/` (a zod schema, form fields and an `instructions()` function that returns a QR payload, a link and/or values to copy), list it in `src/lib/payment-methods/index.ts`, and add its labels to `messages/*.json` under `PaymentMethods`.
+
+## Offline (this fork)
+
+- Works in any browser tab that has opened the group online once; it is smoothest as an installed app (PWA).
+- Offline, **Create expense** still opens and **Save** queues the expense on the device (IndexedDB). Queued expenses show at the top of the list as **Waiting to sync**.
+- They are sent when the connection returns, when you come back to the tab, or when the app opens. The expense id is fixed on the device, so a retry never creates a duplicate.
+- PIN-protected groups keep queued expenses until you unlock them (**Unlock to sync**). Editing or deleting offline, and attaching photos offline, are not supported.
+
+## Test database
+
+A Turso copy of live data for clicking through changes and running new migrations before they touch production.
+
+```bash
+npm run testdb -- create    # copy live into spli7-test, write .env.testdb.local
+npm run testdb -- migrate   # apply migrations/ to the copy
+npm run dev:testdb          # next dev against the copy
+npm run testdb -- refresh   # fresh copy of live data
+npm run testdb -- delete
+```
+
+Needs `TURSO_PLATFORM_TOKEN` (Turso dashboard → Settings → API tokens) and `TURSO_ORG` in `.env.local`. The copy holds real people's data: keep it private and delete it when done.
 
 ## Extra UX (this fork)
 
@@ -87,6 +134,10 @@ Ideas below track community demand from [Spliit Cloud’s roadmap](https://githu
 
 | Feature                                      | Notes                                                                                                                                                    | Prior art                                                                                                                                                             |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pay buttons**                              | SEPA EPC QR, MobilePay, Swish, Bizum, Venmo, PayPal.me, Revolut.me on suggested reimbursements; one file per method.                                     | This fork; written to be ported upstream                                                                                                                              |
+| **Receipt photos (private)**                 | Client-side resize, private Vercel Blob, served through a PIN-checked route; cleaned up with the expense or group.                                       | Upstream document uploads (S3), reimplemented without public URLs                                                                                                     |
+| **Offline add**                              | IndexedDB queue + persisted group data; idempotent sync by client-minted expense id.                                                                     | Spliit Cloud roadmap (offline support)                                                                                                                                |
+| **Daily backups**                            | Gzipped full dump to private Blob, 30 daily + 12 monthly.                                                                                                | This fork                                                                                                                                                             |
 | **Copy expense**                             | From the expense list or edit header icon (opens create prefilled).                                                                                      | Upstream [#527](https://github.com/spliit-app/spliit/issues/527); shipped in Spliit Cloud                                                                             |
 | **Amount math**                              | Expressions in the amount field (`10+5.50`, `5*8`, …) on blur/save.                                                                                      | Upstream [#184](https://github.com/spliit-app/spliit/pull/184); shipped in Spliit Cloud                                                                               |
 | **Default split mode**                       | Stored on the group (device localStorage can still override).                                                                                            | Upstream [#366](https://github.com/spliit-app/spliit/pull/366); shipped in Spliit Cloud                                                                               |
@@ -173,15 +224,15 @@ Upstream Spliit optional features that depended on **AWS S3** and **OpenAI** are
 
 | Feature                          | Upstream dependency               | Status here                                                                                      |
 | -------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Expense document / image uploads | S3 (or compatible object storage) | **Removed** from the critical path; UI/API stubs keep flags off. SQLite is not used for binaries. |
+| Expense document / image uploads | S3 (or compatible object storage) | **Back** as receipt photos on a private Vercel Blob store (see Features). |
 | Create expense from receipt scan | OpenAI + storage                  | **Disabled**; no OpenAI client or API keys.                                                      |
 | Category extract from text/image | OpenAI                            | **Disabled**; same as above.                                                                     |
 
 What changed vs upstream:
 
 - Prisma and Postgres were replaced with **Turso** (same SQLite schema as the later D1 tables).
-- S3/OpenAI packages and env vars were dropped; keep `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS`, `NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT`, and `NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT` unset or `false` (see `.env.example`).
-- Re-enabling uploads later would mean object storage. Receipt/category AI would need an explicit product decision.
+- S3/OpenAI packages and env vars were dropped. Keep `NEXT_PUBLIC_ENABLE_RECEIPT_EXTRACT` and `NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT` unset or `false` (the app refuses to start otherwise).
+- Receipt photos need `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS=true` **and** `BLOB_READ_WRITE_TOKEN` (a private Vercel Blob store, e.g. `npx vercel blob create-store spli7-private --access private`). Receipt/category AI would need an explicit product decision.
 
 ## Run locally
 
@@ -216,9 +267,10 @@ npx vercel --prod --yes --name spli7
 
 Set these on the Vercel project:
 
-- `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`
+- `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` (Preview should point at the test DB, not live)
 - `PIN_SECRET` / `CRON_SECRET`
 - `NEXT_PUBLIC_BASE_URL=https://spli7.vercel.app`
+- `BLOB_READ_WRITE_TOKEN` (added by `vercel blob create-store`) and `NEXT_PUBLIC_ENABLE_EXPENSE_DOCUMENTS=true` for receipt photos and daily backups
 
 Turso migrations are **not** applied by `vercel --prod` — run `npm run db:migrate:remote` when `migrations/` changes.
 
@@ -226,7 +278,8 @@ Turso migrations are **not** applied by `vercel --prod` — run `npm run db:migr
 
 - Pushing code to GitHub does **not** update the live site until you deploy to Vercel (or link Git).
 - Prefer `git` / GitHub CLI over the GitHub web “upload files” UI — uploads often drop directories.
-- Vercel Cron in `vercel.json` calls `/api/cron/cleanup-groups` and `/api/cron/recurring` daily when `CRON_SECRET` is set.
+- Vercel Cron in `vercel.json` calls `/api/cron/backup`, `/api/cron/recurring` and `/api/cron/cleanup-groups` daily when `CRON_SECRET` is set.
+- New migrations: `npm run testdb -- migrate` first, then `npm run db:migrate:remote` **before** deploying code that writes new columns.
 
 ## Health check
 

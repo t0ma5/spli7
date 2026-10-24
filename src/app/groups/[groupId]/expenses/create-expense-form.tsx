@@ -1,6 +1,12 @@
 'use client'
+import { markSavedOffline } from '@/components/offline-sync'
 import { useToast } from '@/components/ui/use-toast'
 import { RuntimeFeatureFlags } from '@/lib/featureFlags'
+import {
+  enqueueExpense,
+  isNetworkError,
+  isOfflineQueueSupported,
+} from '@/lib/offline-queue'
 import { randomId } from '@/lib/randomId'
 import { trpc } from '@/trpc/client'
 import { useTranslations } from 'next-intl'
@@ -54,6 +60,35 @@ export function CreateExpenseForm({
       duplicateFrom={fromExpenseData?.expense ?? undefined}
       expenseId={expenseId}
       onSubmit={async (expenseFormValues, participantId) => {
+        // Offline: keep the expense in IndexedDB under this id; OfflineSync
+        // sends it later, and a duplicate id there means it already landed.
+        const queueOffline = async () => {
+          try {
+            await enqueueExpense({
+              groupId,
+              expenseId,
+              expenseFormValues,
+              participantId,
+            })
+          } catch {
+            return false
+          }
+          // The client router waits for the network before navigating, so
+          // this is a full load from the service worker's cache; the toast
+          // is shown after it.
+          markSavedOffline()
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- router.push stalls offline
+          window.location.assign(`/groups/${groupId}/expenses`)
+          return true
+        }
+
+        if (
+          isOfflineQueueSupported() &&
+          !navigator.onLine &&
+          (await queueOffline())
+        )
+          return
+
         try {
           await createExpenseMutateAsync({
             groupId,
@@ -61,7 +96,13 @@ export function CreateExpenseForm({
             participantId,
             expenseId,
           })
-        } catch {
+        } catch (error) {
+          if (
+            isOfflineQueueSupported() &&
+            isNetworkError(error) &&
+            (await queueOffline())
+          )
+            return
           // The server may have saved the expense and only the response was
           // lost. Reusing this id would upsert over that row.
           setExpenseId(randomId())

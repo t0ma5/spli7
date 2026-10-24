@@ -20,7 +20,9 @@ function snapshotParticipants(participants: Participant[]): string {
   return participants
     .map(
       (participant, index) =>
-        `${participant.id}\0${participant.name}\0${index}`,
+        `${participant.id}\0${participant.name}\0${index}\0${JSON.stringify(
+          participant.paymentMethods ?? [],
+        )}`,
     )
     .join('\n')
 }

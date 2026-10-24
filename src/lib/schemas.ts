@@ -1,5 +1,9 @@
 import { evaluateAmountExpression } from '@/lib/amount-expression'
 import type { SplitMode } from '@/lib/kv/types'
+import {
+  parsePaymentMethods,
+  paymentMethodsSchema,
+} from '@/lib/payment-methods'
 import Decimal from 'decimal.js'
 
 import * as z from 'zod'
@@ -27,6 +31,7 @@ export const groupFormSchema = z
         z.object({
           id: z.string().max(30).optional(),
           name: z.string().min(2, 'min2').max(50, 'max50'),
+          paymentMethods: paymentMethodsSchema.optional(),
         }),
       )
       .min(1)
@@ -213,7 +218,13 @@ export const expenseFormSchema = z
       .array(
         z.object({
           id: z.string().max(30),
-          url: z.string().url().max(2000),
+          url: z
+            .string()
+            .max(200)
+            .regex(
+              /^\/api\/groups\/[A-Za-z0-9_-]{1,64}\/documents\/[A-Za-z0-9_-]{21}$/,
+              'invalidDocument',
+            ),
           width: z.number().int().min(1),
           height: z.number().int().min(1),
         }),
@@ -361,6 +372,12 @@ export const groupImportSchema = z
         z.object({
           id: z.string().min(1),
           name: z.string().min(1).max(50),
+          // Lenient: an export from another version may hold methods this
+          // one does not know; those are dropped, not fatal.
+          paymentMethods: z
+            .unknown()
+            .optional()
+            .transform((value) => parsePaymentMethods(value ?? [])),
         }),
       )
       .min(1)
@@ -408,7 +425,9 @@ export const groupImportSchema = z
             .array(
               z.object({
                 id: z.string().min(1).max(30).optional(),
-                url: z.string().url().max(2000),
+                // Older exports may hold upstream S3 links; the importer only
+                // copies this app's own receipts and drops the rest.
+                url: z.string().max(2000),
                 width: z.number().int().min(1),
                 height: z.number().int().min(1),
               }),

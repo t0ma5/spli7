@@ -2,6 +2,7 @@
 
 import { GroupDeletedScreen } from '@/app/groups/[groupId]/group-deleted-screen'
 import { GroupPinGate } from '@/app/groups/[groupId]/group-pin-gate'
+import { OfflineSync } from '@/components/offline-sync'
 import { useToast } from '@/components/ui/use-toast'
 import { trpc } from '@/trpc/client'
 import { useTranslations } from 'next-intl'
@@ -62,6 +63,7 @@ export function GroupLayoutClient({
 
   return (
     <CurrentGroupProvider {...props}>
+      <OfflineSync groupId={groupId} locked={locked} />
       <GroupPinGate groupId={groupId} hasPin={hasPin} locked={locked}>
         <GroupHeader />
         {children}
