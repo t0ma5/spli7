@@ -1,3 +1,4 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import {
   EXPENSE_NOTES_MAX,
   GROUP_INFORMATION_MAX,
@@ -236,5 +237,57 @@ describe('expenseFormSchema, date', () => {
     if (!result.success) {
       expect(result.error.issues[0].message).toBe('invalidDate')
     }
+  })
+})
+
+describe('expenseFormSchema, messages the form shows', () => {
+  // The resolver turns a union that fails every option into the message of
+  // one option; that must be the translatable key, not zod's English text.
+  async function formErrors(overrides: Record<string, unknown>) {
+    const { errors } = await zodResolver(expenseFormSchema)(
+      expenseForm(overrides) as never,
+      undefined,
+      { fields: {}, shouldUseNativeValidation: false },
+    )
+    return errors as Record<string, any>
+  }
+
+  it('reports an empty or unreadable payer amount as invalidNumber', async () => {
+    for (const amount of ['', 'abc']) {
+      const errors = await formErrors({
+        paidBy: [{ participant: 'ada', amount }],
+      })
+      expect(errors.paidBy?.[0]?.amount?.message).toBe('invalidNumber')
+    }
+  })
+
+  it('reports a missing payer amount as amountRequired', async () => {
+    const errors = await formErrors({ paidBy: [{ participant: 'ada' }] })
+    expect(errors.paidBy?.[0]?.amount?.message).toBe('amountRequired')
+  })
+
+  it('reports unreadable original amount, rate and shares as invalidNumber', async () => {
+    const errors = await formErrors({
+      originalAmount: 'abc',
+      conversionRate: 'abc',
+      paidFor: [{ participant: 'ada', shares: 'abc' }],
+    })
+    expect(errors.originalAmount?.message).toBe('invalidNumber')
+    expect(errors.conversionRate?.message).toBe('invalidNumber')
+    expect(errors.paidFor?.[0]?.shares?.message).toBe('invalidNumber')
+  })
+
+  it('reports a missing title and payer with their keys', async () => {
+    const errors = await formErrors({
+      title: undefined,
+      paidBy: [{ amount: 1000 }],
+    })
+    expect(errors.title?.message).toBe('titleRequired')
+    expect(errors.paidBy?.[0]?.participant?.message).toBe('paidByRequired')
+  })
+
+  it('accepts an emptied original amount and rate', async () => {
+    const errors = await formErrors({ originalAmount: '', conversionRate: '' })
+    expect(errors).toEqual({})
   })
 })

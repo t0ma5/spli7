@@ -1,4 +1,4 @@
-import { ZodIssueCode, z } from 'zod'
+import { z } from 'zod'
 
 const interpretEnvVarAsBool = (val: unknown): boolean => {
   if (typeof val !== 'string') return false
@@ -31,7 +31,7 @@ const envSchema = z
       env.NEXT_PUBLIC_ENABLE_CATEGORY_EXTRACT
     ) {
       ctx.addIssue({
-        code: ZodIssueCode.custom,
+        code: 'custom',
         message:
           'Receipt/category extract features are not supported on this deploy yet. Keep those flags unset/false.',
       })

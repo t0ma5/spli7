@@ -44,7 +44,7 @@ export type PaymentMethodType = PaymentMethod['type']
 
 /** A definition seen through the union of all methods' details. */
 export type AnyPaymentMethodDefinition = PaymentMethodDefinition<
-  z.AnyZodObject,
+  z.ZodObject,
   PaymentMethod
 >
 

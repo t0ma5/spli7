@@ -58,37 +58,44 @@ export const groupFormSchema = z
     }
   })
 
-export type GroupFormValues = z.infer<typeof groupFormSchema>
+export type GroupFormValues = z.output<typeof groupFormSchema>
+export type GroupFormInput = z.input<typeof groupFormSchema>
 
-const inputCoercedToNumber = z.union([
-  z.number(),
-  z.string().transform((value, ctx) => {
-    const valueAsNumber = Number(value)
-    if (Number.isNaN(valueAsNumber))
+/**
+ * A number, or the text a form input holds. Text is parsed after the union:
+ * when every option of a zod 4 union fails, the form resolver shows the first
+ * option's English message instead of the translated key.
+ */
+function numberOrText(requiredError?: string) {
+  const error = (issue: { input?: unknown }) =>
+    issue.input === undefined ? requiredError : undefined
+  return z.union([z.number({ error }), z.string({ error })])
+}
+
+function parsedNumber(
+  parse: (value: string) => number | null,
+  requiredError?: string,
+) {
+  return numberOrText(requiredError).transform((value, ctx) => {
+    if (typeof value === 'number') return value
+    const valueAsNumber = parse(value)
+    if (valueAsNumber === null || Number.isNaN(valueAsNumber)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'invalidNumber',
       })
+      return z.NEVER
+    }
     return valueAsNumber
-  }),
-])
+  })
+}
 
-const paidByAmountSchema = z
-  .union(
-    [
-      z.number(),
-      z.string().transform((value, ctx) => {
-        const valueAsNumber = evaluateAmountExpression(value)
-        if (valueAsNumber === null)
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'invalidNumber',
-          })
-        return valueAsNumber ?? Number.NaN
-      }),
-    ],
-    { required_error: 'amountRequired' },
-  )
+const inputCoercedToNumber = parsedNumber(Number)
+
+const paidByAmountSchema = parsedNumber(
+  evaluateAmountExpression,
+  'amountRequired',
+)
   .refine((amount) => amount != 0, 'amountNotZero')
   .refine((amount) => amount <= 10_000_000_00, 'amountTenMillion')
 
@@ -100,7 +107,7 @@ function rejectDuplicateParticipants(
   rows.forEach(({ participant }, index) => {
     if (seen.has(participant)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'duplicateParticipant',
         path: [index, 'participant'],
       })
@@ -115,10 +122,8 @@ export const expenseFormSchema = z
       .date({
         // A cleared date field coerces to Invalid Date; zod's own text is
         // English only.
-        errorMap: (issue, ctx) => ({
-          message:
-            issue.code === 'invalid_date' ? 'invalidDate' : ctx.defaultError,
-        }),
+        error: (issue) =>
+          issue.code === 'invalid_type' ? 'invalidDate' : undefined,
       })
       .refine((date) => {
         const max = new Date()
@@ -131,44 +136,41 @@ export const expenseFormSchema = z
         return date >= min
       }, 'expenseDateTooOld'),
     title: z
-      .string({ required_error: 'titleRequired' })
+      .string({
+        error: (issue) =>
+          issue.input === undefined ? 'titleRequired' : undefined,
+      })
       .min(2, 'min2')
       .max(200, 'max200'),
     category: z.coerce.number().int().min(0).max(1000).default(0),
     /** Synced from sum of paidBy in the form; overwritten by transform. */
-    amount: z
-      .union([
-        z.number(),
-        z.string().transform((value, ctx) => {
-          const valueAsNumber = evaluateAmountExpression(value)
-          if (valueAsNumber === null)
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: 'invalidNumber',
-            })
-          return valueAsNumber ?? Number.NaN
-        }),
-      ])
-      .optional(),
+    amount: parsedNumber(evaluateAmountExpression).optional(),
     originalAmount: z
       .union([
-        z.literal('').transform(() => undefined),
+        // Number first: on text that is no number both options fail with one
+        // issue each, and the resolver then shows the first one.
         inputCoercedToNumber
           .refine((amount) => amount != 0, 'amountNotZero')
           .refine((amount) => amount <= 10_000_000_00, 'amountTenMillion'),
+        z.literal('').transform(() => undefined),
       ])
       .optional(),
     originalCurrency: z.union([z.string().length(3).nullish(), z.literal('')]),
     conversionRate: z
       .union([
-        z.literal('').transform(() => undefined),
         inputCoercedToNumber.refine((amount) => amount > 0, 'ratePositive'),
+        z.literal('').transform(() => undefined),
       ])
       .optional(),
     paidBy: z
       .array(
         z.object({
-          participant: z.string({ required_error: 'paidByRequired' }).max(30),
+          participant: z
+            .string({
+              error: (issue) =>
+                issue.input === undefined ? 'paidByRequired' : undefined,
+            })
+            .max(30),
           amount: paidByAmountSchema,
         }),
       )
@@ -180,19 +182,17 @@ export const expenseFormSchema = z
         z.object({
           participant: z.string().max(30),
           originalAmount: z.string().optional(), // For converting shares by amounts in original currency, not saved.
-          shares: z.union([
-            z.number(),
-            z.string().transform((value, ctx) => {
-              const normalizedValue = value.replace(/,/g, '.')
-              const valueAsNumber = Number(normalizedValue)
-              if (Number.isNaN(valueAsNumber))
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  message: 'invalidNumber',
-                })
-              return value
-            }),
-          ]),
+          shares: numberOrText().transform((value, ctx) => {
+            if (
+              typeof value === 'string' &&
+              Number.isNaN(Number(value.replace(/,/g, '.')))
+            )
+              ctx.addIssue({
+                code: 'custom',
+                message: 'invalidNumber',
+              })
+            return value
+          }),
         }),
       )
       .min(1, 'paidForMin1')
@@ -203,7 +203,7 @@ export const expenseFormSchema = z
           const shareNumber = Number(String(shares).replace(/,/g, '.'))
           if (!Number.isFinite(shareNumber) || shareNumber <= 0) {
             ctx.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: 'custom',
               message: 'noZeroShares',
             })
           }
@@ -243,14 +243,14 @@ export const expenseFormSchema = z
     )
     if (totalAmount === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'amountNotZero',
         path: ['paidBy'],
       })
     }
     if (Math.abs(totalAmount) > 10_000_000_00) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'amountTenMillion',
         path: ['paidBy'],
       })
@@ -283,7 +283,7 @@ export const expenseFormSchema = z
           // not survive the form resolver, so the expense form computes those
           // values itself and hands them to the message.
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'amountSum',
             path: ['paidFor'],
           })
@@ -301,7 +301,7 @@ export const expenseFormSchema = z
         )
         if (sum !== 10000) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'percentageSum',
             path: ['paidFor'],
           })
@@ -334,7 +334,10 @@ export const expenseFormSchema = z
     }
   })
 
-export type ExpenseFormValues = z.infer<typeof expenseFormSchema>
+export type ExpenseFormValues = z.output<typeof expenseFormSchema>
+// Raw form input type (before zod transforms/coercions). react-hook-form
+// operates on these values; the resolver produces ExpenseFormValues on submit.
+export type ExpenseFormInput = z.input<typeof expenseFormSchema>
 
 export type SplittingOptions = {
   // Used for saving default splitting options in localStorage
@@ -400,7 +403,7 @@ export const groupImportSchema = z
           originalAmount: z.number().int().nullish(),
           originalCurrency: z.string().nullish(),
           conversionRate: z.number().nullish(),
-          paidBy: z.array(importPaidByEntrySchema).min(1).optional(),
+          paidBy: z.array(importPaidByEntrySchema).min(1).max(100).optional(),
           paidById: z.string().min(1).optional(),
           paidFor: z
             .array(
@@ -409,7 +412,8 @@ export const groupImportSchema = z
                 shares: z.number().int(),
               }),
             )
-            .min(1),
+            .min(1)
+            .max(500),
           isReimbursement: z.boolean(),
           splitMode: z.enum([
             'EVENLY',
@@ -464,7 +468,7 @@ export const groupImportSchema = z
     data.participants.forEach((participant, index) => {
       if (seenIds.has(participant.id)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'duplicateParticipantId',
           path: ['participants', index, 'id'],
         })
@@ -472,7 +476,7 @@ export const groupImportSchema = z
       seenIds.add(participant.id)
       if (seenNames.has(participant.name)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'duplicateParticipantName',
           path: ['participants', index, 'name'],
         })
@@ -490,7 +494,7 @@ export const groupImportSchema = z
       entries.forEach((entry, index) => {
         if (seen.has(entry.participantId)) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message:
               field === 'paidBy' ? 'duplicatePaidBy' : 'duplicatePaidFor',
             path: ['expenses', expenseIndex, field, index, 'participantId'],
@@ -517,7 +521,7 @@ export const groupImportSchema = z
       )
       if (paidByEntries.length > 0 && paidTotal !== expense.amount) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'paidBySum',
           path: ['expenses', expenseIndex, 'paidBy'],
         })
@@ -533,7 +537,7 @@ export const groupImportSchema = z
           expense.paidFor.every(({ shares }) => shares < 0))
       if (!sharesValid) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'noZeroShares',
           path: ['expenses', expenseIndex, 'paidFor'],
         })
@@ -541,7 +545,7 @@ export const groupImportSchema = z
 
       if (paidByEntries.length === 0) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'unknownPaidBy',
           path: ['expenses', expenseIndex, 'paidBy'],
         })
@@ -550,7 +554,7 @@ export const groupImportSchema = z
       paidByEntries.forEach((entry, paidByIndex) => {
         if (!participantIds.has(entry.participantId)) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'unknownPaidBy',
             path: [
               'expenses',
@@ -566,7 +570,7 @@ export const groupImportSchema = z
       expense.paidFor.forEach((paidFor, paidForIndex) => {
         if (!participantIds.has(paidFor.participantId)) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             message: 'unknownPaidFor',
             path: [
               'expenses',

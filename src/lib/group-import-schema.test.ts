@@ -180,4 +180,27 @@ describe('groupImportSchema', () => {
       'expenses.0.paidFor.1.participantId:duplicatePaidFor',
     ])
   })
+
+  it('bounds paidBy and paidFor like the expense form', () => {
+    const result = groupImportSchema.safeParse(
+      exportedGroup([
+        expense({
+          paidBy: Array.from({ length: 101 }, () => ({
+            participantId: 'a',
+            amount: 0,
+          })),
+          paidFor: Array.from({ length: 501 }, () => ({
+            participantId: 'a',
+            shares: 1,
+          })),
+        }),
+      ]),
+    )
+    const tooBig = result.success
+      ? []
+      : result.error.issues
+          .filter((i) => i.code === 'too_big')
+          .map((i) => i.path.join('.'))
+    expect(tooBig).toEqual(['expenses.0.paidBy', 'expenses.0.paidFor'])
+  })
 })

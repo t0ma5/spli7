@@ -50,6 +50,7 @@ import { normalizeNumberInput } from '@/lib/number-input'
 import { randomId } from '@/lib/randomId'
 import {
   EXPENSE_NOTES_MAX,
+  ExpenseFormInput,
   ExpenseFormValues,
   SplittingOptions,
   expenseFormSchema,
@@ -336,7 +337,7 @@ export function ExpenseForm({
     return undefined
   }
 
-  const getSelectedRecurrenceRule = (field?: { value: string }) => {
+  const getSelectedRecurrenceRule = (field?: { value?: string }) => {
     return field?.value as RecurrenceRule
   }
   const groupCurrency = getCurrencyFromGroup(group)
@@ -345,7 +346,7 @@ export function ExpenseForm({
     amountAsMinorUnits(Number(searchParams.get('amount')) || 0, groupCurrency),
   )
   const reimbursementTo = searchParams.get('to')
-  const form = useForm<ExpenseFormValues>({
+  const form = useForm<ExpenseFormInput, any, ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: expense
       ? expenseToFormValues(expense, groupCurrency, group.currencyCode, 'edit')
@@ -535,7 +536,7 @@ export function ExpenseForm({
     'Custom',
   )
   const exchangeRate = useCurrencyRate(
-    form.watch('expenseDate'),
+    form.watch('expenseDate') as Date,
     form.watch('originalCurrency') ?? '',
     groupCurrency.code,
   )
@@ -879,7 +880,7 @@ export function ExpenseForm({
                     <Input
                       className="date-base"
                       type="date"
-                      defaultValue={formatDate(field.value)}
+                      defaultValue={formatDate(field.value as Date)}
                       onChange={(event) => {
                         return field.onChange(new Date(event.target.value))
                       }}
@@ -978,7 +979,9 @@ export function ExpenseForm({
                       </FormDescription>
                     )}
                     <FormDescription>
-                      {isNaN(form.getValues('expenseDate').getTime()) ? (
+                      {isNaN(
+                        (form.getValues('expenseDate') as Date).getTime(),
+                      ) ? (
                         t('conversionRateState.noDate')
                       ) : form.getValues('expenseDate') &&
                         !usingCustomConversionRate ? (
@@ -1061,7 +1064,7 @@ export function ExpenseForm({
                   <CategorySelector
                     categories={categories}
                     defaultValue={
-                      form.watch(field.name) // may be overwritten externally
+                      form.watch(field.name) as number // may be overwritten externally
                     }
                     onValueChange={field.onChange}
                     isLoading={isCategoryLoading}
@@ -1468,15 +1471,17 @@ export function ExpenseForm({
                                                   : form.watch('splitMode') ===
                                                       'BY_AMOUNT'
                                                     ? amountAsMinorUnits(
-                                                        shares,
+                                                        Number(shares),
                                                         groupCurrency,
                                                       )
-                                                    : shares,
+                                                    : Number(shares),
                                               expenseId: '',
                                               participantId: '',
                                             }),
                                           ),
-                                          splitMode: form.watch('splitMode'),
+                                          splitMode: form.watch(
+                                            'splitMode',
+                                          ) as SplitMode,
                                           isReimbursement:
                                             form.watch('isReimbursement'),
                                         }),
@@ -1643,7 +1648,7 @@ export function ExpenseForm({
                                         />
                                       </FormControl>
                                       {['BY_SHARES', 'BY_PERCENTAGE'].includes(
-                                        form.getValues().splitMode,
+                                        form.getValues().splitMode!,
                                       ) && sharesLabel}
                                     </div>
                                     <FormMessage className="float-right" />
@@ -1764,7 +1769,7 @@ export function ExpenseForm({
                 render={({ field }) => (
                   <ExpenseDocumentsInput
                     groupId={group.id}
-                    documents={field.value}
+                    documents={field.value ?? []}
                     updateDocuments={field.onChange}
                   />
                 )}

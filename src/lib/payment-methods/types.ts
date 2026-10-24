@@ -41,7 +41,7 @@ export type PaymentFieldSpec<T> = {
 }
 
 export type PaymentMethodDefinition<
-  S extends z.AnyZodObject = z.AnyZodObject,
+  S extends z.ZodObject = z.ZodObject,
   T = z.infer<S>,
 > = {
   type: T extends { type: infer K } ? K : string
