@@ -8,6 +8,7 @@ import { gzipSync } from 'node:zlib'
  * Every table the app writes, in an order that restores without breaking
  * foreign keys. scripts/backup-db.mjs and scripts/restore-db.mjs use the same
  * list. pin_attempts is left out on purpose: it is short-lived rate limiting.
+ * participant_balances is derived; restore-db.mjs makes groups rebuild it.
  */
 export const BACKUP_TABLES = [
   'groups',

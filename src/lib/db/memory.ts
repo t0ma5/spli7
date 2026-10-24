@@ -1,3 +1,4 @@
+import { sumExpenseBalances } from '@/lib/balance-ledger'
 import { applyGroupChildPatch, diffGroupChildren } from '@/lib/db/group-patch'
 import {
   activityIsAfterCursor,
@@ -207,6 +208,17 @@ export function createMemoryRepository(
           new Date(expense.recurringExpenseLink.nextExpenseDate).getTime() <=
             now,
       )
+    },
+    async getBalances(groupId) {
+      const group = groups.get(groupId)
+      if (!group || group.deletedAt) return []
+      return sumExpenseBalances(group.expenses).sort((a, b) =>
+        a.participantId < b.participantId ? -1 : 1,
+      )
+    },
+    async fillBalances(groupId, expectedVersion) {
+      // Sums are derived on read here, so there is nothing to fill.
+      return (groups.get(groupId)?.version ?? 0) === expectedVersion
     },
     async create(group) {
       if (groups.has(group.id)) throw new Error(`Group exists: ${group.id}`)

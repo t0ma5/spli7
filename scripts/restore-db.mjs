@@ -57,3 +57,7 @@ for (const table of TABLES) {
   }
   console.log(`${table}: ${rows.length}`)
 }
+
+// participant_balances is derived and not in backups. Mark every group
+// unfilled so its first balance read rebuilds the ledger.
+await client.execute('UPDATE groups SET balances_ready = 0')

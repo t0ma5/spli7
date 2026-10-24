@@ -1,3 +1,4 @@
+import type { PaidForOwed, ParticipantBalanceRow } from '@/lib/balance-ledger'
 import type {
   ActivityListCursor,
   ExpenseListCursor,
@@ -88,6 +89,21 @@ export interface GroupRepository {
   ): Promise<Pick<Expense, 'amount' | 'recurrenceRule' | 'isReimbursement'>[]>
   /** Cheap check so list pages do not hydrate the group when nothing is due. */
   hasDueRecurring(groupId: string, nowIso: string): Promise<boolean>
+  /**
+   * Per-participant ledger sums, one row per participant. `[]` for a missing
+   * or deleted group; `null` while the group's ledger is not filled yet.
+   */
+  getBalances(groupId: string): Promise<ParticipantBalanceRow[] | null>
+  /**
+   * Store `owed` on paid-for rows written before the ledger existed and
+   * rebuild the sums. False (nothing written) if the group changed since
+   * `expectedVersion`.
+   */
+  fillBalances(
+    groupId: string,
+    expectedVersion: number,
+    owed: PaidForOwed[],
+  ): Promise<boolean>
   create(group: GroupDocument): Promise<void>
   /**
    * Replace the stored group if `expectedVersion` still matches.

@@ -1,5 +1,11 @@
 import 'server-only'
 
+import {
+  balancesFromRows,
+  expenseOwedAmounts,
+  sumExpenseBalances,
+} from '@/lib/balance-ledger'
+import type { Balances } from '@/lib/balances'
 import { getRepository } from '@/lib/db'
 import { encodeActivityCursor, encodeExpenseCursor } from '@/lib/db/list-cursor'
 import {
@@ -1132,6 +1138,39 @@ export async function getGroupExpenses(
       }),
     }
   })
+}
+
+/**
+ * Balances from the stored ledger: one row per participant, no expense rows.
+ * A group written before the ledger existed is summed in memory once, and its
+ * ledger is filled after the response so later reads take the fast path.
+ */
+export async function getGroupBalances(groupId: string): Promise<Balances> {
+  await materializeDueRecurringExpenses(groupId)
+  const repository = getRepository()
+  const rows = await repository.getBalances(groupId)
+  if (rows) {
+    // [] is also what a deleted group returns; do not bump it.
+    if (rows.length > 0) touchLastSeen(groupId)
+    return balancesFromRows(rows)
+  }
+
+  const group = await repository.getMeta(groupId)
+  if (!group || group.deletedAt) return {}
+  touchLastSeen(groupId)
+  const expenses = await repository.listExpenses(groupId, {
+    documents: false,
+    recurring: false,
+  })
+  const version = group.version ?? 0
+  afterResponse(() =>
+    repository.fillBalances(
+      groupId,
+      version,
+      expenses.flatMap((expense) => expenseOwedAmounts(expense)),
+    ),
+  )
+  return balancesFromRows(sumExpenseBalances(expenses))
 }
 
 export async function getGroupExpenseCount(groupId: string) {

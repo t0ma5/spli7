@@ -1,5 +1,4 @@
-import { getGroup, getGroupExpenses } from '@/lib/api'
-import { getBalances } from '@/lib/balances'
+import { getGroup, getGroupBalances } from '@/lib/api'
 import { isGroupUnlocked } from '@/lib/group-access'
 import { MAX_GROUPS_PER_QUERY } from '@/lib/group-query-limits'
 import { baseProcedure } from '@/trpc/init'
@@ -38,8 +37,8 @@ export const forUserBalancesProcedure = baseProcedure
         )
         if (!participant) return null
 
-        const expenses = await getGroupExpenses(groupId)
-        const amount = getBalances(expenses)[participantId]?.total ?? 0
+        const balances = await getGroupBalances(groupId)
+        const amount = balances[participantId]?.total ?? 0
 
         return {
           groupId,

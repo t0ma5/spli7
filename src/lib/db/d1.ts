@@ -1,3 +1,7 @@
+import {
+  expenseOwedAmounts,
+  type ParticipantBalanceRow,
+} from '@/lib/balance-ledger'
 import { getD1, type SqlDatabase, type SqlStatement } from '@/lib/db/client'
 import { diffGroupChildren } from '@/lib/db/group-patch'
 import type {
@@ -242,13 +246,21 @@ function expenseInserts(
         .bind(expense.id, paidBy.participantId, paidBy.amount),
     )
   }
+  const owed = new Map(
+    expenseOwedAmounts(expense).map((row) => [row.participantId, row.owed]),
+  )
   for (const paidFor of expense.paidFor ?? []) {
     stmts.push(
       db
         .prepare(
-          'INSERT INTO expense_paid_for (expense_id, participant_id, shares) VALUES (?, ?, ?)',
+          'INSERT INTO expense_paid_for (expense_id, participant_id, shares, owed) VALUES (?, ?, ?, ?)',
         )
-        .bind(expense.id, paidFor.participantId, paidFor.shares),
+        .bind(
+          expense.id,
+          paidFor.participantId,
+          paidFor.shares,
+          owed.get(paidFor.participantId) ?? 0,
+        ),
     )
   }
   for (const document of expense.documents) {
@@ -509,6 +521,46 @@ function childDeletes(db: SqlDatabase, groupId: string): SqlStatement[] {
       .bind(groupId),
     db.prepare('DELETE FROM expenses WHERE group_id = ?').bind(groupId),
     db.prepare('DELETE FROM participants WHERE group_id = ?').bind(groupId),
+  ]
+}
+
+/**
+ * Rebuild the group's participant_balances from its paid-by and paid-for
+ * rows. Runs inside every expense write, so reads never see stale sums. The
+ * group counts as ready only when no paid-for row is missing `owed`.
+ */
+function balanceRefresh(db: SqlDatabase, groupId: string): SqlStatement[] {
+  return [
+    db
+      .prepare('DELETE FROM participant_balances WHERE group_id = ?')
+      .bind(groupId),
+    db
+      .prepare(
+        `INSERT INTO participant_balances (group_id, participant_id, paid, owed)
+         SELECT ?, participant_id, SUM(paid), SUM(owed) FROM (
+           SELECT pb.participant_id, pb.amount AS paid, 0 AS owed
+           FROM expense_paid_by pb
+           INNER JOIN expenses e ON e.id = pb.expense_id
+           WHERE e.group_id = ?
+           UNION ALL
+           SELECT pf.participant_id, 0 AS paid, IFNULL(pf.owed, 0) AS owed
+           FROM expense_paid_for pf
+           INNER JOIN expenses e ON e.id = pf.expense_id
+           WHERE e.group_id = ?
+         )
+         GROUP BY participant_id`,
+      )
+      .bind(groupId, groupId, groupId),
+    db
+      .prepare(
+        `UPDATE groups SET balances_ready = NOT EXISTS (
+           SELECT 1 FROM expense_paid_for pf
+           INNER JOIN expenses e ON e.id = pf.expense_id
+           WHERE e.group_id = ? AND pf.owed IS NULL
+         )
+         WHERE id = ?`,
+      )
+      .bind(groupId, groupId),
   ]
 }
 
@@ -1003,6 +1055,62 @@ export const d1Repository: GroupRepository = {
     return Boolean(row)
   },
 
+  async getBalances(groupId) {
+    const db = await getD1()
+    const group = await db
+      .prepare(
+        'SELECT balances_ready FROM groups WHERE id = ? AND deleted_at IS NULL',
+      )
+      .bind(groupId)
+      .first<{ balances_ready: number }>()
+    if (!group) return []
+    if (group.balances_ready !== 1) return null
+    const { results } = await db
+      .prepare(
+        `SELECT participant_id, paid, owed FROM participant_balances
+         WHERE group_id = ? ORDER BY participant_id`,
+      )
+      .bind(groupId)
+      .all<{ participant_id: string; paid: number; owed: number }>()
+    return results.map((row): ParticipantBalanceRow => ({
+      participantId: row.participant_id,
+      paid: Number(row.paid),
+      owed: Number(row.owed),
+    }))
+  },
+
+  async fillBalances(groupId, expectedVersion, owed) {
+    const db = await getD1()
+    try {
+      await db.transaction(async (tx) => {
+        // Bumping nothing: the version check only proves the rows the
+        // amounts were computed from are still the stored ones.
+        const current = await tx
+          .prepare('SELECT version FROM groups WHERE id = ?')
+          .bind(groupId)
+          .first<{ version: number }>()
+        if (!current || Number(current.version) !== expectedVersion) {
+          throw new VersionConflict()
+        }
+        await runChunks(
+          tx,
+          owed.map((row) =>
+            tx
+              .prepare(
+                'UPDATE expense_paid_for SET owed = ? WHERE expense_id = ? AND participant_id = ?',
+              )
+              .bind(row.owed, row.expenseId, row.participantId),
+          ),
+        )
+        await tx.batch(balanceRefresh(tx, groupId))
+      })
+    } catch (error) {
+      if (error instanceof VersionConflict) return false
+      throw error
+    }
+    return true
+  },
+
   async create(group) {
     const db = await getD1()
     const version = group.version ?? 0
@@ -1030,9 +1138,10 @@ export const d1Repository: GroupRepository = {
         group.deletedAt ?? null,
       )
     const children = childInserts(db, group)
+    const refresh = balanceRefresh(db, group.id)
     // One batch is one transaction.
     if (children.length < CREATE_BATCH_SIZE) {
-      await db.batch([insertGroup, ...children])
+      await db.batch([insertGroup, ...children, ...refresh])
       return
     }
     // A large import does not fit one batch, and holding a write transaction
@@ -1048,6 +1157,7 @@ export const d1Repository: GroupRepository = {
     try {
       await db.batch([insertGroup, pending])
       await runChunks(db, children)
+      await db.batch(refresh)
       await publish.run()
     } catch (error) {
       await db.prepare('DELETE FROM groups WHERE id = ?').bind(group.id).run()
@@ -1077,6 +1187,7 @@ export const d1Repository: GroupRepository = {
           await tx.batch(childDeletes(tx, group.id))
           await runChunks(tx, childInserts(tx, group))
         }
+        await tx.batch(balanceRefresh(tx, group.id))
       })
     } catch (error) {
       if (error instanceof VersionConflict) return 'conflict'
@@ -1102,6 +1213,7 @@ export const d1Repository: GroupRepository = {
           .run()
         if ((claimed.meta.changes ?? 0) !== 1) throw new VersionConflict()
         await runChunks(tx, expenseMutationStatements(tx, groupId, mutation))
+        await tx.batch(balanceRefresh(tx, groupId))
       })
     } catch (error) {
       if (error instanceof VersionConflict) return 'conflict'
