@@ -109,6 +109,10 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "@swc/helpers": "0.5.23"
+    "@swc/helpers": "0.5.23",
+    "@vercel/cli-config": {
+      "zod": "^4.6.6"
+    },
+    "postcss-selector-parser": "^7.1.6"
   }
 }
